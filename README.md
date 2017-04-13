@@ -38,22 +38,43 @@ def recallProbability(alpha, beta, t, tnow, percentile=0.5):
   # [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`
   # [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
 
+  dt = tnow / t
+
   # See [peak]. This is the mode but can be nonsense for PDFs that blow up
   tentativePeak = ((alpha - dt) / (alpha + beta - dt - 1)) ** dt
   if tentativePeak.imag == 0 and tentativePeak > 0. and tentativePeak < 1.:
     return tentativePeak
 
   from scipy.optimize import brentq
+  from scipy.special import beta as fbeta
 
   # See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.
   # N.B. I prefer to try to find the mode (above) because it will be much faster than this.
   cdfPercentile = lambda p: (p**(alpha/dt) *
                              hyp2f1(alpha, 1 - beta, 1 + alpha, p**(1/dt)) /
                              alpha /
-                             beta(alpha,beta)) - percentile
+                             fbeta(alpha,beta)) - percentile
   return brentq(cdfPercentile, 0, 1)
 
+def recallProbabilityMedian(alpha, beta, t, tnow, percentile=0.5):
+  from scipy.optimize import brentq
+  from scipy.special import beta as fbeta
+  dt = tnow / t
 
+  # See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.
+  # N.B. I prefer to try to find the mode (above) because it will be much faster than this.
+  cdfPercentile = lambda p: (p**(alpha/dt) *
+                             hyp2f1(alpha, 1 - beta, 1 + alpha, p**(1/dt)) /
+                             alpha /
+                             fbeta(alpha,beta)) - percentile
+  return brentq(cdfPercentile, 0, 1)
+
+# Looks like the median-finding `brentq` approach is faster than the mode approach, and it works all the time. Consider switching to median-only.
+%timeit(lambda : recallProbability(betaa,betab,t0, 1*t0))
+%timeit(lambda : recallProbabilityMedian(betaa,betab,t0, 1*t0))
+
+%timeit(lambda : recallProbability(betaa,betab,t0, 10*t0))
+%timeit(lambda : recallProbabilityMedian(betaa,betab,t0, 10*t0))
 
 # So we have several ways of evaluating the posterior mean/var:
 # - Monte Carlo

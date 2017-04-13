@@ -68,13 +68,20 @@ def recallProbabilityMedian(alpha, beta, t, tnow, percentile=0.5):
                              alpha /
                              fbeta(alpha,beta)) - percentile
   return brentq(cdfPercentile, 0, 1)
+#
+def recallProbabilityMean(alpha, beta, t, tnow):
+  from scipy.special import beta as fbeta
+  dt = tnow / t
+  return fbeta(alpha + dt, beta) / fbeta(alpha, beta)
 
-# Looks like the median-finding `brentq` approach is faster than the mode approach, and it works all the time. Consider switching to median-only.
-%timeit(lambda : recallProbability(betaa,betab,t0, 1*t0))
-%timeit(lambda : recallProbabilityMedian(betaa,betab,t0, 1*t0))
+def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=10000):
+  import scipy.stats as stats
+  tPrior = stats.beta.rvs(alpha, beta, size=N)
+  tnowPrior = tPrior ** (tnow / t)
+  freqs, bins = np.histogram(tnowPrior,'auto')
+  bincenters = bins[:-1] + np.diff(bins) / 2
+  return dict(mean=np.mean(tnowPrior), median=np.median(tnowPrior), mode=bincenters[freqs.argmax()])
 
-%timeit(lambda : recallProbability(betaa,betab,t0, 10*t0))
-%timeit(lambda : recallProbabilityMedian(betaa,betab,t0, 10*t0))
 
 # So we have several ways of evaluating the posterior mean/var:
 # - Monte Carlo
@@ -106,7 +113,6 @@ def posteriorAnalytic(alpha, beta, t, result, tnow):
               - mu * (2 + mu) * fbeta(alpha+dt, beta)
               + (1 + 2 * mu) * fbeta(alpha+2*dt, beta)
               - fbeta(alpha+3*dt, beta)) / marginal
-  print(mu, var, marginal)
 
   newAlpha, newBeta = meanVarToBeta(mu, var)
   return newAlpha, newBeta, tnow
@@ -141,7 +147,6 @@ def posteriorQuad(alpha, beta, t, result, tnow, analyticMarginal=True, maxiter=1
   varInt = lambda p: marginalInt(p) * (p - mu)**2
   varEst = quadrature(varInt, 0, 1, maxiter=maxiter)
   var = varEst[0] / marginal
-  print(mu, var, marginal)
 
   newAlpha, newBeta = meanVarToBeta(mu, var)
   return newAlpha, newBeta, tnow
@@ -175,7 +180,6 @@ def posteriorMonteCarlo(alpha, beta, t, result, tnow, N=10000):
   weightedMean = np.sum(weights * tnowPrior) / np.sum(weights)
   # See [weightedVar]
   weightedVar = np.sum(weights * (tnowPrior - weightedMean)**2) / np.sum(weights)
-  print(weightedMean, weightedVar)
 
   newAlpha, newBeta = meanVarToBeta(weightedMean, weightedVar)
 
@@ -184,16 +188,47 @@ def posteriorMonteCarlo(alpha, beta, t, result, tnow, N=10000):
 ```
 
 ```py
-betaa = 4.
-betab = 4.
+import scipy.stats as stats
+import matplotlib.pyplot as plt
+
+betaa = 4./3
+betab = 4./3
+
+betaa = 12.
+betab = 12.
+
 t0 = 7.
 dt = 3.3
-[posteriorMonteCarlo(betaa, betab, t0, 1., t0 * dt, N=100000), posteriorQuad(betaa, betab, t0, 1., t0 * dt, analyticMarginal=True), posteriorQuad(betaa, betab, t0, 1., t0 * dt, analyticMarginal=False), posteriorAnalytic(betaa, betab, t0, 1., t0 * dt)]
-[posteriorMonteCarlo(betaa, betab, t0, 0., t0 * dt, N=100000), posteriorQuad(betaa, betab, t0, 0., t0 * dt, analyticMarginal=True), posteriorQuad(betaa, betab, t0, 0., t0 * dt, analyticMarginal=False), posteriorAnalytic(betaa, betab, t0, 0., t0 * dt)]
+# dt=.01
+
+print([posteriorMonteCarlo(betaa, betab, t0, 1., t0 * dt, N=100000), posteriorQuad(betaa, betab, t0, 1., t0 * dt, analyticMarginal=True), posteriorQuad(betaa, betab, t0, 1., t0 * dt, analyticMarginal=False), posteriorAnalytic(betaa, betab, t0, 1., t0 * dt)])
+
+print([posteriorMonteCarlo(betaa, betab, t0, 0., t0 * dt, N=100000), posteriorQuad(betaa, betab, t0, 0., t0 * dt, analyticMarginal=True), posteriorQuad(betaa, betab, t0, 0., t0 * dt, analyticMarginal=False), posteriorAnalytic(betaa, betab, t0, 0., t0 * dt)])
+
+print('gamma pass', priorToHalflife(*posteriorAnalytic(betaa, betab, t0, 1., t0 * dt)))
+print('gamma fail', priorToHalflife(*posteriorAnalytic(betaa, betab, t0, 0., t0 * dt)))
 
 def priorToHalflife(a, b, t, N=10000):
   p = stats.beta.rvs(a, b, size=N)
   return pis2gammaest(p, t)
+def pis2gammaest(pis, t):
+  h2s = -t / np.log2(pis)
+  alpha2, _, beta2inv = stats.gamma.fit(h2s, floc=0)
+  beta2 = 1 / beta2inv
+
+  uh2, vh2 = (alpha2/beta2, alpha2 / beta2**2)
+  return (uh2, np.sqrt(vh2))
+
+pis = stats.beta.rvs(betaa, betab, size=50000)**dt
+
+plt.close('all')
+plt.figure()
+plt.hist(pis,50,normed=True)
+plt.show()
+
+[recallProbabilityMean(betaa,betab,t0, dt*t0), recallProbabilityMedian(betaa,betab,t0, dt*t0), recallProbability(betaa,betab,t0, dt*t0), recallProbabilityMonteCarlo(betaa,betab,t0, dt*t0)]
+# All 2.5 methods above (mode doesn't make sense for PDFs going to infinity) are about equally fast. Which to use?
+
 ```
 
 ### Details (😱😪)

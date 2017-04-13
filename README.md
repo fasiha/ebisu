@@ -29,22 +29,20 @@ This is, as far as I can tell, correct implementations of the above, using Bayes
 
 ```py
 import numpy as np
-import scipy.stats as stats
+
+from scipy.special import hyp2f1, beta
 
 
 def recallProbability(alpha, beta, t, tnow, percentile=0.5):
   """Returns the mode (or median) of the immediate (pseudo-Beta) prior"""
-  # [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p^((a-t)/t) * (1-p^(1/t))^(b-1), p] == 0, p]`
-  # [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p^((a-t)/t) * (1-p^(1/t))^(b-1) / t / Beta[a,b], p]`
-
-  dt = tnow / t
+  # [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`
+  # [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
 
   # See [peak]. This is the mode but can be nonsense for PDFs that blow up
   tentativePeak = ((alpha - dt) / (alpha + beta - dt - 1)) ** dt
   if tentativePeak.imag == 0 and tentativePeak > 0. and tentativePeak < 1.:
     return tentativePeak
 
-  from scipy.special import hyp2f1, beta
   from scipy.optimize import brentq
 
   # See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.
@@ -56,12 +54,93 @@ def recallProbability(alpha, beta, t, tnow, percentile=0.5):
   return brentq(cdfPercentile, 0, 1)
 
 
-def posterior(alpha, beta, t, result, tnow, N=10000):
+
+# So we have several ways of evaluating the posterior mean/var:
+# - Monte Carlo
+# - Quadrature integration
+# - Analytic expression, with several hyp2f1
+# - Simplified analytic expression with fewer hyp2f1 (recurrence relations)
+
+def posteriorAnalytic(alpha, beta, t, result, tnow):
+  from scipy.special import beta as fbeta
+
+  dt = tnow / t
+  if result == 1:
+    # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
+    marginal = dt * fbeta(alpha+dt, beta)
+    # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`
+    mu = dt * fbeta(alpha + 2*dt, beta) / marginal
+    # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
+    var = dt * (mu**2 * fbeta(alpha + dt, beta)
+              - 2 * mu * fbeta(alpha+ 2*dt, beta)
+              + fbeta(alpha+ 3*dt, beta)) / marginal
+  else:
+    # Mathematica code is same as above, but replace one `p` with `(1-p)`
+    # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
+    marginal = dt * (fbeta(alpha, beta) - fbeta(alpha+dt, beta))
+    # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
+    mu = dt * (fbeta(alpha + dt, beta) - fbeta(alpha + 2*dt, beta)) / marginal
+    # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
+    var = dt * (mu**2 * fbeta(alpha, beta)
+              - mu * (2 + mu) * fbeta(alpha+dt, beta)
+              + (1 + 2 * mu) * fbeta(alpha+2*dt, beta)
+              - fbeta(alpha+3*dt, beta)) / marginal
+  print(mu, var, marginal)
+
+  newAlpha, newBeta = meanVarToBeta(mu, var)
+  return newAlpha, newBeta, tnow
+
+
+def posteriorQuad(alpha, beta, t, result, tnow, analyticMarginal=True, maxiter=100):
+  """Update a time-dependent Beta distribution with a new data sample"""
+  from scipy.integrate import quadrature
+
+  dt = tnow / t
+
+  if result == 1:
+    marginalInt = lambda p: p**((alpha-dt)/dt) * (1-p**(1/dt))**(beta-1)*p
+  else:
+    # difference from above: -------------------------------------------^vvvv
+    marginalInt = lambda p: p**((alpha-dt)/dt) * (1-p**(1/dt))**(beta-1)*(1-p)
+
+  if analyticMarginal:
+    from scipy.special import beta as fbeta
+    if result == 1:
+      marginal = dt * fbeta(alpha+dt, beta)
+    else:
+      marginal = dt * (fbeta(alpha, beta) - fbeta(alpha+dt, beta))
+  else:
+    marginalEst = quadrature(marginalInt, 0, 1, maxiter=maxiter)
+    marginal = marginalEst[0]
+
+  muInt = lambda p: marginalInt(p) * p
+  muEst = quadrature(muInt, 0, 1, maxiter=maxiter)
+  mu = muEst[0] / marginal
+
+  varInt = lambda p: marginalInt(p) * (p - mu)**2
+  varEst = quadrature(varInt, 0, 1, maxiter=maxiter)
+  var = varEst[0] / marginal
+  print(mu, var, marginal)
+
+  newAlpha, newBeta = meanVarToBeta(mu, var)
+  return newAlpha, newBeta, tnow
+
+
+def meanVarToBeta(mean, var):
+  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
+
+  tmp = mean * (1 - mean) / var - 1
+  alpha = mean * tmp
+  beta = (1 - mean) * tmp
+  return alpha, beta
+
+
+def posteriorMonteCarlo(alpha, beta, t, result, tnow, N=10000):
   """Update a time-dependent Beta distribution with a new data sample"""
   # [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&oldid=769806318#Properties_of_the_Bernoulli_Distribution, third (last) equation
   # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
   # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
-  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
+  import scipy.stats as stats
 
   tPrior = stats.beta.rvs(alpha, beta, size=N)
 
@@ -75,20 +154,21 @@ def posterior(alpha, beta, t, result, tnow, N=10000):
   weightedMean = np.sum(weights * tnowPrior) / np.sum(weights)
   # See [weightedVar]
   weightedVar = np.sum(weights * (tnowPrior - weightedMean)**2) / np.sum(weights)
+  print(weightedMean, weightedVar)
 
-  # See [betaFit]
-  tmp = weightedMean * (1 - weightedMean) / weightedVar - 1
-  newAlpha = weightedMean * tmp
-  newBeta = (1 - weightedMean) * tmp
+  newAlpha, newBeta = meanVarToBeta(weightedMean, weightedVar)
 
   return newAlpha, newBeta, tnow
 
 ```
 
 ```py
-priorToHalflife(betaa, betab, t0)
-priorToHalflife(*posterior(betaa, betab, t0, 1., 700.0))
-posterior(betaa, betab, t0, 1., 3.)
+betaa = 4.
+betab = 4.
+t0 = 7.
+dt = 3.3
+[posteriorMonteCarlo(betaa, betab, t0, 1., t0 * dt, N=100000), posteriorQuad(betaa, betab, t0, 1., t0 * dt, analyticMarginal=True), posteriorQuad(betaa, betab, t0, 1., t0 * dt, analyticMarginal=False), posteriorAnalytic(betaa, betab, t0, 1., t0 * dt)]
+[posteriorMonteCarlo(betaa, betab, t0, 0., t0 * dt, N=100000), posteriorQuad(betaa, betab, t0, 0., t0 * dt, analyticMarginal=True), posteriorQuad(betaa, betab, t0, 0., t0 * dt, analyticMarginal=False), posteriorAnalytic(betaa, betab, t0, 0., t0 * dt)]
 
 def priorToHalflife(a, b, t, N=10000):
   p = stats.beta.rvs(a, b, size=N)
@@ -278,7 +358,7 @@ pylab.show()
 
 
 uh = 7. # days (mean)
-vh = 4. # days^2 (variance)
+vh = 4. # days**2 (variance)
 
 beta = uh / vh
 alpha = vh * beta**2

@@ -1,4 +1,52 @@
-# Ebisu
+# Ebisu: intelligent quiz scheduling
+
+## Introduction
+
+Given a set of facts that a student is memorizing,
+
+- which facts need reviewing?, and
+- how does the student’s performance on a quiz of those facts affect the latter’s future review schedule?
+
+Ebisu is a public-domain library that answers these two questions for developers writing quiz apps.
+
+It aims to provide a simple API to deal with these two aspects of scheduling quizzes.
+
+Under the hood, though, it uses a simple and powerful statistical model of forgetting. It’s recommendations are backed by principled application of Bayesian statistics.
+
+Because of this, Ebisu allows you to ask, at any given moment, “what is the probability that the student has forgotten this fact?”, and it will respond with a percentage.
+
+
+
+
+## Comparisons
+
+Some words on how Ebisu is different from some of the other scheduling schemes I’ve used before, e.g.,
+
+- [Anki](https://apps.ankiweb.net/), an open-source Python flashcard app (and a closed-source mobile app),
+- the [SuperMemo](https://www.supermemo.com/help/smalg.htm) family of algorithms (Anki’s is a derivative of SM-2),
+- [Memrise.com](https://www.memrise.com), a closed-source webapp,
+- [Duolingo](https://www.duolingo.com/), which has published a [blog entry](http://making.duolingo.com/how-we-learn-how-you-learn) and a [conference paper/code repo](https://github.com/duolingo/halflife-regression) on their half-life regression technique,
+- the Leitner and Pimsleur spacing schemes (also discussed in some length in Duolingo’s paper).
+
+Many of the above schedulers are inspired by Hermann Ebbinghaus’ discovery of the [exponential forgetting curve](https://en.wikipedia.org/w/index.php?title=Forgetting_curve&oldid=766120598#History), published in 1885, when he was thirty-five years old. He [memorized random](https://en.wikipedia.org/w/index.php?title=Hermann_Ebbinghaus&oldid=773908952#Research_on_memory) consonant–vowel–consonant trigrams (‘PED’, e.g.) and found, among other things, that his recall decayed exponentially with some time-constant.
+
+Anki and SuperMemo use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little [field guide](https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174) to Anki’s, with links to the source code. Furthermore, there is a tendency to mass
+
+Duolingo’s half-life regression explicitly models the probability of you recalling a fact as $2^{-Δ/h}$, where $Δ$ is the time since your last review and $h$ is a *half-life*. They estimate this half-life by combining your past performance with
+
+
+## This document
+
+This document is a literate program. It contains not only source code (currently only Python; JavaScript/compile-to-JavaScript and PostgreSQL versions are planned), but also an explanation of the statistics and mathematics underlying the algorithm.
+
+Therefore, there are three major parts of this document.
+
+1. A brief “too long; didn’t read” section that helps you get going with the library, with minimum of fuss.
+1. An implementation section where the source code that you downloaded is presented and explained. If you want to hack on Ebisu, this is the section for you.
+1. And finally, the math. If you like Beta-distributed random variables, conjugate priors, and non-standard CDFs, you’ll like this part.
+
+
+## Introduction
 
 Super-simple library and engine for spaced-repetition systems in the vein of Anki and Memrise.
 
@@ -24,6 +72,7 @@ This is, as far as I can tell, correct implementations of the above, using Bayes
 
 - complete details including Python code
 - JavaScript (potentially TypeScript/PureScript) implementation
+- PostgreSQL implementation
 
 ### TL;DR
 
@@ -74,14 +123,26 @@ def recallProbabilityMean(alpha, beta, t, tnow):
   dt = tnow / t
   return fbeta(alpha + dt, beta) / fbeta(alpha, beta)
 
+def recallProbabilityVar(alpha, beta, t, tnow):
+  from scipy.special import beta as fbeta
+  dt = tnow / t
+  m = recallProbabilityMean(alpha, beta, t, tnow)
+  # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2, {p, 0, 1}]`
+  # FIXME fewer fbeta calls if we combine the expression below with m
+  return dt * (m**2 * fbeta(alpha, beta)
+             - 2 * m * fbeta(alpha + dt, beta)
+             + fbeta(alpha + 2 * dt, beta))
+
 def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=10000):
   import scipy.stats as stats
   tPrior = stats.beta.rvs(alpha, beta, size=N)
   tnowPrior = tPrior ** (tnow / t)
   freqs, bins = np.histogram(tnowPrior,'auto')
   bincenters = bins[:-1] + np.diff(bins) / 2
-  return dict(mean=np.mean(tnowPrior), median=np.median(tnowPrior), mode=bincenters[freqs.argmax()])
-
+  return dict(mean=np.mean(tnowPrior),
+              median=np.median(tnowPrior),
+              mode=bincenters[freqs.argmax()],
+              var=np.var(tnowPrior))
 
 # So we have several ways of evaluating the posterior mean/var:
 # - Monte Carlo
@@ -185,8 +246,12 @@ def posteriorMonteCarlo(alpha, beta, t, result, tnow, N=10000):
 
   return newAlpha, newBeta, tnow
 
-def priorToHalflife(alpha, beta, t):
-  return -t / np.log2(alpha / (alpha + beta))
+def priorToHalflife(alpha, beta, t, percentile=0.5, maxt=100, mint=0):
+  from scipy.optimize import brentq
+  h = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - percentile,
+             mint, maxt)
+  return h, recallProbabilityVar(alpha, beta, t, h)
+  # return -t / np.log2(alpha / (alpha + beta))
 
 ```
 
@@ -210,25 +275,36 @@ print([posteriorMonteCarlo(betaa, betab, t0, 0., t0 * dt, N=100000), posteriorQu
 
 print('gamma pass', priorToHalflife(*posteriorAnalytic(betaa, betab, t0, 1., t0 * dt)))
 print('gamma fail', priorToHalflife(*posteriorAnalytic(betaa, betab, t0, 0., t0 * dt)))
-print('MC gamma pass', priorToHalflifeMonteCarlo(*posteriorAnalytic(betaa, betab, t0, 1., t0 * dt)))
-print('MC gamma fail', priorToHalflifeMonteCarlo(*posteriorAnalytic(betaa, betab, t0, 0., t0 * dt)))
 
 def priorToHalflifeMonteCarlo(a, b, t, N=10000):
   pis = stats.beta.rvs(a, b, size=N)
-  h2s = -t / np.log2(pis)
-  alpha2, _, beta2inv = stats.gamma.fit(h2s, floc=0)
-  beta2 = 1 / beta2inv
-  uh2, vh2 = (alpha2/beta2, alpha2 / beta2**2) # mean, variance
-  return (uh2, np.sqrt(vh2))
+  hs = -t / np.log2(pis)
+  return np.mean(hs), np.var(hs)
 
-print([recallProbabilityMean(betaa,betab,t0, dt*t0), recallProbabilityMedian(betaa,betab,t0, dt*t0), recallProbability(betaa,betab,t0, dt*t0), recallProbabilityMonteCarlo(betaa,betab,t0, dt*t0)])
+
+print('MC gamma pass', priorToHalflifeMonteCarlo(*posteriorAnalytic(betaa, betab, t0, 1., t0 * dt)))
+print('MC gamma fail', priorToHalflifeMonteCarlo(*posteriorAnalytic(betaa, betab, t0, 0., t0 * dt)))
+
+alls = [recallProbabilityMean(betaa,betab,t0, dt*t0), recallProbabilityMedian(betaa,betab,t0, dt*t0), recallProbability(betaa,betab,t0, dt*t0), recallProbabilityVar(betaa,betab,t0, dt*t0), recallProbabilityMonteCarlo(betaa,betab,t0, dt*t0)]
+alls
+print(alls)
 # All 2.5 methods above (mode doesn't make sense for PDFs going to infinity) are about equally fast. Which to use?
 
-ts = np.arange(1, 40.)
+ts = np.arange(1, 31.)
 
 plt.close('all')
+plt.style.use('ggplot')
+
 plt.figure()
-[plt.plot(ts, np.array(list(map(lambda t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t)), ts))), 'x-' if xobs == 1 else 'o-', label='a=b={}, {}'.format(a, 'pass' if xobs==1 else 'fail')) for a in [3, 6, 12] for xobs in [1, 0]];
+ax = plt.subplot(111)
+plt.axhline(y=t0, linewidth=1, color='0.5')
+[plt.plot(ts,
+          np.array(list(map(lambda t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t))[0],
+                            ts))),
+          'x-' if xobs == 1 else 'o-',
+          label='a=b={}, {}'.format(a, 'pass' if xobs==1 else 'fail'))
+ for a in [3, 6, 12]
+ for xobs in [1, 0]]
 plt.grid(True)
 plt.legend(loc=0)
 plt.title('New interval, for old interval={} days'.format(t0))
@@ -237,19 +313,32 @@ plt.ylabel('New interval (days)')
 plt.savefig('whee.svg')
 plt.savefig('whee.png')
 plt.show()
+
+
+
 ```
 
 ```py
-from scipy.special import gamma
-model2gamma = lambda model, ts: gamma(model[0]+model[1]) / gamma(model[0]) * gamma(model[0]+ts/model[2]) / gamma(model[0] + model[1] + ts/model[2])
+v2s = lambda var: np.sqrt(var) / 3.
 
 plt.figure();
 modelA = posteriorAnalytic(3., 3., 7., 1, 15.)
 modelB = posteriorAnalytic(12., 12., 7., 1, 15.)
-plt.plot(ts, recallProbabilityMean(*modelA, ts), '.-', label='Model A')
-plt.plot(ts + 3, recallProbabilityMean(*modelB, ts), '.-', label='Model B')
+hlA = priorToHalflife(*modelA)
+hlB = priorToHalflife(*modelB)
+plt.errorbar(ts,
+             recallProbabilityMean(*modelA, ts),
+             v2s(recallProbabilityVar(*modelA, ts)),
+             fmt='.-', label='Model A')
+plt.plot(ts, 2**(-ts / hlA[0]), '--', label='approx A')
+plt.errorbar(ts,
+             recallProbabilityMean(*modelB, ts),
+             v2s(recallProbabilityVar(*modelB, ts)),
+             fmt='.-', label='Model B')
+plt.plot(ts, 2**(-ts / hlB[0]), '--', label='approx B')
 plt.legend(loc=0)
 plt.ylim([0, 1])
+plt.grid(True)
 plt.show()
 
 

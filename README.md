@@ -185,6 +185,9 @@ def posteriorMonteCarlo(alpha, beta, t, result, tnow, N=10000):
 
   return newAlpha, newBeta, tnow
 
+def priorToHalflife(alpha, beta, t):
+  return -t / np.log2(alpha / (alpha + beta))
+
 ```
 
 ```py
@@ -207,27 +210,31 @@ print([posteriorMonteCarlo(betaa, betab, t0, 0., t0 * dt, N=100000), posteriorQu
 
 print('gamma pass', priorToHalflife(*posteriorAnalytic(betaa, betab, t0, 1., t0 * dt)))
 print('gamma fail', priorToHalflife(*posteriorAnalytic(betaa, betab, t0, 0., t0 * dt)))
+print('MC gamma pass', priorToHalflifeMonteCarlo(*posteriorAnalytic(betaa, betab, t0, 1., t0 * dt)))
+print('MC gamma fail', priorToHalflifeMonteCarlo(*posteriorAnalytic(betaa, betab, t0, 0., t0 * dt)))
 
-def priorToHalflife(a, b, t, N=10000):
-  p = stats.beta.rvs(a, b, size=N)
-  return pis2gammaest(p, t)
-def pis2gammaest(pis, t):
+def priorToHalflifeMonteCarlo(a, b, t, N=10000):
+  pis = stats.beta.rvs(a, b, size=N)
   h2s = -t / np.log2(pis)
   alpha2, _, beta2inv = stats.gamma.fit(h2s, floc=0)
   beta2 = 1 / beta2inv
-
-  uh2, vh2 = (alpha2/beta2, alpha2 / beta2**2)
+  uh2, vh2 = (alpha2/beta2, alpha2 / beta2**2) # mean, variance
   return (uh2, np.sqrt(vh2))
 
-pis = stats.beta.rvs(betaa, betab, size=50000)**dt
+print([recallProbabilityMean(betaa,betab,t0, dt*t0), recallProbabilityMedian(betaa,betab,t0, dt*t0), recallProbability(betaa,betab,t0, dt*t0), recallProbabilityMonteCarlo(betaa,betab,t0, dt*t0)])
+# All 2.5 methods above (mode doesn't make sense for PDFs going to infinity) are about equally fast. Which to use?
+
+ts = np.arange(1, 40.)
 
 plt.close('all')
 plt.figure()
-plt.hist(pis,50,normed=True)
+[plt.plot(ts, np.array(list(map(lambda t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t)), ts))), 'x-' if xobs == 1 else 'o-', label='a=b={}, x={}'.format(a, xobs)) for a in [3, 6, 12] for xobs in [1, 0]];
+plt.grid(True)
+plt.legend(loc=0)
+plt.title('New interval, for old interval={} days'.format(t0))
+plt.xlabel('Time test taken (days)')
+plt.ylabel('New interval (days)')
 plt.show()
-
-[recallProbabilityMean(betaa,betab,t0, dt*t0), recallProbabilityMedian(betaa,betab,t0, dt*t0), recallProbability(betaa,betab,t0, dt*t0), recallProbabilityMonteCarlo(betaa,betab,t0, dt*t0)]
-# All 2.5 methods above (mode doesn't make sense for PDFs going to infinity) are about equally fast. Which to use?
 
 ```
 

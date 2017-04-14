@@ -250,8 +250,13 @@ def priorToHalflife(alpha, beta, t, percentile=0.5, maxt=100, mint=0):
   from scipy.optimize import brentq
   h = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - percentile,
              mint, maxt)
-  return h, recallProbabilityVar(alpha, beta, t, h)
-  # return -t / np.log2(alpha / (alpha + beta))
+  v = recallProbabilityVar(alpha, beta, t, h)
+  h2 = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - (percentile - np.sqrt(v)),
+              mint, maxt)
+  h3 = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - (percentile + np.sqrt(v)),
+              mint, maxt)
+
+  return h, ((np.abs(h2 - h) + np.abs(h3 - h)) / 2)**2
 
 ```
 
@@ -290,6 +295,8 @@ alls
 print(alls)
 # All 2.5 methods above (mode doesn't make sense for PDFs going to infinity) are about equally fast. Which to use?
 
+v2s = lambda var: np.sqrt(var)
+
 ts = np.arange(1, 31.)
 
 plt.close('all')
@@ -298,12 +305,15 @@ plt.style.use('ggplot')
 plt.figure()
 ax = plt.subplot(111)
 plt.axhline(y=t0, linewidth=1, color='0.5')
-[plt.plot(ts,
+[plt.errorbar(ts,
           np.array(list(map(lambda t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t))[0],
                             ts))),
-          'x-' if xobs == 1 else 'o-',
+          v2s(np.array(list(map(lambda t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t))[1],
+                            ts)))),
+          fmt='x-' if xobs == 1 else 'o-',
+          color='C{}'.format(aidx),
           label='a=b={}, {}'.format(a, 'pass' if xobs==1 else 'fail'))
- for a in [3, 6, 12]
+ for (aidx, a) in enumerate([3, 6, 12])
  for xobs in [1, 0]]
 plt.grid(True)
 plt.legend(loc=0)
@@ -319,7 +329,6 @@ plt.show()
 ```
 
 ```py
-v2s = lambda var: np.sqrt(var) / 3.
 
 plt.figure();
 modelA = posteriorAnalytic(3., 3., 7., 1, 15.)

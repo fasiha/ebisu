@@ -237,8 +237,25 @@ plt.ylabel('New interval (days)')
 plt.savefig('whee.svg')
 plt.savefig('whee.png')
 plt.show()
+```
+
+```py
+from scipy.special import gamma
+model2gamma = lambda model, ts: gamma(model[0]+model[1]) / gamma(model[0]) * gamma(model[0]+ts/model[2]) / gamma(model[0] + model[1] + ts/model[2])
+
+plt.figure();
+modelA = posteriorAnalytic(3., 3., 7., 1, 15.)
+modelB = posteriorAnalytic(12., 12., 7., 1, 15.)
+plt.plot(ts, recallProbabilityMean(*modelA, ts), '.-', label='Model A')
+plt.plot(ts + 3, recallProbabilityMean(*modelB, ts), '.-', label='Model B')
+plt.legend(loc=0)
+plt.ylim([0, 1])
+plt.show()
+
+
 
 ```
+
 
 ### Details (😱😪)
 ```py

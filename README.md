@@ -13,14 +13,18 @@ It aims to provide a simple API to deal with these two aspects of scheduling qui
 
 Under the hood, though, it uses a simple and powerful statistical model of forgetting. It’s recommendations are backed by principled application of Bayesian statistics.
 
-Because of this, Ebisu allows you to ask, at any given moment, “what is the probability that the student has forgotten this fact?”, and it will respond with a percentage.
+Because of this, Ebisu allows you to ask, at any given moment, “what is the probability that the student has forgotten this fact?”, and it responds with a percentage. Furthermore, Ebisu gives a *confidence interval* around that percentage, giving you an estimate of how sure it is about about its recall score (kind of a “probability about my estimated probability of recall”—meta).
 
+This opens the way for quiz applications to move away from “daily review piles” caused by scheduling algorithms that expect the student to review all the facts scheduled for that day. For instance, a student might have only five minutes to study today—an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed. Apps can also provide an infinite stream of quizzes (nightmare!) for students cramming: Ebisu intelligently updates its estimate of memory even when over-reviewing.
 
+Currently, this library comes with a Python implementation, as well as detailed mathematical notes. I plan on porting the algorithm to at least:
 
+- a JavaScript or compiled-to-JavaScript language for browser usage, and
+- PostgreSQL for use in that SQL database.
 
-## Comparisons
+## How it works
 
-Some words on how Ebisu is different from some of the other scheduling schemes I’ve used before, e.g.,
+There are many scheduling schemes, e.g.,
 
 - [Anki](https://apps.ankiweb.net/), an open-source Python flashcard app (and a closed-source mobile app),
 - the [SuperMemo](https://www.supermemo.com/help/smalg.htm) family of algorithms (Anki’s is a derivative of SM-2),
@@ -28,12 +32,17 @@ Some words on how Ebisu is different from some of the other scheduling schemes I
 - [Duolingo](https://www.duolingo.com/), which has published a [blog entry](http://making.duolingo.com/how-we-learn-how-you-learn) and a [conference paper/code repo](https://github.com/duolingo/halflife-regression) on their half-life regression technique,
 - the Leitner and Pimsleur spacing schemes (also discussed in some length in Duolingo’s paper).
 
-Many of the above schedulers are inspired by Hermann Ebbinghaus’ discovery of the [exponential forgetting curve](https://en.wikipedia.org/w/index.php?title=Forgetting_curve&oldid=766120598#History), published in 1885, when he was thirty-five years old. He [memorized random](https://en.wikipedia.org/w/index.php?title=Hermann_Ebbinghaus&oldid=773908952#Research_on_memory) consonant–vowel–consonant trigrams (‘PED’, e.g.) and found, among other things, that his recall decayed exponentially with some time-constant.
+Many of these are inspired by Hermann Ebbinghaus’ discovery of the [exponential forgetting curve](https://en.wikipedia.org/w/index.php?title=Forgetting_curve&oldid=766120598#History), published in 1885, when he was thirty-five. He [memorized random](https://en.wikipedia.org/w/index.php?title=Hermann_Ebbinghaus&oldid=773908952#Research_on_memory) consonant–vowel–consonant trigrams (‘PED’, e.g.) and found, among other things, that his recall decayed exponentially with some time-constant.
 
-Anki and SuperMemo use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little [field guide](https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174) to Anki’s, with links to the source code. Furthermore, there is a tendency to mass
+Anki and SuperMemo use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little [field guide](https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174) to Anki’s, with links to the source code—but they are optimized to minimize daily review time while maximizing retention. But because each fact has simply a date of next review, these algorithms do not gracefully accommodate over- or under-reviewing. Even when used as prescribed, they can schedule many facts for review on one day but few on others. (I must note that all three of these issues—over-reviewing (cramming), under-reviewing, and lumpy reviews—have well-supported solutions in Anki: they are tweaks on the rules.)
 
-Duolingo’s half-life regression explicitly models the probability of you recalling a fact as $2^{-Δ/h}$, where $Δ$ is the time since your last review and $h$ is a *half-life*. They estimate this half-life by combining your past performance with
+Duolingo’s half-life regression explicitly models the probability of you recalling a fact as $2^{-Δ/h}$, where Δ is the time since your last review and $h$ is a *half-life*. In this model, your chances of failing a quiz after Δ days is 50%, which drops to 25% after 2Δ days. They estimate this half-life by combining your past performance and fact metadata in a machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.
 
+Like Duolingo’s approach, Ebisu can provide a sorted list of facts, from most in danger of being forgotten to least, by explicitly tracking the exponential forgetting curve. However, Ebisu formulates the problem very differently—while memory is understood to decay exponentially, Ebisu posits a *probability distribution* on the half-life and uses quiz results to continually update its beliefs about the half-life in a fully Bayesian way. These updates, while a little more computationally-burdensome than Anki’s scheduler, are much lighter-weight than Duolingo’s industrial-strength approach.
+
+This gives small quiz apps the same intelligent scheduling as Duolingo’s approach—recall probabilities for each fact—but with fast incorporation of quiz results.
+
+Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how cards are related the way Duolingo can with its data. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.
 
 ## This document
 
@@ -42,29 +51,13 @@ This document is a literate program. It contains not only source code (currently
 Therefore, there are three major parts of this document.
 
 1. A brief “too long; didn’t read” section that helps you get going with the library, with minimum of fuss.
-1. An implementation section where the source code that you downloaded is presented and explained. If you want to hack on Ebisu, this is the section for you.
-1. And finally, the math. If you like Beta-distributed random variables, conjugate priors, and non-standard CDFs, you’ll like this part.
+1. An implementation section where the source code that you downloaded is presented and explained. If you want to hack on Ebisu’s code, this is the section for you.
+1. And finally, the math. If you like Beta-distributed random variables, conjugate priors, and marginalization, you’ll want to read this part.
 
 
-## Introduction
+# WIP
 
-Super-simple library and engine for spaced-repetition systems in the vein of Anki and Memrise.
-
-It just needs an append-only table. Each row has:
-
-- user ID doing the addressing
-- fact ID addressed
-- what’s happening:
-  - quiz?, with result boolean
-  - restart?
-  - upsert mem?, with new mem string
-  - stop quizzing?
-- timestamp
-
-Given a table of these, we have a few functions we need:
-
-- for a given user, and an optional timestamp, give next fact to review
-- after that fact is reviewed, update it’s spacing.
+The rest of this document is a work-in-progress.
 
 ## Algorithm
 
@@ -328,8 +321,8 @@ plt.legend(loc=0)
 plt.title('New interval, for old interval={} days'.format(t0))
 plt.xlabel('Time test taken (days)')
 plt.ylabel('New interval (days)')
-plt.savefig('whee.svg')
-plt.savefig('whee.png')
+plt.savefig('figures/halflife.svg')
+plt.savefig('figures/halflife.png',dpi=150)
 plt.show()
 
 
@@ -346,18 +339,22 @@ hlB = priorToHalflife(*modelB)
 plt.errorbar(ts,
              recallProbabilityMean(*modelA, ts),
              v2s(recallProbabilityVar(*modelA, ts)),
-             fmt='.-', label='Model A')
-plt.plot(ts, 2**(-ts / hlA[0]), '--', label='approx A')
+             fmt='.-', label='Model A', color='C0')
+plt.plot(ts, 2**(-ts / hlA[0]), '--', label='approx A', color='C0')
 plt.errorbar(ts,
              recallProbabilityMean(*modelB, ts),
              v2s(recallProbabilityVar(*modelB, ts)),
-             fmt='.-', label='Model B')
-plt.plot(ts, 2**(-ts / hlB[0]), '--', label='approx B')
+             fmt='.-', label='Model B', color='C1')
+plt.plot(ts, 2**(-ts / hlB[0]), '--', label='approx B', color='C1')
 plt.legend(loc=0)
 plt.ylim([0, 1])
 plt.grid(True)
+plt.xlabel('Time (days)')
+plt.ylabel('Recall probability')
+plt.title('Predicted forgetting curves (A: a=b=3, B: a=b=12)')
+plt.savefig('figures/forgetting-curve.svg')
+plt.savefig('figures/forgetting-curve.png',dpi=150)
 plt.show()
-
 
 
 ```

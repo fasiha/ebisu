@@ -264,6 +264,10 @@ def priorToHalflife(alpha, beta, t, percentile=0.5, maxt=100, mint=0):
 import scipy.stats as stats
 import matplotlib.pyplot as plt
 
+plt.style.use('ggplot')
+plt.rcParams['svg.fonttype'] = 'none'
+
+
 betaa = 4./3
 betab = 4./3
 
@@ -300,8 +304,6 @@ v2s = lambda var: np.sqrt(var)
 ts = np.arange(1, 31.)
 
 plt.close('all')
-plt.style.use('ggplot')
-
 plt.figure()
 ax = plt.subplot(111)
 plt.axhline(y=t0, linewidth=1, color='0.5')

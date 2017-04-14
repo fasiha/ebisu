@@ -228,12 +228,14 @@ ts = np.arange(1, 40.)
 
 plt.close('all')
 plt.figure()
-[plt.plot(ts, np.array(list(map(lambda t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t)), ts))), 'x-' if xobs == 1 else 'o-', label='a=b={}, x={}'.format(a, xobs)) for a in [3, 6, 12] for xobs in [1, 0]];
+[plt.plot(ts, np.array(list(map(lambda t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t)), ts))), 'x-' if xobs == 1 else 'o-', label='a=b={}, {}'.format(a, 'pass' if xobs==1 else 'fail')) for a in [3, 6, 12] for xobs in [1, 0]];
 plt.grid(True)
 plt.legend(loc=0)
 plt.title('New interval, for old interval={} days'.format(t0))
 plt.xlabel('Time test taken (days)')
 plt.ylabel('New interval (days)')
+plt.savefig('whee.svg')
+plt.savefig('whee.png')
 plt.show()
 
 ```

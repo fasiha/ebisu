@@ -19,8 +19,10 @@ This opens the way for quiz applications to move away from “daily review piles
 
 Currently, this library comes with a Python implementation, as well as detailed mathematical notes. I plan on porting the algorithm to at least:
 
-- a JavaScript or compiled-to-JavaScript language for browser usage, and
-- PostgreSQL for use in that SQL database.
+- JavaScript, or a compiled-to-JavaScript language, for browsers, and
+- PostgreSQL.
+
+This first version was built in Python because of the numerical batteries provided by Scipy, Numpy, PyMC, etc.
 
 ## How it works
 
@@ -42,7 +44,7 @@ Like Duolingo’s approach, Ebisu can provide a sorted list of facts, from most 
 
 This gives small quiz apps the same intelligent scheduling as Duolingo’s approach—recall probabilities for each fact—but with fast incorporation of quiz results.
 
-> Nerdy details in a nutshell: Ebisu posits a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on the recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it needs to evaluate the [Gamma function](http://mathworld.wolfram.com/GammaFunction.html) to predict the current recall probability. A quiz is modeled as a Beroulli trial, whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta posterior by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the Gamma function.
+> Nerdy details in a nutshell: Ebisu posits a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it evaluates the [Gamma function](http://mathworld.wolfram.com/GammaFunction.html) to predict the current recall probability. A *quiz* is modeled as a Beroulli trial, whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta posterior by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the Gamma function.
 
 Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how cards are related the way Duolingo can with its data. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.
 
@@ -53,56 +55,153 @@ This document is a literate program. It contains not only source code (currently
 Therefore, there are three major parts of this document.
 
 1. A brief “too long; didn’t read” section that helps you get going with the library, with minimum of fuss.
-1. An implementation section where the source code that you downloaded is presented and explained. If you want to hack on Ebisu’s code, this is the section for you.
-1. And finally, the math. If you like Beta-distributed random variables, conjugate priors, and marginalization, you’ll want to read this part.
+1. The math—if you like Beta-distributed random variables, conjugate priors, and marginalization, you’ll want to read this part. If you don’t, I’ll highlight the formulas that Ebisu actually implements.
+1. And finally, the source code itself, annotated and explained. If you want to hack on Ebisu’s code, this is the section for you.
 
 
 # WIP
 
 The rest of this document is a work-in-progress.
 
-## Algorithm
 
-This is, as far as I can tell, correct implementations of the above, using Bayesian statistics. Forthcoming:
 
-- complete details including Python code
-- JavaScript (potentially TypeScript/PureScript) implementation
-- PostgreSQL implementation
+## TL;DR
 
-### TL;DR
+Setup instructions go here
+
+## The math
+
+Let us begin with the exponential decay forgetting curve. The probability of recall is
+$$π = 2^{-t/h},$$
+where $t > 0$ denotes time since the last review of a given fact, and $h > 0$ our best guess of the half-life of that fact. Both $t$ and $h$ must be in consistent units (let’s assume days). Notice that $0 ≤ π ≤ 1$.   Immediately after reviewing a fact, when $t = 0$, the probability of recall is 1. A million years after the last review, as $t→∞$, the recall probability goes to 0.
+
+After first teaching a new fact to a student, we can put a probability distribution on the half-life $h$ of this newest fact. We’ll see that it doesn’t at all matter what that distribution is, but for sake of exposition let’s say we believe the half-life $h$ to follow a [Gamma distribution](https://en.wikipedia.org/wiki/Gamma_distribution) with some shape and scale, that is, the random variable
+$$H ∼ Gamma(shape, scale).$$
+(I’m not even defining variables for those parameters to emphasize that this is hypothetical.)
+
+Let’s say we draw thousands of random samples from this Gamma distribution. We can use the forgetting curve to convert these samples to samples from the distribution that $π$ comes from. $t$ then is the time elapsed since this fact was first taught to the student (or her most-recent review).
+```py
+import matplotlib.pyplot as plt
+plt.style.use('ggplot')
+plt.rcParams['svg.fonttype'] = 'none'
+
+
+def generatePis(t, shape=7.0, scale=1.0):
+  import scipy.stats as stats
+  h = stats.gamma.rvs(shape, scale, size=50*1000)
+  pis = 2 ** (-t / h)
+  plt.hist(pis, bins=20, label='t={}'.format(t), alpha=0.25, normed=True)
+  return pis
+
+generatePis(1.)
+generatePis(7.)
+generatePis(30.)
+plt.xlabel('π (recall probability)')
+plt.ylabel('Density')
+plt.title('Histogram of π for different t')
+plt.legend(loc=0)
+plt.savefig('figures/pis.svg')
+plt.show()
+```
+![figures/pis.svg](figures/pis.svg)
+
+This plot shows the histograms of $π$, the recall probability, a day and a week and a month after the most recent review. The distributions of $π$ move leftwards, from high recall probabilities to low, as the time increases.
+
+So far so good. This gives us an average recall probability (say, the mean of these samples) and a confidence interval, and can be repeated for all the facts the student has learned.
+
+Now, say we have picked a fact to quiz the student on. We’ll model this as a [Bernoulli experiment](https://en.wikipedia.org/wiki/Bernoulli_distribution), i.e., a coin flip with a weighted coin: let $x ∈ \{0, 1\}$ be the result of the quiz, 1 for pass, 0 for fail, a draw from the random variable
+$$X ∼ Bernoulli(π).$$
+$π$ itself still follows a histogram like the one above, i.e., it depends on the distribution chosen for the half-life $h$ and the time since last review, $t$.
+
+(The fact that quizzes are Bernoulli experiments is important—that piece of the model holds for everything that follows.)
+
+How can we incorporate the quiz result $x$ on the distribution on recall probability $π$ and therefore the distribution on half-life $h$? Recall that a [Beta distribution](https://en.wikipedia.org/wiki/Beta_distribution) is a conjugate prior for the Bernoulli distribution, i.e.,
+- *if* $π ∼ Beta(α, β)$
+  - (this is called the *prior* distribution because it’s our belief about the distribution of $π$ before new data comes in),
+- then $(π | x) ∼ Beta(α + x, β + 1 - x)$.
+  - (This is the *posterior* distribution, since we’ve updated the our beliefs about $π$ with new data $x$.)
+  - (Notice that since $x$ is either 0 or 1, $(α + x, β + 1 - x)$ is $(α, β + 1)$ when the quiz was a fail, and $(α + 1, β)$ when it was a pass.)
+
+> **Aside** I realize the folly in explaining what a “prior” and “posterior” are and not explaining how Bayesian statistics works. Sorry. If I can beg off with a few Wikipedia links, this all works because the posterior probability
+> $$P(π | x) = \frac{P(x | π) · P(π)}{P(x)}.$$
+> We can ignore the denominator since it’s not a function of $π$ and just serves to normalize the numerator, so the numerator sums to 1. Usually we write
+> $$P(π | x) ∝ P(x | π) · P(π),$$
+> where that “∝” is read “proportional to”, i.e., there is a normalizing constant that we’re omitting.
+>
+> So when the prior $P(π)$ is a Beta density and the “likelihood” $P(x|π)$ is a Bernoulli density, then the posterior $P(π |x)$ is Beta again. And then as another quiz result comes in, the process is repeated, but your prior/posterior on $π$ remains Beta. That’s what it means to have [conjugate priors](https://en.wikipedia.org/wiki/Conjugate_prior), and they’re a big deal in Bayesian statistics.
+>
+> (When I was a student, my statistics department had a new course called “Bayesian analysis”. If that’s still a thing, and you can take it, go take it. I fear that, with the acknowledged importance of Bayesian approaches, it’s contents might be distributed among several classes, and not readily available in just one.)
+
+What we could do is to fit a Beta distribution to these histograms of $π$ for different times that we made earlier.
+```py
+def pisToBeta(pis):
+  import scipy.stats as stats
+  import numpy as np
+  alpha, beta, _, _ = stats.beta.fit(pis, floc=0, fscale=1)
+  p = np.linspace(0, 1, num=1000)
+  plt.plot(p, stats.beta.pdf(p, alpha, beta), ls='dotted', lw=3, alpha=0.5, color='0.5')
+
+
+plt.figure()
+list(map(pisToBeta, map(generatePis, [1., 7., 30.])))
+plt.xlabel('π (recall probability)')
+plt.ylabel('Frequency')
+plt.title('Histogram of π for different t, with Beta fit')
+plt.legend(loc=0)
+plt.savefig('figures/pis-betas.svg')
+plt.show()
+```
+![figures/pis-betas.svg](figures/pis-betas.svg)
+
+Here we’ve done just this. Note that the fits aren’t perfect, nor should they be, since this particular nonlinear function of a Gamma random variable is not Beta-distributed.
+
+Nonetheless, through this approximation we get a conjugate prior for our Bernoulli-distributed quiz result.
+
+
+## Source code
 
 ```py
+# export ebisu/__init__.py #
+from .ebisu import *
+from . import alternate
+from . import montecarlo
+```
+
+```py
+# export ebisu/alternate.py #
 import numpy as np
 
-from scipy.special import hyp2f1, beta
-
-
-def recallProbability(alpha, beta, t, tnow, percentile=0.5):
-  """Returns the mode (or median) of the immediate (pseudo-Beta) prior"""
+def recallProbabilityMode(alpha, beta, t, tnow):
+  """Returns the mode of the immediate (pseudo-Beta) prior"""
   # [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`
-  # [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
-
   dt = tnow / t
+  pr = lambda p: p**((alpha-dt)/dt) * (1-p**(1/dt))**(beta-1)
 
-  # See [peak]. This is the mode but can be nonsense for PDFs that blow up
-  tentativePeak = ((alpha - dt) / (alpha + beta - dt - 1)) ** dt
-  if tentativePeak.imag == 0 and tentativePeak > 0. and tentativePeak < 1.:
-    return tentativePeak
+  # See [peak]. The actual mode is `modeBase ** dt`, but since `modeBase` might be negative or otherwise invalid, check it.
+  modeBase = (alpha - dt) / (alpha + beta - dt - 1)
+  if modeBase >= 0 and modeBase <= 1:
+    # Still need to confirm this is not a minimum (anti-mode). Do this with a coarse check of other points likely to be the mode.
+    mode = modeBase ** dt
+    modePr = pr(mode)
 
-  from scipy.optimize import brentq
-  from scipy.special import beta as fbeta
-
-  # See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.
-  # N.B. I prefer to try to find the mode (above) because it will be much faster than this.
-  cdfPercentile = lambda p: (p**(alpha/dt) *
-                             hyp2f1(alpha, 1 - beta, 1 + alpha, p**(1/dt)) /
-                             alpha /
-                             fbeta(alpha,beta)) - percentile
-  return brentq(cdfPercentile, 0, 1)
+    eps = 1e-3
+    others = [eps,
+              mode - eps if mode > eps else mode / 2,
+              mode + eps if mode < 1 - eps else (1 + mode) / 2,
+              1 - eps]
+    otherPr = map(pr, others)
+    if max(otherPr) <= modePr:
+      return mode
+  # If anti-mode detected, that means one of the edges is the mode, likely caused by a very large or very small `dt`. Just use `dt` to guess which extreme it was pushed to. If `dt` == 1.0, and we get to this point, likely we have malformed alpha/beta (i.e., <1)
+  return 0.5 if dt == 1. else (0. if dt > 1 else 1.)
 
 def recallProbabilityMedian(alpha, beta, t, tnow, percentile=0.5):
+  """"""
+  # [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
   from scipy.optimize import brentq
   from scipy.special import beta as fbeta
+  from scipy.special import hyp2f1
+
   dt = tnow / t
 
   # See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.
@@ -295,7 +394,7 @@ def priorToHalflifeMonteCarlo(a, b, t, N=10000):
 print('MC gamma pass', priorToHalflifeMonteCarlo(*posteriorAnalytic(betaa, betab, t0, 1., t0 * dt)))
 print('MC gamma fail', priorToHalflifeMonteCarlo(*posteriorAnalytic(betaa, betab, t0, 0., t0 * dt)))
 
-alls = [recallProbabilityMean(betaa,betab,t0, dt*t0), recallProbabilityMedian(betaa,betab,t0, dt*t0), recallProbability(betaa,betab,t0, dt*t0), recallProbabilityVar(betaa,betab,t0, dt*t0), recallProbabilityMonteCarlo(betaa,betab,t0, dt*t0)]
+alls = [recallProbabilityMean(betaa,betab,t0, dt*t0), recallProbabilityMedian(betaa,betab,t0, dt*t0), recallProbabilityMode(betaa,betab,t0, dt*t0), recallProbabilityVar(betaa,betab,t0, dt*t0), recallProbabilityMonteCarlo(betaa,betab,t0, dt*t0)]
 alls
 print(alls)
 # All 2.5 methods above (mode doesn't make sense for PDFs going to infinity) are about equally fast. Which to use?

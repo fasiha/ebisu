@@ -101,9 +101,10 @@ plt.ylabel('Density')
 plt.title('Histogram of π for different t')
 plt.legend(loc=0)
 plt.savefig('figures/pis.svg')
+plt.savefig('figures/pis.png', dpi=150)
 plt.show()
 ```
-![figures/pis.svg](figures/pis.svg)
+![figures/pis.svg](figures/pis.png)
 
 This plot shows the histograms of $π$, the recall probability, a day and a week and a month after the most recent review. The distributions of $π$ move leftwards, from high recall probabilities to low, as the time increases.
 
@@ -149,9 +150,10 @@ plt.ylabel('Frequency')
 plt.title('Histogram of π for different t, with Beta fit')
 plt.legend(loc=0)
 plt.savefig('figures/pis-betas.svg')
+plt.savefig('figures/pis-betas.png', dpi=150)
 plt.show()
 ```
-![figures/pis-betas.svg](figures/pis-betas.svg)
+![figures/pis-betas.png](figures/pis-betas.png)
 
 Here we’ve done just this. Note that the fits aren’t perfect, nor should they be, since this particular nonlinear function of a Gamma random variable is not Beta-distributed.
 

@@ -58,106 +58,92 @@ Therefore, there are three major parts of this document.
 1. The math—if you like Beta-distributed random variables, conjugate priors, and marginalization, you’ll want to read this part. If you don’t, I’ll highlight the formulas that Ebisu actually implements.
 1. And finally, the source code itself, annotated and explained. If you want to hack on Ebisu’s code, this is the section for you.
 
-
-# WIP
-
-The rest of this document is a work-in-progress.
-
-
-
 ## TL;DR
 
 Setup instructions go here
 
 ## The math
 
-Let us begin with the exponential decay forgetting curve. The probability of recall is
-$$π = 2^{-t/h},$$
-where $t > 0$ denotes time since the last review of a given fact, and $h > 0$ our best guess of the half-life of that fact. Both $t$ and $h$ must be in consistent units (let’s assume days). Notice that $0 ≤ π ≤ 1$.   Immediately after reviewing a fact, when $t = 0$, the probability of recall is 1. A million years after the last review, as $t→∞$, the recall probability goes to 0.
+Let’s begin with a quiz. One way or another, we’ve picked a fact to quiz the student on, $t$ days (the units are arbitrary since $t$ can be any positive real number) after her last quiz on it, or since she learned it for the first time.
 
-After first teaching a new fact to a student, we can put a probability distribution on the half-life $h$ of this newest fact. We’ll see that it doesn’t at all matter what that distribution is, but for sake of exposition let’s say we believe the half-life $h$ to follow a [Gamma distribution](https://en.wikipedia.org/wiki/Gamma_distribution) with some shape and scale, that is, the random variable
-$$H ∼ Gamma(shape, scale).$$
-(I’m not even defining variables for those parameters to emphasize that this is hypothetical.)
+We’ll model the results of the quiz as a [Bernoulli experiment](https://en.wikipedia.org/wiki/Bernoulli_distribution), $x_t ∼ Bernoulli(π)$; $x_t$ can be either 1 (success) with probability $π_t$, or 0 (fail) with probability $1-π_t$. Let’s think about $π_t$ as the recall probability at time $t$—then $x_t$ is a coin flip, with a $π_t$-weighted coin.
 
-Let’s say we draw thousands of random samples from this Gamma distribution. We can use the forgetting curve to convert these samples to samples from the distribution that $π$ comes from. $t$ then is the time elapsed since this fact was first taught to the student (or her most-recent review).
+The [Beta distribution](https://en.wikipedia.org/wiki/Beta_distribution) happens to be the [conjugate prior](https://en.wikipedia.org/wiki/Conjugate_prior) for the Bernoulli distribution. So if our *a priori* belief about $π_t$ follow a Beta distribution, that is, if
+$$π_t ∼ Beta(α_t, β_t)$$
+for specific $α_t$ and $β_t$, then observing the quiz result updates our belief about the recall probability to be:
+$$π_t | x_t ∼ Beta(α_t + x_t, β_t + 1 - x_t).$$
+
+> **Aside 1** Notice that since $x_t$ is either 1 or 0, the updated parameters $(α + x_t, β + 1 - x_t)$ are $(α + 1, β)$ when the student correctly answered the quiz, and $(α, β + 1)$ when she answered incorrectly.)
+>
+> **Aside 2** Even if you’re familiar with Bayesian statistics, if you’ve never worked with priors on probabilities, the meta-ness here might confuse you. What the above means is that, before we flipped our $π_t$-weighted coin (before we administered the quiz), we had a specific probability distribution representing the coin’s weighting $π_t$, *not* just a scalar number. After we observed the result of the coin flip, we updated our belief about the coin’s weighting—it *still* makes total sense to talk about the probability of something happening after it happens. Said another way, since we’re being Bayesian, something actually happening doesn’t preclude us from maintaining beliefs about what *could* have happened.
+
+This is totally ordinary, bread-and-butter Bayesian statistics. However, the major complication arises when the experiment took place not at time $t$ but $t_2$? That is, we have a Beta prior on $π_t$ (probability of  recall at time $t$) but the test is administered at some other time $t_2$.
+
+How can we update our beliefs about the recall probability at time $t$ to another time $t_2$, either earlier or later than $t$?
+
+Our old friend Ebbinghaus comes to our rescue. According to the exponentially-decaying forgetting curve, the probability of recall at time $t$ is
+$$π_t = 2^{-t/h},$$
+for some notional half-life $h$. Let $t_2 = δ·t$. Then,
+$$π_{t_2} = π_{δ t} = 2^{-δt/h} = (2^{-t/h})^δ = (π_t)^δ.$$
+That is, to fast-forward or rewind $π_t$ to time $t_2$, we raise it to the $δ = t_2 / t$ power.
+
+Unfortunately, a Beta-distributed $π_t$ becomes not-Beta-distributed when raised to any positive power $δ$.
+
+In the code snippet below, we start out with $π_t ∼ Beta(12, 12)$ and show the distribution of $π_t^δ$ for various $δ$. To make it concrete, imagine $t$ is seven days. The $Beta(12, 12)$ prior on recall probability seven days after the last review is the middle histogram ($δ = 1$). If the student is quizzed on this fact just two days after last review ($δ=0.3$), that density moves from the middle of the plot to the right, meaning a high probability of recall. However, if the student is quizzed three weeks after review, the original density moves to the left: it’s likely the student will fail the quiz.
 ```py
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
 plt.rcParams['svg.fonttype'] = 'none'
 
 
-def generatePis(t, shape=7.0, scale=1.0):
-  import scipy.stats as stats
-  h = stats.gamma.rvs(shape, scale, size=50*1000)
-  pis = 2 ** (-t / h)
-  plt.hist(pis, bins=20, label='t={}'.format(t), alpha=0.25, normed=True)
-  return pis
-
-generatePis(1.)
-generatePis(7.)
-generatePis(30.)
-plt.xlabel('π (recall probability)')
-plt.ylabel('Density')
-plt.title('Histogram of π for different t')
-plt.legend(loc=0)
-plt.savefig('figures/pis.svg')
-plt.savefig('figures/pis.png', dpi=150)
-plt.show()
-```
-![figures/pis.svg](figures/pis.png)
-
-This plot shows the histograms of $π$, the recall probability, a day and a week and a month after the most recent review. The distributions of $π$ move leftwards, from high recall probabilities to low, as the time increases.
-
-So far so good. This gives us an average recall probability (say, the mean of these samples) and a confidence interval, and can be repeated for all the facts the student has learned.
-
-Now, say we have picked a fact to quiz the student on. We’ll model this as a [Bernoulli experiment](https://en.wikipedia.org/wiki/Bernoulli_distribution), i.e., a coin flip with a weighted coin: let $x ∈ \{0, 1\}$ be the result of the quiz, 1 for pass, 0 for fail, a draw from the random variable
-$$X ∼ Bernoulli(π).$$
-$π$ itself still follows a histogram like the one above, i.e., it depends on the distribution chosen for the half-life $h$ and the time since last review, $t$.
-
-(The fact that quizzes are Bernoulli experiments is important—that piece of the model holds for everything that follows.)
-
-How can we incorporate the quiz result $x$ on the distribution on recall probability $π$ and therefore the distribution on half-life $h$? Recall that a [Beta distribution](https://en.wikipedia.org/wiki/Beta_distribution) is a conjugate prior for the Bernoulli distribution, i.e.,
-- *if* $π ∼ Beta(α, β)$
-  - (this is called the *prior* distribution because it’s our belief about the distribution of $π$ before new data comes in),
-- then $(π | x) ∼ Beta(α + x, β + 1 - x)$.
-  - (This is the *posterior* distribution, since we’ve updated the our beliefs about $π$ with new data $x$.)
-  - (Notice that since $x$ is either 0 or 1, $(α + x, β + 1 - x)$ is $(α, β + 1)$ when the quiz was a fail, and $(α + 1, β)$ when it was a pass.)
-
-> **Aside** I realize the folly in explaining what a “prior” and “posterior” are and not explaining how Bayesian statistics works. Sorry. If I can beg off with a few Wikipedia links, this all works because the posterior probability
-> $$P(π | x) = \frac{P(x | π) · P(π)}{P(x)}.$$
-> We can ignore the denominator since it’s not a function of $π$ and just serves to normalize the numerator, so the numerator sums to 1. Usually we write
-> $$P(π | x) ∝ P(x | π) · P(π),$$
-> where that “∝” is read “proportional to”, i.e., there is a normalizing constant that we’re omitting.
->
-> So when the prior $P(π)$ is a Beta density and the “likelihood” $P(x|π)$ is a Bernoulli density, then the posterior $P(π |x)$ is Beta again. And then as another quiz result comes in, the process is repeated, but your prior/posterior on $π$ remains Beta. That’s what it means to have [conjugate priors](https://en.wikipedia.org/wiki/Conjugate_prior), and they’re a big deal in Bayesian statistics.
->
-> (When I was a student, my statistics department had a new course called “Bayesian analysis”. If that’s still a thing, and you can take it, go take it. I fear that, with the acknowledged importance of Bayesian approaches, it’s contents might be distributed among several classes, and not readily available in just one.)
-
-What we could do is to fit a Beta distribution to these histograms of $π$ for different times that we made earlier.
-```py
-def pisToBeta(pis):
+def generatePis(deltaT, alpha=12.0, beta=12.0):
   import scipy.stats as stats
   import numpy as np
-  alpha, beta, _, _ = stats.beta.fit(pis, floc=0, fscale=1)
-  p = np.linspace(0, 1, num=1000)
-  plt.plot(p, stats.beta.pdf(p, alpha, beta), ls='dotted', lw=3, alpha=0.5, color='0.5')
+  from scipy.special import beta as fbeta
 
+  piT = stats.beta.rvs(alpha, beta, size=50*1000)
+  piT2 = piT ** deltaT
 
-plt.figure()
-list(map(pisToBeta, map(generatePis, [1., 7., 30.])))
+  plt.hist(piT2, bins=20, label='δ={}'.format(deltaT), alpha=0.25, normed=True)
+  # p = np.linspace(0, 1, num=1000)
+  # a, b, _, _ = stats.beta.fit(piT2, floc=0, fscale=1)
+  # plt.plot(p, stats.beta.pdf(p, a, b), ls='dotted', lw=4, alpha=0.5, color='0.5')
+  # pr = lambda a,b,d,p: p**((a-d)/d) * (1-p**(1/d))**(b-1) / d / fbeta(a,b)
+  # plt.plot(p, pr(alpha,beta,deltaT,p), ls='dashed', color='0.25', alpha=0.35)
+
+  return piT2
+
+generatePis(0.3)
+generatePis(1.)
+generatePis(3.)
 plt.xlabel('π (recall probability)')
-plt.ylabel('Frequency')
-plt.title('Histogram of π for different t, with Beta fit')
+plt.ylabel('Probability(π)')
+plt.title('Histograms of π_t^δ for different δ')
 plt.legend(loc=0)
-plt.savefig('figures/pis-betas.svg')
-plt.savefig('figures/pis-betas.png', dpi=150)
+plt.savefig('figures/pidelta.svg')
+plt.savefig('figures/pidelta.png', dpi=150)
 plt.show()
 ```
-![figures/pis-betas.png](figures/pis-betas.png)
+![figures/pidelta.png](figures/pidelta.png)
 
-Here we’ve done just this. Note that the fits aren’t perfect, nor should they be, since this particular nonlinear function of a Gamma random variable is not Beta-distributed.
+You’ll have to take my word for it that the histograms where $δ≠1$ as indeed not Beta. I initially fit a Beta distribution to them and sought to make this point visually but alas, for reasonable values of $α$, $β$, and $δ$, a histogram for $π_t^δ$ was well-matched by a Beta distribution.
 
-Nonetheless, through this approximation we get a conjugate prior for our Bernoulli-distributed quiz result.
+So let’s derive analytically the probability density function (PDF) for $π_t^δ$. Recall the conventional way to obtain the density of a [nonlinearly-transformed random variable](https://en.wikipedia.org/w/index.php?title=Random_variable&oldid=771423505#Functions_of_random_variables): let $x=π_t$ and $y = g(x) = x^δ$ be the forward transform, so $g^{-1}(y) = x^{1/δ}$ is its inverse. Then, with $x$ being $Beta(α,β)$,
+$$P_{Y}(y) = P_{x}(g^{-1}(y)) · \frac{∂}{∂y} g^{-1}(y),$$
+and this after some manipulation becomes
+$$P_{Y}(y) = y^{(α-δ)/δ} · (1-y^{1/δ})^{β-1} / (δ · B(α, β)),$$
+where $B(α, β) = Γ(α) · Γ(β) / Γ(α + β)$ is [beta function](https://en.wikipedia.org/wiki/Beta_function), also the normalizing denominator in the Beta density (very confusing, sorry; here $Γ(·)$ denotes the [gamma function](https://en.wikipedia.org/wiki/Gamma_function), which is a generalization of factorial).
+
+Replacing the $X$’s and $Y$’s with our usual variables, we have the probability density for $π_{t_2} = π_t^δ$ in terms of the original density for $π_t$:
+$$P(π_t^δ) = \frac{π^{(α - δ)/δ} · (1-π^{1/δ})^{β-1}}{δ · B(α, β)}.$$
+I tried but failed to rewrite this as a Beta distribution, and indeed, we can show numerically that this density does indeed differ from the best-approximating Beta density.
+
+We will use the density of {π_t^δ} to reach our two most important goals:
+- what’s the recall probability of a given fact right now?, and
+- how do I update my estimate of that recall probability given quiz results?
+
+Let’s first
+
 
 
 ## Source code
@@ -220,16 +206,15 @@ def recallProbabilityMean(alpha, beta, t, tnow):
   return fbeta(alpha + dt, beta) / fbeta(alpha, beta)
 
 def recallProbabilityVar(alpha, beta, t, tnow):
-  from scipy.special import beta as fbeta
-  dt = tnow / t
-  m = recallProbabilityMean(alpha, beta, t, tnow)
-  # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2, {p, 0, 1}]`
-  # FIXME fewer fbeta calls if we combine the expression below with m
-  return dt * (m**2 * fbeta(alpha, beta)
-             - 2 * m * fbeta(alpha + dt, beta)
-             + fbeta(alpha + 2 * dt, beta))
+  # TODO Reduce the number of Gammas required by sharing intermediate results:
+  md = recallProbabilityMean(alpha, beta, t, tnow)
+  md2 = recallProbabilityMean(alpha, beta, t, 2 * tnow)
 
-def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=10000):
+  # `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``
+  # And then plug in mean for `m` & simplify to get:
+  return md2 - md**2
+
+def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=1000000):
   import scipy.stats as stats
   tPrior = stats.beta.rvs(alpha, beta, size=N)
   tnowPrior = tPrior ** (tnow / t)

@@ -130,21 +130,44 @@ You’ll have to take my word for it that the histograms where $δ≠1$ as indee
 
 So let’s derive analytically the probability density function (PDF) for $π_t^δ$. Recall the conventional way to obtain the density of a [nonlinearly-transformed random variable](https://en.wikipedia.org/w/index.php?title=Random_variable&oldid=771423505#Functions_of_random_variables): let $x=π_t$ and $y = g(x) = x^δ$ be the forward transform, so $g^{-1}(y) = x^{1/δ}$ is its inverse. Then, with $x$ being $Beta(α,β)$,
 $$P_{Y}(y) = P_{x}(g^{-1}(y)) · \frac{∂}{∂y} g^{-1}(y),$$
-and this after some manipulation becomes
+and this after some Wolfram Alpha and hand-manipulation becomes
 $$P_{Y}(y) = y^{(α-δ)/δ} · (1-y^{1/δ})^{β-1} / (δ · B(α, β)),$$
 where $B(α, β) = Γ(α) · Γ(β) / Γ(α + β)$ is [beta function](https://en.wikipedia.org/wiki/Beta_function), also the normalizing denominator in the Beta density (very confusing, sorry; here $Γ(·)$ denotes the [gamma function](https://en.wikipedia.org/wiki/Gamma_function), which is a generalization of factorial).
 
+> To check this, type in `y^((a-1)/d) * (1 - y^(1/d))^(b-1) / Beta[a,b] * D[y^(1/d), y]` at [Wolfram Alpha](https://www.wolframalpha.com).
+
 Replacing the $X$’s and $Y$’s with our usual variables, we have the probability density for $π_{t_2} = π_t^δ$ in terms of the original density for $π_t$:
 $$P(π_t^δ) = \frac{π^{(α - δ)/δ} · (1-π^{1/δ})^{β-1}}{δ · B(α, β)}.$$
-I tried but failed to rewrite this as a Beta distribution, and indeed, we can show numerically that this density does indeed differ from the best-approximating Beta density.
+I tried but failed to rewrite this as a Beta distribution, and indeed, we can show numerically that this density does indeed diverge from the best-approximating Beta density.
 
 We will use the density of {π_t^δ} to reach our two most important goals:
 - what’s the recall probability of a given fact right now?, and
 - how do I update my estimate of that recall probability given quiz results?
 
-Let’s first
+Let’s see how to get the recall probability right now. Recall that we start out with a prior on $π_t ∼ Beta(α, β)$, that is, we believe the recall probability on a quiz conducted $t$ days after the last review for a given fact is $Beta(α, β)$-distributed. This prior is parameterized by three positive real numbers: $[α, β, t]$. Let $δ = t_{now} / t$, where $t_{now}$ is the time currently elapsed since the last review. The expected recall probability right now is
+$$\begin{align}
+E[π_t^δ] &= \int_0^1 P(π_t^δ) · π \, dπ \\
+         &= \frac{Γ(α + β)}{Γ(α)} · \frac{Γ(α + δ)}{Γ(α + β + δ)}.
+\end{align}$$
 
+> Mathematica code to verify on Wolfram Alpha: `Integrate[p^((a - d)/d) * (1 - p^(1/d))^(b - 1) / (d * Gamma[a]*Gamma[b]/Gamma[a+b]) * p, {p, 0, 1}]`.
 
+It’s also useful to know how much uncertainty is in our belief about $π_t^δ$. We can evaluate the variance of $π_t^δ$:
+$$\begin{align}
+Var[π_t^δ] &= \int_0^1 P(π_t^δ) · (π - E[π_t^δ])^2 \, dπ \\
+           &= E[π_t^{2 δ}] - (E[π_t^δ])^2.
+\end{align}$$
+
+That first value $E[π_t^{2 δ}]$ means evaluate the expected recall probability for $2 δ$, that is, at another $t_{now}$ days in the future. It might be just coincidence but the fact that $2 δ$ shows up in this way surprised me.
+
+> Verifying this in Mathematica/Wolfram Alpha is a bit more involved. First,
+> `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - d)/d) * (1 - p^(1/d))^(b - 1) / (d * Gamma[a]*Gamma[b]/Gamma[a+b]) * (p-m)^2, {p, 0, 1}]}]` gives the result in terms of mean `m` = $E[π_t^δ]$. Then plug in that value for `m` and simplify by hand.
+
+So far we have found three analytical expressions. Suffice it to say that I tested both the derivations as well as my implementations of them in the code thoroughly to confirm that they matched the answers given by quadrature integration as well as Monte Carlo analysis. Code to do that is provided below, and when I present it, I will show how the above formulae are corroborated.
+
+A quiz app can implement at least the expectation $E[π_t^δ]$ above to identify the facts most at risk of being forgotten.
+
+**Important aside (about which I will say more later)** Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple $[α, β, t]$ initially, for example when the student has first learned a fact.
 
 ## Source code
 
@@ -201,6 +224,7 @@ def recallProbabilityMedian(alpha, beta, t, tnow, percentile=0.5):
   return brentq(cdfPercentile, 0, 1)
 #
 def recallProbabilityMean(alpha, beta, t, tnow):
+  # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`
   from scipy.special import beta as fbeta
   dt = tnow / t
   return fbeta(alpha + dt, beta) / fbeta(alpha, beta)

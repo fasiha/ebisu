@@ -46,7 +46,7 @@ This gives small quiz apps the same intelligent scheduling as Duolingo’s appro
 
 > Nerdy details in a nutshell: Ebisu posits a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it evaluates the [Gamma function](http://mathworld.wolfram.com/GammaFunction.html) to predict the current recall probability. A *quiz* is modeled as a Beroulli trial, whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta posterior by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the Gamma function.
 
-Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how cards are related the way Duolingo can with its data. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.
+Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how facts are related the way Duolingo can with its sentences. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.
 
 ## This document
 
@@ -73,7 +73,7 @@ $$π_t ∼ Beta(α_t, β_t)$$
 for specific $α_t$ and $β_t$, then observing the quiz result updates our belief about the recall probability to be:
 $$π_t | x_t ∼ Beta(α_t + x_t, β_t + 1 - x_t).$$
 
-> **Aside 1** Notice that since $x_t$ is either 1 or 0, the updated parameters $(α + x_t, β + 1 - x_t)$ are $(α + 1, β)$ when the student correctly answered the quiz, and $(α, β + 1)$ when she answered incorrectly.)
+> **Aside 1** Notice that since $x_t$ is either 1 or 0, the updated parameters $(α + x_t, β + 1 - x_t)$ are $(α + 1, β)$ when the student correctly answered the quiz, and $(α, β + 1)$ when she answered incorrectly.
 >
 > **Aside 2** Even if you’re familiar with Bayesian statistics, if you’ve never worked with priors on probabilities, the meta-ness here might confuse you. What the above means is that, before we flipped our $π_t$-weighted coin (before we administered the quiz), we had a specific probability distribution representing the coin’s weighting $π_t$, *not* just a scalar number. After we observed the result of the coin flip, we updated our belief about the coin’s weighting—it *still* makes total sense to talk about the probability of something happening after it happens. Said another way, since we’re being Bayesian, something actually happening doesn’t preclude us from maintaining beliefs about what *could* have happened.
 
@@ -167,7 +167,21 @@ So far we have found three analytical expressions. Suffice it to say that I test
 
 A quiz app can implement at least the expectation $E[π_t^δ]$ above to identify the facts most at risk of being forgotten.
 
-**Important aside (about which I will say more later)** Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple $[α, β, t]$ initially, for example when the student has first learned a fact.
+**Important aside** Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple $[α, β, t]$ initially, for example when the student has first learned a fact. I propose setting $t$ equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set $t$ to four hours or a day, respectively. Then, set $α = β ≥ 2$: the $α = β$ part will center the Beta distribution for $π_t$ at 0.5, and then the actual value will constrain the variability of $π_t$. Specifically, the $Beta(α, β)$ distribution has
+- mean $α / (α + β)$ or $0.5$ if $α = β$, and
+- variance $α · β / (α + β)^ 2 / (α + β + 1)$ which simplifies to $1/(4 (2 α + 1))$ when $α = β$.
+  - (Recall the traditional explanation of $α$ and $β$ are the number of successes and failures, respectively, that have been observed by flipping a weighted coin—or in our application, the number of successful versus unsuccessful quiz results for a sequence of quizzes on the same fact $t$ days apart.)
+
+A higher value for $α = β$ encodes *higher* confidence in the expected half-life $t$, which in turn makes the model (which we’ll detail below) *less* sensitive to quiz results. In our experiments below, $α = β = 12$ (standard deviation of 0.1 on $π_t$) is our least sensitive model, while $α = β = 3$ is our most sensitive model. In the absence of strong feelings, a quiz app author can pick a number between these.
+
+
+```py
+def betafitBeforeLikelihood(a,b,t1,x,t2):
+  a2, b2 = meanVarToBeta(recallProbabilityMean(a,b,t1, t2), recallProbabilityVar(a,b, t1, t2))
+  return a2 + x, b2 + 1 - x, t2
+update(3.3,4.4,1.,0.,2.)
+posteriorAnalytic(3.3,4.4,1.,1.,2.)
+```
 
 ## Source code
 

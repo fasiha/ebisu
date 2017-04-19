@@ -101,8 +101,8 @@ def generatePis(deltaT, alpha=12.0, beta=12.0):
   import numpy as np
   from scipy.special import beta as fbeta
 
-  piT = stats.beta.rvs(alpha, beta, size=50*1000)
-  piT2 = piT ** deltaT
+  piT = stats.beta.rvs(alpha, beta, size=50 * 1000)
+  piT2 = piT**deltaT
 
   plt.hist(piT2, bins=20, label='δ={}'.format(deltaT), alpha=0.25, normed=True)
   # p = np.linspace(0, 1, num=1000)
@@ -112,6 +112,7 @@ def generatePis(deltaT, alpha=12.0, beta=12.0):
   # plt.plot(p, pr(alpha,beta,deltaT,p), ls='dashed', color='0.25', alpha=0.35)
 
   return piT2
+
 
 generatePis(0.3)
 generatePis(1.)
@@ -212,31 +213,24 @@ We are done. That’s all the math.
 
 ## Source code
 
-```py
-def betafitBeforeLikelihood(a,b,t1,x,t2):
-  a2, b2 = meanVarToBeta(recallProbabilityMean(a,b,t1, t2), recallProbabilityVar(a,b, t1, t2))
-  return a2 + x, b2 + 1 - x, t2
-update(3.3,4.4,1.,0.,2.)
-posteriorAnalytic(3.3,4.4,1.,1.,2.)
-```
+### Core library
 
 ```py
 # export ebisu/__init__.py #
 from .ebisu import *
 from . import alternate
-
 ```
 
 ```py
 # export ebisu/ebisu.py #
-
 def recallProbabilityMean(alpha, beta, t, tnow):
   # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`
-  from scipy.special import gamma
+  from scipy.special import gammaln
+  from numpy import exp
   dt = tnow / t
-  same0 = gamma(alpha) / gamma(alpha+beta)
-  same1 = gamma(alpha+dt) / gamma(alpha+beta+dt)
-  return same1 / same0
+  return exp(
+      gammaln(alpha + dt) - gammaln(alpha + beta + dt) - (
+          gammaln(alpha) - gammaln(alpha + beta)))
 
 
 def recallProbabilityVar(alpha, beta, t, tnow):
@@ -244,9 +238,9 @@ def recallProbabilityVar(alpha, beta, t, tnow):
   # `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``
   # And then plug in mean for `m` & simplify to get:
   dt = tnow / t
-  same0 = gamma(alpha) / gamma(alpha+beta)
-  same1 = gamma(alpha+dt) / gamma(alpha+beta+dt)
-  same2 = gamma(alpha+2*dt) / gamma(alpha+beta+2*dt)
+  same0 = gamma(alpha) / gamma(alpha + beta)
+  same1 = gamma(alpha + dt) / gamma(alpha + beta + dt)
+  same2 = gamma(alpha + 2 * dt) / gamma(alpha + beta + 2 * dt)
   md = same1 / same0
   md2 = same2 / same0
   return md2 - md**2
@@ -261,23 +255,23 @@ def posteriorAnalytic(alpha, beta, t, result, tnow):
     # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`
     # variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
     # Simplify all three to get the following:
-    same = gammaln(alpha+beta+dt) - gammaln(alpha+dt)
-    mu = exp(gammaln(alpha + 2*dt)
-           - gammaln(alpha + beta + 2*dt)
-           + same)
-    var = exp(same + gammaln(alpha + 3*dt) - gammaln(alpha + beta + 3*dt)) - mu**2
+    same = gammaln(alpha + beta + dt) - gammaln(alpha + dt)
+    mu = exp(gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt) + same)
+    var = exp(same + gammaln(alpha + 3 * dt) -
+              gammaln(alpha + beta + 3 * dt)) - mu**2
   else:
     # Mathematica code is same as above, but replace one `p` with `(1-p)`
     # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
     # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
     # var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
     # Then simplify and combine
-    same0 = gamma(alpha) / gamma(alpha+beta)
-    same1 = gamma(alpha+dt) / gamma(alpha+beta+dt)
-    same2 = gamma(alpha+2*dt) / gamma(alpha+beta+2*dt)
-    same3 = gamma(alpha+3*dt) / gamma(alpha+beta+3*dt)
+    same0 = gamma(alpha) / gamma(alpha + beta)
+    same1 = gamma(alpha + dt) / gamma(alpha + beta + dt)
+    same2 = gamma(alpha + 2 * dt) / gamma(alpha + beta + 2 * dt)
+    same3 = gamma(alpha + 3 * dt) / gamma(alpha + beta + 3 * dt)
     mu = (same1 - same2) / (same0 - same1)
-    var = (same3 * (same1 - same0) + same2 * (same0 + same1 - same2) - same1**2) / (same1 - same0) ** 2
+    var = (same3 * (same1 - same0) + same2 *
+           (same0 + same1 - same2) - same1**2) / (same1 - same0)**2
   newAlpha, newBeta = meanVarToBeta(mu, var)
   return newAlpha, newBeta, tnow
 
@@ -289,25 +283,190 @@ def meanVarToBeta(mean, var):
   beta = (1 - mean) * tmp
   return alpha, beta
 
-  def priorToHalflife(alpha, beta, t, percentile=0.5, maxt=100, mint=0):
-    from math import sqrt, abs
-    from scipy.optimize import brentq
-    h = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - percentile,
-               mint, maxt)
-    # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.
-    # To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that:
-    # - `v` is the probability variance around 0.5, so `sqrt(v)` is the standard deviation
-    # - find the times for which `0.5 +/- sqrt(v)`. This is a kind of one-sigma confidence interval in time
-    # - convert these times to a 'time variance' by taking their mean-absolute-distance to `h` and squaring that.
-    # Open to suggestions for improving this. The second 'variance' number should not be taken seriously, but it can be used for notional plotting.
-    v = recallProbabilityVar(alpha, beta, t, h)
-    h2 = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - (percentile - sqrt(v)),
-                mint, maxt)
-    h3 = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - (percentile + sqrt(v)),
-                mint, maxt)
 
-    return h, ((abs(h2 - h) + abs(h3 - h)) / 2)**2
+def priorToHalflife(alpha, beta, t, percentile=0.5, maxt=100, mint=1e-3):
+  from math import sqrt
+  from scipy.optimize import brentq
+  h = brentq(
+      lambda now: recallProbabilityMean(alpha, beta, t, now) - percentile, mint,
+      maxt)
+  # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.
+  # To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that:
+  # - `v` is the probability variance around 0.5, so `sqrt(v)` is the standard deviation
+  # - find the times for which `0.5 +/- sqrt(v)`. This is a kind of one-sigma confidence interval in time
+  # - convert these times to a 'time variance' by taking their mean-absolute-distance to `h` and squaring that.
+  # Open to suggestions for improving this. The second 'variance' number should not be taken seriously, but it can be used for notional plotting.
+  v = recallProbabilityVar(alpha, beta, t, h)
+  h2 = brentq(
+      lambda now: recallProbabilityMean(alpha, beta, t, now) - (percentile - sqrt(v)),
+      mint, maxt)
+  h3 = brentq(
+      lambda now: recallProbabilityMean(alpha, beta, t, now) - (percentile + sqrt(v)),
+      mint, maxt)
 
+  return h, ((abs(h2 - h) + abs(h3 - h)) / 2)**2
+```
+
+### Alternate ways of evaluating the same results as above
+```py
+# export ebisu/alternate.py #
+from .ebisu import meanVarToBeta
+```
+
+```py
+# export ebisu/alternate.py #
+import numpy as np
+
+
+def recallProbabilityMode(alpha, beta, t, tnow):
+  """Returns the mode of the immediate (pseudo-Beta) prior"""
+  # [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`
+  dt = tnow / t
+  pr = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1)
+
+  # See [peak]. The actual mode is `modeBase ** dt`, but since `modeBase` might be negative or otherwise invalid, check it.
+  modeBase = (alpha - dt) / (alpha + beta - dt - 1)
+  if modeBase >= 0 and modeBase <= 1:
+    # Still need to confirm this is not a minimum (anti-mode). Do this with a coarse check of other points likely to be the mode.
+    mode = modeBase**dt
+    modePr = pr(mode)
+
+    eps = 1e-3
+    others = [
+        eps, mode - eps if mode > eps else mode / 2, mode + eps
+        if mode < 1 - eps else (1 + mode) / 2, 1 - eps
+    ]
+    otherPr = map(pr, others)
+    if max(otherPr) <= modePr:
+      return mode
+  # If anti-mode detected, that means one of the edges is the mode, likely caused by a very large or very small `dt`. Just use `dt` to guess which extreme it was pushed to. If `dt` == 1.0, and we get to this point, likely we have malformed alpha/beta (i.e., <1)
+  return 0.5 if dt == 1. else (0. if dt > 1 else 1.)
+
+
+def recallProbabilityMedian(alpha, beta, t, tnow, percentile=0.5):
+  """"""
+  # [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
+  from scipy.optimize import brentq
+  from scipy.special import beta as fbeta
+  from scipy.special import hyp2f1
+
+  dt = tnow / t
+
+  # See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.
+  # N.B. I prefer to try to find the mode (above) because it will be much faster than this.
+  cdfPercentile = lambda p: (p**(alpha/dt) *
+                             hyp2f1(alpha, 1 - beta, 1 + alpha, p**(1/dt)) /
+                             alpha /
+                             fbeta(alpha,beta)) - percentile
+  return brentq(cdfPercentile, 0, 1)
+
+
+def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=1000000):
+  import scipy.stats as stats
+  tPrior = stats.beta.rvs(alpha, beta, size=N)
+  tnowPrior = tPrior**(tnow / t)
+  freqs, bins = np.histogram(tnowPrior, 'auto')
+  bincenters = bins[:-1] + np.diff(bins) / 2
+  return dict(
+      mean=np.mean(tnowPrior),
+      median=np.median(tnowPrior),
+      mode=bincenters[freqs.argmax()],
+      var=np.var(tnowPrior))
+
+
+# So we have several ways of evaluating the posterior mean/var:
+# - Monte Carlo
+# - Quadrature integration
+# - Analytic expression, with several hyp2f1
+# - Simplified analytic expression with fewer hyp2f1 (recurrence relations)
+
+
+def posteriorQuad(alpha,
+                  beta,
+                  t,
+                  result,
+                  tnow,
+                  analyticMarginal=True,
+                  maxiter=100):
+  """Update a time-dependent Beta distribution with a new data sample"""
+  from scipy.integrate import quad
+
+  dt = tnow / t
+
+  if result == 1:
+    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1) * p
+  else:
+    # difference from above: -------------------------------------------^vvvv
+    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1) * (1 - p)
+
+  if analyticMarginal:
+    from scipy.special import beta as fbeta
+    if result == 1:
+      marginal = dt * fbeta(alpha + dt, beta)
+    else:
+      marginal = dt * (fbeta(alpha, beta) - fbeta(alpha + dt, beta))
+  else:
+    marginalEst = quad(marginalInt, 0, 1)
+    if marginalEst[0] < marginalEst[1] * 10.:
+      raise OverflowError(
+          'Marginal integral error too high: value={}, error={}'.format(
+              marginalEst[0], marginalEst[1]))
+    marginal = marginalEst[0]
+
+  muInt = lambda p: marginalInt(p) * p
+  muEst = quad(muInt, 0, 1)
+  if muEst[0] < muEst[1] * 10.:
+    raise OverflowError('Mean integral error too high: value={}, error={}'.
+                        format(muEst[0], muEst[1]))
+  mu = muEst[0] / marginal
+
+  varInt = lambda p: marginalInt(p) * (p - mu)**2
+  varEst = quad(varInt, 0, 1)
+  if varEst[0] < varEst[1] * 10.:
+    raise OverflowError('Variance integral error too high: value={}, error={}'.
+                        format(varEst[0], varEst[1]))
+  var = varEst[0] / marginal
+
+  newAlpha, newBeta = meanVarToBeta(mu, var)
+  return newAlpha, newBeta, tnow
+
+
+def posteriorMonteCarlo(alpha, beta, t, result, tnow, N=10000):
+  """Update a time-dependent Beta distribution with a new data sample"""
+  # [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&oldid=769806318#Properties_of_the_Bernoulli_Distribution, third (last) equation
+  # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
+  # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
+  import scipy.stats as stats
+
+  tPrior = stats.beta.rvs(alpha, beta, size=N)
+
+  # To see where this comes from, read the rest of this document!
+  tnowPrior = tPrior**(tnow / t)
+
+  # This is the Bernoulli likelihood [bernoulliLikelihood]
+  weights = (tnowPrior)**result * ((1 - tnowPrior)**(1 - result))
+
+  # See [weightedMean]
+  weightedMean = np.sum(weights * tnowPrior) / np.sum(weights)
+  # See [weightedVar]
+  weightedVar = np.sum(weights *
+                       (tnowPrior - weightedMean)**2) / np.sum(weights)
+
+  newAlpha, newBeta = meanVarToBeta(weightedMean, weightedVar)
+
+  return newAlpha, newBeta, tnow
+```
+
+### Test code
+```py
+def betafitBeforeLikelihood(a, b, t1, x, t2):
+  a2, b2 = meanVarToBeta(
+      recallProbabilityMean(a, b, t1, t2), recallProbabilityVar(a, b, t1, t2))
+  return a2 + x, b2 + 1 - x, t2
+
+
+betafitBeforeLikelihood(3.3, 4.4, 1., 1., 2.)
+posteriorAnalytic(3.3, 4.4, 1., 1., 2.)
 ```
 
 ```py
@@ -315,18 +474,20 @@ def meanVarToBeta(mean, var):
 from unittest import TestCase
 from ebisu import *
 from ebisu.alternate import *
-
 ```
 
 ```py
 # export ebisu/tests/test_ebisu.py
 import unittest
 
+
 def relerr(dirt, gold):
   return abs(dirt - gold) / abs(gold)
 
+
 def maxrelerr(dirts, golds):
   return max(map(relerr, dirts, golds))
+
 
 def klDivBeta(a, b, a2, b2):
   """Kullback-Leibler divergence between two Beta distributions in nats"""
@@ -335,19 +496,22 @@ def klDivBeta(a, b, a2, b2):
   import numpy as np
   left = np.array([a, b])
   right = np.array([a2, b2])
-  return gammaln(sum(left)) - gammaln(sum(right)) - sum(gammaln(left)) + sum(gammaln(right)) + np.dot(left - right, psi(left) - psi(sum(left)))
+  return gammaln(sum(left)) - gammaln(sum(right)) - sum(gammaln(left)) + sum(
+      gammaln(right)) + np.dot(left - right, psi(left) - psi(sum(left)))
 
 
 class TestEbisu(unittest.TestCase):
+
   def test_kl(self):
     # See https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Quantities_of_information_.28entropy.29 for these numbers
     self.assertAlmostEqual(klDivBeta(1., 1., 3., 3.), 0.598803, places=5)
     self.assertAlmostEqual(klDivBeta(3., 3., 1., 1.), 0.267864, places=5)
 
   def test_prior(self):
+
     def inner(a, b, t0):
       for t in map(lambda dt: dt * t0, [0.1, .99, 1., 1.01, 5.5]):
-        mc = recallProbabilityMonteCarlo(a, b, t0, t, N=100*1000)
+        mc = recallProbabilityMonteCarlo(a, b, t0, t, N=100 * 1000)
         mean = recallProbabilityMean(a, b, t0, t)
         var = recallProbabilityVar(a, b, t0, t)
         self.assertLess(relerr(mean, mc['mean']), 3e-2)
@@ -360,12 +524,13 @@ class TestEbisu(unittest.TestCase):
     inner(34.4, 34.4, .5)
 
   def test_posterior(self):
+
     def inner(a, b, t0):
-      kl = lambda v, w: (klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])) / 2.
+      kl = lambda v, w: ((klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])) / 2.)
       for t in map(lambda dt: dt * t0, [0.1, 1., 5.5]):
         for x in [0., 1.]:
           msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
-          mc = posteriorMonteCarlo(a, b, t0, x, t, N=1*1000*1000)
+          mc = posteriorMonteCarlo(a, b, t0, x, t, N=1 * 1000 * 1000)
           an = posteriorAnalytic(a, b, t0, x, t)
           self.assertLess(kl(an, mc), 1e-4, msg=msg)
 
@@ -390,142 +555,13 @@ class TestEbisu(unittest.TestCase):
     inner(34.4, 34.4, 15.5)
     inner(34.4, 34.4, .5)
 
+
 if __name__ == '__main__':
-  unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(TestEbisu()))
-
+  unittest.TextTestRunner().run(
+      unittest.TestLoader().loadTestsFromModule(TestEbisu()))
 ```
 
-
-```py
-# export ebisu/alternate.py #
-import numpy as np
-from .ebisu import meanVarToBeta
-
-def recallProbabilityMode(alpha, beta, t, tnow):
-  """Returns the mode of the immediate (pseudo-Beta) prior"""
-  # [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`
-  dt = tnow / t
-  pr = lambda p: p**((alpha-dt)/dt) * (1-p**(1/dt))**(beta-1)
-
-  # See [peak]. The actual mode is `modeBase ** dt`, but since `modeBase` might be negative or otherwise invalid, check it.
-  modeBase = (alpha - dt) / (alpha + beta - dt - 1)
-  if modeBase >= 0 and modeBase <= 1:
-    # Still need to confirm this is not a minimum (anti-mode). Do this with a coarse check of other points likely to be the mode.
-    mode = modeBase ** dt
-    modePr = pr(mode)
-
-    eps = 1e-3
-    others = [eps,
-              mode - eps if mode > eps else mode / 2,
-              mode + eps if mode < 1 - eps else (1 + mode) / 2,
-              1 - eps]
-    otherPr = map(pr, others)
-    if max(otherPr) <= modePr:
-      return mode
-  # If anti-mode detected, that means one of the edges is the mode, likely caused by a very large or very small `dt`. Just use `dt` to guess which extreme it was pushed to. If `dt` == 1.0, and we get to this point, likely we have malformed alpha/beta (i.e., <1)
-  return 0.5 if dt == 1. else (0. if dt > 1 else 1.)
-
-def recallProbabilityMedian(alpha, beta, t, tnow, percentile=0.5):
-  """"""
-  # [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
-  from scipy.optimize import brentq
-  from scipy.special import beta as fbeta
-  from scipy.special import hyp2f1
-
-  dt = tnow / t
-
-  # See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.
-  # N.B. I prefer to try to find the mode (above) because it will be much faster than this.
-  cdfPercentile = lambda p: (p**(alpha/dt) *
-                             hyp2f1(alpha, 1 - beta, 1 + alpha, p**(1/dt)) /
-                             alpha /
-                             fbeta(alpha,beta)) - percentile
-  return brentq(cdfPercentile, 0, 1)
-
-def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=1000000):
-  import scipy.stats as stats
-  tPrior = stats.beta.rvs(alpha, beta, size=N)
-  tnowPrior = tPrior ** (tnow / t)
-  freqs, bins = np.histogram(tnowPrior,'auto')
-  bincenters = bins[:-1] + np.diff(bins) / 2
-  return dict(mean=np.mean(tnowPrior),
-              median=np.median(tnowPrior),
-              mode=bincenters[freqs.argmax()],
-              var=np.var(tnowPrior))
-
-# So we have several ways of evaluating the posterior mean/var:
-# - Monte Carlo
-# - Quadrature integration
-# - Analytic expression, with several hyp2f1
-# - Simplified analytic expression with fewer hyp2f1 (recurrence relations)
-
-
-def posteriorQuad(alpha, beta, t, result, tnow, analyticMarginal=True, maxiter=100):
-  """Update a time-dependent Beta distribution with a new data sample"""
-  from scipy.integrate import quad
-
-  dt = tnow / t
-
-  if result == 1:
-    marginalInt = lambda p: p**((alpha-dt)/dt) * (1-p**(1/dt))**(beta-1)*p
-  else:
-    # difference from above: -------------------------------------------^vvvv
-    marginalInt = lambda p: p**((alpha-dt)/dt) * (1-p**(1/dt))**(beta-1)*(1-p)
-
-  if analyticMarginal:
-    from scipy.special import beta as fbeta
-    if result == 1:
-      marginal = dt * fbeta(alpha+dt, beta)
-    else:
-      marginal = dt * (fbeta(alpha, beta) - fbeta(alpha+dt, beta))
-  else:
-    marginalEst = quad(marginalInt, 0, 1)
-    if marginalEst[0] < marginalEst[1] * 10.:
-      raise OverflowError('Marginal integral error too high: value={}, error={}'.format(marginalEst[0], marginalEst[1]))
-    marginal = marginalEst[0]
-
-  muInt = lambda p: marginalInt(p) * p
-  muEst = quad(muInt, 0, 1)
-  if muEst[0] < muEst[1] * 10.:
-    raise OverflowError('Mean integral error too high: value={}, error={}'.format(muEst[0], muEst[1]))
-  mu = muEst[0] / marginal
-
-  varInt = lambda p: marginalInt(p) * (p - mu)**2
-  varEst = quad(varInt, 0, 1)
-  if varEst[0] < varEst[1] * 10.:
-    raise OverflowError('Variance integral error too high: value={}, error={}'.format(varEst[0], varEst[1]))
-  var = varEst[0] / marginal
-
-  newAlpha, newBeta = meanVarToBeta(mu, var)
-  return newAlpha, newBeta, tnow
-
-
-
-def posteriorMonteCarlo(alpha, beta, t, result, tnow, N=10000):
-  """Update a time-dependent Beta distribution with a new data sample"""
-  # [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&oldid=769806318#Properties_of_the_Bernoulli_Distribution, third (last) equation
-  # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
-  # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
-  import scipy.stats as stats
-
-  tPrior = stats.beta.rvs(alpha, beta, size=N)
-
-  # To see where this comes from, read the rest of this document!
-  tnowPrior = tPrior ** (tnow / t)
-
-  # This is the Bernoulli likelihood [bernoulliLikelihood]
-  weights = (tnowPrior)**result * ((1 - tnowPrior)**(1 - result))
-
-  # See [weightedMean]
-  weightedMean = np.sum(weights * tnowPrior) / np.sum(weights)
-  # See [weightedVar]
-  weightedVar = np.sum(weights * (tnowPrior - weightedMean)**2) / np.sum(weights)
-
-  newAlpha, newBeta = meanVarToBeta(weightedMean, weightedVar)
-
-  return newAlpha, newBeta, tnow
-
-```
+### Demo code
 
 ```py
 import scipy.stats as stats
@@ -534,16 +570,15 @@ import matplotlib.pyplot as plt
 plt.style.use('ggplot')
 plt.rcParams['svg.fonttype'] = 'none'
 
-
-betaa = 4./3
-betab = 4./3
+betaa = 4. / 3
+betab = 4. / 3
 
 betaa = 12.
 betab = 12.
 
 t0 = 7.
 
-v2s = lambda var: np.sqrt(var)
+v2s = lambda var: np.sqrt(var) / 10
 
 ts = np.arange(1, 31.)
 
@@ -567,27 +602,31 @@ plt.title('New interval, for old interval={} days'.format(t0))
 plt.xlabel('Time test taken (days)')
 plt.ylabel('New interval (days)')
 plt.savefig('figures/halflife.svg')
-plt.savefig('figures/halflife.png',dpi=150)
+plt.savefig('figures/halflife.png', dpi=150)
 plt.show()
-
 ```
 
 ```py
-
-plt.figure();
+plt.figure()
 modelA = posteriorAnalytic(3., 3., 7., 1, 15.)
 modelB = posteriorAnalytic(12., 12., 7., 1, 15.)
 hlA = priorToHalflife(*modelA)
 hlB = priorToHalflife(*modelB)
-plt.errorbar(ts,
-             recallProbabilityMean(*modelA, ts),
-             v2s(recallProbabilityVar(*modelA, ts)),
-             fmt='.-', label='Model A', color='C0')
+plt.errorbar(
+    ts,
+    recallProbabilityMean(*modelA, ts),
+    v2s(recallProbabilityVar(*modelA, ts)),
+    fmt='.-',
+    label='Model A',
+    color='C0')
 plt.plot(ts, 2**(-ts / hlA[0]), '--', label='approx A', color='C0')
-plt.errorbar(ts,
-             recallProbabilityMean(*modelB, ts),
-             v2s(recallProbabilityVar(*modelB, ts)),
-             fmt='.-', label='Model B', color='C1')
+plt.errorbar(
+    ts,
+    recallProbabilityMean(*modelB, ts),
+    v2s(recallProbabilityVar(*modelB, ts)),
+    fmt='.-',
+    label='Model B',
+    color='C1')
 plt.plot(ts, 2**(-ts / hlB[0]), '--', label='approx B', color='C1')
 plt.legend(loc=0)
 plt.ylim([0, 1])
@@ -596,10 +635,8 @@ plt.xlabel('Time (days)')
 plt.ylabel('Recall probability')
 plt.title('Predicted forgetting curves (A: a=b=3, B: a=b=12)')
 plt.savefig('figures/forgetting-curve.svg')
-plt.savefig('figures/forgetting-curve.png',dpi=150)
+plt.savefig('figures/forgetting-curve.png', dpi=150)
 plt.show()
-
-
 ```
 
 ## Implementation thoughts

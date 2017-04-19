@@ -197,8 +197,20 @@ $$E[π | x=0] = \frac{γ_2 - γ_1}{γ_1 - γ_0}.$$
 
 $$Var[π | x=0] = \frac{γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2}{(γ_1 - γ_0)^2}$$
 
-> The Mathematica expressions used in deriving these are given in the source code below. Unlike the first few analytical results above, these required considerable hand-simplification. Nonetheless, we will double-check these analytical expressions with both Monte Carlo and quadrature integration below.
+> The Mathematica expressions used in deriving these are given in the source code below. Unlike the first few analytical results above, these required considerable hand-simplification, and we will double-check them against both Monte Carlo and quadrature integration below.
 
+With the mean and variance of the posterior in hand, it is straightforward to find a well-approximating Beta distribution using the [method of moments](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters):
+- a new $α' = μ (μ (1-μ) / σ^2 - 1)$ and
+- $β' = (1-μ) (μ (1-μ) / σ^2 - 1)$,
+  - for $μ = E[π|x]$ and $σ^2 = Var[π|x]$.
+
+The updated posterior becomes the new prior, parameterized by this $[α', β', t_2]$, where $t_2$ is the time elapsed between this fact’s last quiz and the one just used in the update.
+
+We are done. That’s all the math.
+
+
+
+## Source code
 
 ```py
 def betafitBeforeLikelihood(a,b,t1,x,t2):
@@ -207,8 +219,6 @@ def betafitBeforeLikelihood(a,b,t1,x,t2):
 update(3.3,4.4,1.,0.,2.)
 posteriorAnalytic(3.3,4.4,1.,1.,2.)
 ```
-
-## Source code
 
 ```py
 # export ebisu/__init__.py #

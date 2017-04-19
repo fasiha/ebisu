@@ -224,7 +224,7 @@ posteriorAnalytic(3.3,4.4,1.,1.,2.)
 # export ebisu/__init__.py #
 from .ebisu import *
 from . import alternate
-from . import montecarlo
+
 ```
 
 ```py
@@ -254,7 +254,7 @@ def recallProbabilityVar(alpha, beta, t, tnow):
 
 def posteriorAnalytic(alpha, beta, t, result, tnow):
   from scipy.special import gammaln, gamma
-
+  from math import exp
   dt = tnow / t
   if result == 1:
     # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
@@ -262,10 +262,10 @@ def posteriorAnalytic(alpha, beta, t, result, tnow):
     # variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
     # Simplify all three to get the following:
     same = gammaln(alpha+beta+dt) - gammaln(alpha+dt)
-    mu = np.exp(gammaln(alpha + 2*dt)
-              - gammaln(alpha + beta + 2*dt)
-              + same)
-    var = np.exp(same + gammaln(alpha + 3*dt) - gammaln(alpha + beta + 3*dt)) - mu**2
+    mu = exp(gammaln(alpha + 2*dt)
+           - gammaln(alpha + beta + 2*dt)
+           + same)
+    var = exp(same + gammaln(alpha + 3*dt) - gammaln(alpha + beta + 3*dt)) - mu**2
   else:
     # Mathematica code is same as above, but replace one `p` with `(1-p)`
     # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
@@ -300,26 +300,6 @@ from ebisu.alternate import *
 
 ```
 
-
-```py
-# export ebisu/tests/test_ebisu.py
-
-import unittest
-class TestStringMethods(unittest.TestCase):
-    def test_upper(self):
-        self.assertEqual('foo'.upper(), 'FOO')
-    def test_isupper(self):
-        self.assertTrue('FOO'.isupper())
-        self.assertFalse('Foo'.isupper())
-    def test_split(self):
-        s = 'hello world'
-        self.assertEqual(s.split(), ['hello', 'world'])
-        # check that s.split fails when the separator is not a string
-        with self.assertRaises(TypeError):
-            s.split(2)
-unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(TestStringMethods()))
-```
-
 ```py
 # export ebisu/tests/test_ebisu.py
 import unittest
@@ -352,7 +332,7 @@ class TestEbisu(unittest.TestCase):
         mc = recallProbabilityMonteCarlo(a, b, t0, t, N=100*1000)
         mean = recallProbabilityMean(a, b, t0, t)
         var = recallProbabilityVar(a, b, t0, t)
-        self.assertLess(relerr(mean, mc['mean']), 1e-2)
+        self.assertLess(relerr(mean, mc['mean']), 3e-2)
 
     inner(3.3, 4.4, 5.5)
     inner(3.3, 4.4, 15.5)
@@ -363,7 +343,7 @@ class TestEbisu(unittest.TestCase):
 
   def test_posterior(self):
     def inner(a, b, t0):
-      kl = lambda v, w: (klDivBeta(*v[:2], *w[:2]) + klDivBeta(*w[:2], *v[:2])) / 2.
+      kl = lambda v, w: (klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])) / 2.
       for t in map(lambda dt: dt * t0, [0.1, 1., 5.5]):
         for x in [0., 1.]:
           msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
@@ -401,6 +381,7 @@ if __name__ == '__main__':
 ```py
 # export ebisu/alternate.py #
 import numpy as np
+from .ebisu import meanVarToBeta
 
 def recallProbabilityMode(alpha, beta, t, tnow):
   """Returns the mode of the immediate (pseudo-Beta) prior"""

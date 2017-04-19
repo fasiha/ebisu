@@ -1,0 +1,15 @@
+{
+  "name": "Ebisu",
+  "version": "1.0.0",
+  "main": "md2code.js",
+  "repository": "git@github.com:fasiha/ebisu.git",
+  "author": "Ahmed Fasih <wuzzyview@gmail.com>",
+  "license": "Unlicense",
+  "scripts": {
+    "build": "node md2code.js",
+    "test": "yarn build && python -m \"nose\" -v"
+  },
+  "dependencies": {
+    "lodash": "^4.17.4"
+  }
+}

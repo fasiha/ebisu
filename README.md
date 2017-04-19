@@ -195,9 +195,9 @@ The posterior mean and variance when $x=0$ (failed quiz) are:
 
 $$E[π | x=0] = \frac{γ_2 - γ_1}{γ_1 - γ_0}.$$
 
-$$Var[π | x=0] = \frac{γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2}{(γ_1 - γ_0)^2}$$
+$$Var[π | x=0] = \frac{γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2}{(γ_1 - γ_0)^2}.$$
 
-> The Mathematica expressions used in deriving these are given in the source code below. Unlike the first few analytical results above, these required considerable hand-simplification, and we will double-check them against both Monte Carlo and quadrature integration below.
+> The Mathematica expressions used in deriving these are given in the source code below. Unlike the first few analytical results above, these required considerable hand-simplification, and we will double-check them against both Monte Carlo simulation and quadrature integration below.
 
 With the mean and variance of the posterior in hand, it is straightforward to find a well-approximating Beta distribution using the [method of moments](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters):
 - a new $α' = μ (μ (1-μ) / σ^2 - 1)$ and
@@ -226,6 +226,123 @@ from .ebisu import *
 from . import alternate
 from . import montecarlo
 ```
+
+```py
+# export ebisu/ebisu.py #
+
+def recallProbabilityMean(alpha, beta, t, tnow):
+  # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`
+  from scipy.special import gamma
+  dt = tnow / t
+  same0 = gamma(alpha) / gamma(alpha+beta)
+  same1 = gamma(alpha+dt) / gamma(alpha+beta+dt)
+  return same1 / same0
+
+
+def recallProbabilityVar(alpha, beta, t, tnow):
+  from scipy.special import gamma
+  # `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``
+  # And then plug in mean for `m` & simplify to get:
+  dt = tnow / t
+  same0 = gamma(alpha) / gamma(alpha+beta)
+  same1 = gamma(alpha+dt) / gamma(alpha+beta+dt)
+  same2 = gamma(alpha+2*dt) / gamma(alpha+beta+2*dt)
+  md = same1 / same0
+  md2 = same2 / same0
+  return md2 - md**2
+
+
+def posteriorAnalytic(alpha, beta, t, result, tnow):
+  from scipy.special import gammaln, gamma
+
+  dt = tnow / t
+  if result == 1:
+    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
+    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`
+    # variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
+    # Simplify all three to get the following:
+    same = gammaln(alpha+beta+dt) - gammaln(alpha+dt)
+    mu = np.exp(gammaln(alpha + 2*dt)
+              - gammaln(alpha + beta + 2*dt)
+              + same)
+    var = np.exp(same + gammaln(alpha + 3*dt) - gammaln(alpha + beta + 3*dt)) - mu**2
+  else:
+    # Mathematica code is same as above, but replace one `p` with `(1-p)`
+    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
+    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
+    # var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
+    # Then simplify and combine
+    same0 = gamma(alpha) / gamma(alpha+beta)
+    same1 = gamma(alpha+dt) / gamma(alpha+beta+dt)
+    same2 = gamma(alpha+2*dt) / gamma(alpha+beta+2*dt)
+    same3 = gamma(alpha+3*dt) / gamma(alpha+beta+3*dt)
+    mu = (same1 - same2) / (same0 - same1)
+    var = (same3 * (same1 - same0) + same2 * (same0 + same1 - same2) - same1**2) / (same1 - same0) ** 2
+  newAlpha, newBeta = meanVarToBeta(mu, var)
+  return newAlpha, newBeta, tnow
+```
+
+```py
+# export ebisu/tests/test_ebisu.py
+from unittest import TestCase
+from ebisu import *
+from ebisu.alternate import *
+
+```
+
+```py
+# export ebisu/tests/test_ebisu.py
+
+def relerr(dirt, gold):
+  return np.abs(dirt - gold) / np.abs(gold)
+
+
+def testPrior(a, b, t0, t):
+  import numpy as np
+  mean = recallProbabilityMean(a, b, t0, t)
+  var = recallProbabilityVar(a, b, t0, t)
+  med = recallProbabilityMedian(a, b, t0, t)
+  mod = recallProbabilityMode(a, b, t0, t)
+  mc = recallProbabilityMonteCarlo(a, b, t0, t)
+  # return np.allclose([mean,var,med,mod], [mc['mean'], mc['var'], mc['median'], mc['mode']])
+  a = np.array([mean,var,med,mod])
+  m = np.array([mc['mean'], mc['var'], mc['median'], mc['mode']])
+  return relerr(a, m)
+
+def testPost(a,b,t0,x,t):
+  post = [posteriorMonteCarlo(a, b, t0, x, t, N=1000*1000),
+         posteriorQuad(a, b, t0, x, t, analyticMarginal=True),
+         posteriorQuad(a, b, t0, x, t, analyticMarginal=False),
+         posteriorAnalytic(a, b, t0, x, t)]
+  return relerr(np.array(post[1:]), np.array(post[0]))
+
+def testBoth(a, b, t0, x, t):
+  pre = testPrior(a, b, t0, t)
+  post = testPost(a,b,t0,x,t)
+  return pre, post
+
+def testerx(a, b, t0, x, t):
+  pre, post = testBoth(a, b, t0, x, t)
+  try:
+    assert(np.max(post) < 1e-2)
+    assert(np.max(pre[:-1]) < 1e-2)
+    assert(pre[-1] < 1e-1)
+  except AssertionError:
+    print(pre)
+    print(post)
+    assert(False)
+
+def tester(a, b, t0, t):
+  testerx(a,b,t0,1.,t)
+  testerx(a,b,t0,0.,t)
+
+
+tester(3.3,4.4,7.,9)
+tester(3.3,4.4,7.,2.9)
+tester(3.3,3.3,7.,0.9) # quad disagreeing?
+tester(13.3,13.3,7.,32.9)
+```
+
 
 ```py
 # export ebisu/alternate.py #
@@ -271,21 +388,6 @@ def recallProbabilityMedian(alpha, beta, t, tnow, percentile=0.5):
                              alpha /
                              fbeta(alpha,beta)) - percentile
   return brentq(cdfPercentile, 0, 1)
-#
-def recallProbabilityMean(alpha, beta, t, tnow):
-  # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`
-  from scipy.special import beta as fbeta
-  dt = tnow / t
-  return fbeta(alpha + dt, beta) / fbeta(alpha, beta)
-
-def recallProbabilityVar(alpha, beta, t, tnow):
-  # TODO Reduce the number of Gammas required by sharing intermediate results:
-  md = recallProbabilityMean(alpha, beta, t, tnow)
-  md2 = recallProbabilityMean(alpha, beta, t, 2 * tnow)
-
-  # `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``
-  # And then plug in mean for `m` & simplify to get:
-  return md2 - md**2
 
 def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=1000000):
   import scipy.stats as stats
@@ -303,35 +405,6 @@ def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=1000000):
 # - Quadrature integration
 # - Analytic expression, with several hyp2f1
 # - Simplified analytic expression with fewer hyp2f1 (recurrence relations)
-
-def posteriorAnalytic(alpha, beta, t, result, tnow):
-  from scipy.special import gammaln, gamma
-
-  dt = tnow / t
-  if result == 1:
-    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
-    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`
-    # variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
-    # Simplify all three to get the following:
-    same = gammaln(alpha+beta+dt) - gammaln(alpha+dt)
-    mu = np.exp(gammaln(alpha + 2*dt)
-              - gammaln(alpha + beta + 2*dt)
-              + same)
-    var = np.exp(same + gammaln(alpha + 3*dt) - gammaln(alpha + beta + 3*dt)) - mu**2
-  else:
-    # Mathematica code is same as above, but replace one `p` with `(1-p)`
-    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
-    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
-    # var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
-    # Then simplify and combine
-    same0 = gamma(alpha) / gamma(alpha+beta)
-    same1 = gamma(alpha+dt) / gamma(alpha+beta+dt)
-    same2 = gamma(alpha+2*dt) / gamma(alpha+beta+2*dt)
-    same3 = gamma(alpha+3*dt) / gamma(alpha+beta+3*dt)
-    mu = (same1 - same2) / (same0 - same1)
-    var = (same3 * (same1 - same0) + same2 * (same0 + same1 - same2) - same1**2) / (same1 - same0) ** 2
-  newAlpha, newBeta = meanVarToBeta(mu, var)
-  return newAlpha, newBeta, tnow
 
 
 def posteriorQuad(alpha, beta, t, result, tnow, analyticMarginal=True, maxiter=100):

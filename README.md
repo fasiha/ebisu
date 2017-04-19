@@ -182,14 +182,23 @@ By application of Bayes rule, the posterior is
 $$Posterior(π|x) = \frac{Prior(π) · Lik(x|π)}{\int_0^1 Prior(π) · Lik(x|π) \, dπ},$$
 where “posterior” and “prior” are the Beta densities, $Lik$ is the Bernoulli likelihood, and the denominator is the marginal probability of the observation $x$. $Lik(x|π) = π$ when $x=1$ and $1-π$ when $x=0$. (Here we’re dropping the time-subscripts since all recall probabilities $π$ and quiz results $x$ are at the same $t_2 = t · δ$.)
 
-Next we compute the mean and variance of this posterior, because that’s how we’ll fit it to a Beta distribution to function as our subsequent prior. We’ll break this down into the $x=1$ (success) and $x=0$ (failure) cases.
+Next we compute the mean and variance of this posterior, because that’s how we’ll fit it to a Beta distribution to function as our subsequent prior. We’ll break this down into the $x=1$ (success) and $x=0$ (failure) cases. In the following, let $γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)$; this exposes numerical symmetries that an implementation can take advantage of.
 
-$$E[π | x=1] = \int_0^1 π · Posterior(π|x=1) \, dπ = \frac{Γ(α + β + δ)}{Γ(α + δ)} · \frac{Γ(a + 2 δ)}{Γ(α + β + 2 δ)}.$$
+$$E[π | x=1] = \int_0^1 π · Posterior(π|x=1) \, dπ = γ_2 / γ_1.$$
 
 $$\begin{align}
 Var[π | x=1] &= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \\
-             &= \frac{Γ(α+β+δ)}{Γ(α+δ)} · \frac{Γ(α+3δ)}{Γ(α+β+3δ)} - (E[π|x=1])^2.
+             &= γ_3 / γ_1 - (E[π|x=1])^2.
 \end{align}$$
+
+The posterior mean and variance when $x=0$ (failed quiz) are:
+
+$$E[π | x=0] = \frac{γ_2 - γ_1}{γ_1 - γ_0}.$$
+
+$$Var[π | x=0] = \frac{γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2}{(γ_1 - γ_0)^2}$$
+
+> The Mathematica expressions used in deriving these are given in the source code below. Unlike the first few analytical results above, these required considerable hand-simplification. Nonetheless, we will double-check these analytical expressions with both Monte Carlo and quadrature integration below.
+
 
 ```py
 def betafitBeforeLikelihood(a,b,t1,x,t2):
@@ -286,7 +295,7 @@ def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=1000000):
 # - Simplified analytic expression with fewer hyp2f1 (recurrence relations)
 
 def posteriorAnalytic(alpha, beta, t, result, tnow):
-  from scipy.special import gammaln
+  from scipy.special import gammaln, gamma
 
   dt = tnow / t
   if result == 1:
@@ -300,18 +309,17 @@ def posteriorAnalytic(alpha, beta, t, result, tnow):
               + same)
     var = np.exp(same + gammaln(alpha + 3*dt) - gammaln(alpha + beta + 3*dt)) - mu**2
   else:
-    from scipy.special import beta as fbeta
     # Mathematica code is same as above, but replace one `p` with `(1-p)`
-    # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
-    marginal = dt * (fbeta(alpha, beta) - fbeta(alpha+dt, beta))
-    # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
-    mu = dt * (fbeta(alpha + dt, beta) - fbeta(alpha + 2*dt, beta)) / marginal
-    # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
-    var = dt * (mu**2 * fbeta(alpha, beta)
-              - mu * (2 + mu) * fbeta(alpha+dt, beta)
-              + (1 + 2 * mu) * fbeta(alpha+2*dt, beta)
-              - fbeta(alpha+3*dt, beta)) / marginal
-
+    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
+    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
+    # var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
+    # Then simplify and combine
+    same0 = gamma(alpha) / gamma(alpha+beta)
+    same1 = gamma(alpha+dt) / gamma(alpha+beta+dt)
+    same2 = gamma(alpha+2*dt) / gamma(alpha+beta+2*dt)
+    same3 = gamma(alpha+3*dt) / gamma(alpha+beta+3*dt)
+    mu = (same1 - same2) / (same0 - same1)
+    var = (same3 * (same1 - same0) + same2 * (same0 + same1 - same2) - same1**2) / (same1 - same0) ** 2
   newAlpha, newBeta = meanVarToBeta(mu, var)
   return newAlpha, newBeta, tnow
 

@@ -289,6 +289,24 @@ def meanVarToBeta(mean, var):
   beta = (1 - mean) * tmp
   return alpha, beta
 
+  def priorToHalflife(alpha, beta, t, percentile=0.5, maxt=100, mint=0):
+    from math import sqrt, abs
+    from scipy.optimize import brentq
+    h = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - percentile,
+               mint, maxt)
+    # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.
+    # To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that:
+    # - `v` is the probability variance around 0.5, so `sqrt(v)` is the standard deviation
+    # - find the times for which `0.5 +/- sqrt(v)`. This is a kind of one-sigma confidence interval in time
+    # - convert these times to a 'time variance' by taking their mean-absolute-distance to `h` and squaring that.
+    # Open to suggestions for improving this. The second 'variance' number should not be taken seriously, but it can be used for notional plotting.
+    v = recallProbabilityVar(alpha, beta, t, h)
+    h2 = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - (percentile - sqrt(v)),
+                mint, maxt)
+    h3 = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - (percentile + sqrt(v)),
+                mint, maxt)
+
+    return h, ((abs(h2 - h) + abs(h3 - h)) / 2)**2
 
 ```
 
@@ -506,24 +524,6 @@ def posteriorMonteCarlo(alpha, beta, t, result, tnow, N=10000):
   newAlpha, newBeta = meanVarToBeta(weightedMean, weightedVar)
 
   return newAlpha, newBeta, tnow
-
-def priorToHalflife(alpha, beta, t, percentile=0.5, maxt=100, mint=0):
-  from scipy.optimize import brentq
-  h = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - percentile,
-             mint, maxt)
-  # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.
-  # To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that:
-  # - `v` is the probability variance around 0.5, so `sqrt(v)` is the standard deviation
-  # - find the times for which `0.5 +/- sqrt(v)`. This is a kind of one-sigma confidence interval in time
-  # - convert these times to a 'time variance' by taking their mean-absolute-distance to `h` and squaring that.
-  # Open to suggestions for improving this. The second 'variance' number should not be taken seriously, but it can be used for notional plotting.
-  v = recallProbabilityVar(alpha, beta, t, h)
-  h2 = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - (percentile - np.sqrt(v)),
-              mint, maxt)
-  h3 = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - (percentile + np.sqrt(v)),
-              mint, maxt)
-
-  return h, ((np.abs(h2 - h) + np.abs(h3 - h)) / 2)**2
 
 ```
 

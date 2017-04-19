@@ -172,8 +172,24 @@ A quiz app can implement at least the expectation $E[π_t^δ]$ above to identify
 - variance $α · β / (α + β)^ 2 / (α + β + 1)$ which simplifies to $1/(4 (2 α + 1))$ when $α = β$.
   - (Recall the traditional explanation of $α$ and $β$ are the number of successes and failures, respectively, that have been observed by flipping a weighted coin—or in our application, the number of successful versus unsuccessful quiz results for a sequence of quizzes on the same fact $t$ days apart.)
 
-A higher value for $α = β$ encodes *higher* confidence in the expected half-life $t$, which in turn makes the model (which we’ll detail below) *less* sensitive to quiz results. In our experiments below, $α = β = 12$ (standard deviation of 0.1 on $π_t$) is our least sensitive model, while $α = β = 3$ is our most sensitive model. In the absence of strong feelings, a quiz app author can pick a number between these.
+A higher value for $α = β$ encodes *higher* confidence in the expected half-life $t$, which in turn makes the model (which we’ll detail below) *less* sensitive to quiz results. In our experiments below, $α = β = 12$ is our least sensitive model, while $α = β = 3$ is our most sensitive model. In the absence of strong feelings, a quiz app author can pick a number between these.
 
+Now, let us turn to the final piece of the math, how to update our Beta prior on a fact’s recall probability when a quiz result arrives.
+
+One option could be this: since we have analytical expressions for the mean and variance of the prior on $π_t^δ$, convert these to the [closest Beta distribution](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) and straightforwardly update with the Bernoulli likelihood (straightforward because of conjugacy). However, it is better to delay the Beta fit till we have the posterior, and do the likelihood update analytically. Lucky for us, this is tractable and we will see code later that demonstrates the  boost in accuracy with respect to a computationally-expensive Monte Carlo simulation.
+
+By application of Bayes rule, the posterior is
+$$Posterior(π|x) = \frac{Prior(π) · Lik(x|π)}{\int_0^1 Prior(π) · Lik(x|π) \, dπ},$$
+where “posterior” and “prior” are the Beta densities, $Lik$ is the Bernoulli likelihood, and the denominator is the marginal probability of the observation $x$. $Lik(x|π) = π$ when $x=1$ and $1-π$ when $x=0$. (Here we’re dropping the time-subscripts since all recall probabilities $π$ and quiz results $x$ are at the same $t_2 = t · δ$.)
+
+Next we compute the mean and variance of this posterior, because that’s how we’ll fit it to a Beta distribution to function as our subsequent prior. We’ll break this down into the $x=1$ (success) and $x=0$ (failure) cases.
+
+$$E[π | x=1] = \int_0^1 π · Posterior(π|x=1) \, dπ = \frac{Γ(α + β + δ)}{Γ(α + δ)} · \frac{Γ(a + 2 δ)}{Γ(α + β + 2 δ)}.$$
+
+$$\begin{align}
+Var[π | x=1] &= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \\
+             &= \frac{Γ(α+β+δ)}{Γ(α+δ)} · \frac{Γ(α+3δ)}{Γ(α+β+3δ)} - (E[π|x=1])^2.
+\end{align}$$
 
 ```py
 def betafitBeforeLikelihood(a,b,t1,x,t2):
@@ -270,19 +286,21 @@ def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=1000000):
 # - Simplified analytic expression with fewer hyp2f1 (recurrence relations)
 
 def posteriorAnalytic(alpha, beta, t, result, tnow):
-  from scipy.special import beta as fbeta
+  from scipy.special import gammaln
 
   dt = tnow / t
   if result == 1:
-    # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
-    marginal = dt * fbeta(alpha+dt, beta)
-    # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`
-    mu = dt * fbeta(alpha + 2*dt, beta) / marginal
-    # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
-    var = dt * (mu**2 * fbeta(alpha + dt, beta)
-              - 2 * mu * fbeta(alpha+ 2*dt, beta)
-              + fbeta(alpha+ 3*dt, beta)) / marginal
+    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
+    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`
+    # variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
+    # Simplify all three to get the following:
+    same = gammaln(alpha+beta+dt) - gammaln(alpha+dt)
+    mu = np.exp(gammaln(alpha + 2*dt)
+              - gammaln(alpha + beta + 2*dt)
+              + same)
+    var = np.exp(same + gammaln(alpha + 3*dt) - gammaln(alpha + beta + 3*dt)) - mu**2
   else:
+    from scipy.special import beta as fbeta
     # Mathematica code is same as above, but replace one `p` with `(1-p)`
     # `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
     marginal = dt * (fbeta(alpha, beta) - fbeta(alpha+dt, beta))
@@ -399,8 +417,11 @@ betab = 4./3
 betaa = 12.
 betab = 12.
 
+betaa = 3.3
+betab = 4.4
+
 t0 = 7.
-dt = 3.3
+dt = 2.
 # dt=.01
 
 print([posteriorMonteCarlo(betaa, betab, t0, 1., t0 * dt, N=100000), posteriorQuad(betaa, betab, t0, 1., t0 * dt, analyticMarginal=True), posteriorQuad(betaa, betab, t0, 1., t0 * dt, analyticMarginal=False), posteriorAnalytic(betaa, betab, t0, 1., t0 * dt)])

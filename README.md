@@ -1,5 +1,11 @@
 # Ebisu: intelligent quiz scheduling
 
+## Important links
+
+- [Literate document](https://fasiha.github.io/ebisu/)
+- [GitHub repo](https://github.com/fasiha/ebisu)
+- [PyPI package](https://pypi.python.org/pypi/ebisu/0.1)
+
 ## Introduction
 
 Given a set of facts that a student is memorizing,
@@ -60,7 +66,9 @@ Therefore, there are three major parts of this document.
 
 ## TL;DR
 
-Setup instructions go here
+Install the Python library with `pip3 install ebisu` (or `pip install ebisu` if you only have Python3 🤠).
+
+Coming soon: API.
 
 ## The math
 
@@ -659,4 +667,3 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 ## Acknowledgements
 
 [Modest CSS](http://markdowncss.github.io/modest/) for Markdown
-

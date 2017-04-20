@@ -38,6 +38,7 @@ class TestEbisu(unittest.TestCase):
         mean = recallProbabilityMean(a, b, t0, t)
         var = recallProbabilityVar(a, b, t0, t)
         self.assertLess(relerr(mean, mc['mean']), 3e-2)
+        self.assertLess(relerr(var, mc['var']), 3e-2)
 
     inner(3.3, 4.4, 5.5)
     inner(3.3, 4.4, 15.5)

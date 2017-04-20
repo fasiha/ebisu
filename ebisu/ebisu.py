@@ -19,7 +19,7 @@ def recallProbabilityVar(alpha, beta, t, tnow):
   same2 = gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt)
   md = same1 - same0
   md2 = same2 - same0
-  return exp(md2) - exp(2 * md2)
+  return exp(md2) - exp(2 * md)
 
 
 def posteriorAnalytic(alpha, beta, t, result, tnow):

@@ -252,7 +252,7 @@ def recallProbabilityVar(alpha, beta, t, tnow):
   same2 = gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt)
   md = same1 - same0
   md2 = same2 - same0
-  return exp(md2) - exp(2 * md2)
+  return exp(md2) - exp(2 * md)
 
 
 def posteriorAnalytic(alpha, beta, t, result, tnow):
@@ -525,6 +525,7 @@ class TestEbisu(unittest.TestCase):
         mean = recallProbabilityMean(a, b, t0, t)
         var = recallProbabilityVar(a, b, t0, t)
         self.assertLess(relerr(mean, mc['mean']), 3e-2)
+        self.assertLess(relerr(var, mc['var']), 3e-2)
 
     inner(3.3, 4.4, 5.5)
     inner(3.3, 4.4, 15.5)
@@ -667,3 +668,4 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 ## Acknowledgements
 
 [Modest CSS](http://markdowncss.github.io/modest/) for Markdown
+

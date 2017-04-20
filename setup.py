@@ -5,7 +5,7 @@ setup(name='ebisu',
       description='Intelligent quiz scheduling',
       long_description=('Public-domain library for quiz scheduling with'
                         ' Bayesian statistics.'),
-      keywords=('quiz review schedule spaced repetition system srs bayesian'
+      keywords=('quiz review schedule spaced repetition system srs bayesian '
                 'probability beta random variable'),
       url='http://github.com/fasiha/ebisu',
       author='Ahmed Fasih',

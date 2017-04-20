@@ -653,4 +653,7 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 - [cmark-gfm](https://github.com/github/cmark)
 - JavaScript
   - [Yarn](https://yarnpkg.com)
-- `sed`, `tail` (for running scripts in `package.json`)
+
+## Acknowledgements
+
+[Modest CSS](http://markdowncss.github.io/modest/) for Markdown

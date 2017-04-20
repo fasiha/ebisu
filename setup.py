@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='ebisu',
-      version='0.3',
+      version='0.4',
       description='Intelligent quiz scheduling',
       long_description=('Public-domain library for quiz scheduling with'
                         ' Bayesian statistics.'),

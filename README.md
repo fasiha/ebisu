@@ -9,27 +9,39 @@
 
 ## Introduction
 
-Given a set of facts that a student is memorizing,
+Consider a student that is memorizing a set of facts.
 
-- which facts need reviewing?, and
-- how does the student’s performance on a quiz of those facts affect the latter’s future review schedule?
+- Which facts need reviewing?
+- How does the student’s performance on a review change the fact’s future review schedule?
 
-Ebisu is a public-domain library that answers these two questions for developers writing quiz apps.
+Ebisu is a public-domain library that answers these two questions. It is intended to be used by software developers writing quiz apps, and provides a simple API to deal with these two aspects of scheduling quizzes:
+- `predictRecall` gives the current recall probability for a given fact.
+- `updateRecall` adjusts the belief about future recall probability given a quiz result.
 
-It aims to provide a simple API to deal with these two aspects of scheduling quizzes.
+Behind these two simple functions (plus a couple of additional helpful utilities), Ebisu is using a simple yet powerful model of forgetting founded on Bayesian statistics.
 
-Under the hood, though, it uses a simple and powerful statistical model of forgetting. It’s recommendations are backed by principled application of Bayesian statistics.
+With this system, quiz applications can hopefully move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today—an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed. Apps can also provide an infinite stream of quizzes (nightmare!) for students that are cramming: Ebisu intelligently updates its estimate of memory even when over-reviewing.
 
-Because of this, Ebisu allows you to ask, at any given moment, “what is the probability that the student has forgotten this fact?”, and it responds with a percentage. Furthermore, Ebisu gives a *confidence interval* around that percentage, giving you an estimate of how sure it is about about its recall score (kind of a “probability about my estimated probability of recall”—meta).
-
-This opens the way for quiz applications to move away from “daily review piles” caused by scheduling algorithms that expect the student to review all the facts scheduled for that day. For instance, a student might have only five minutes to study today—an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed. Apps can also provide an infinite stream of quizzes (nightmare!) for students cramming: Ebisu intelligently updates its estimate of memory even when over-reviewing.
-
-Currently, this library comes with a Python implementation, as well as detailed mathematical notes. I plan on porting the algorithm to at least:
-
+This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as a Python implementation (requires Scipy and Numpy). I plan on porting the algorithm to at least:
 - JavaScript, or a compiled-to-JavaScript language, for browsers, and
 - PostgreSQL.
 
-This first version was built in Python because of the numerical batteries provided by Scipy, Numpy, PyMC, etc.
+The next section, the [TL;DR](#tldr), is a quick guide to setup and usage. See this if you know you want to use Ebisu in your app.
+
+Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other scheduling algorithms and describe, non-technically, why you should use it.
+
+Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. if you like Beta-distributed random variables, conjugate priors, and marginalization, this is for you. If not, you’ll find the formulas to implement `predictRecall` and `updateRecall`.
+
+> Nerdy details in a nutshell: Ebisu posits a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it requires only a few [Gamma function](http://mathworld.wolfram.com/GammaFunction.html) evaluations to predict the current recall probability. A *quiz* is modeled as a Beroulli trial, whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta distribution by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the Gamma function.
+
+Finally, the [Source Code](#source-code) section presents the literate source of the library.
+
+## TL;DR
+
+Install the Python library with `pip3 install ebisu` (or `pip install ebisu` if you only have Python3 🤠).
+
+Coming soon: API docs. In the meantime, please see this [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb).
+
 
 ## How it works
 
@@ -40,36 +52,29 @@ There are many scheduling schemes, e.g.,
 - [Memrise.com](https://www.memrise.com), a closed-source webapp,
 - [Duolingo](https://www.duolingo.com/), which has published a [blog entry](http://making.duolingo.com/how-we-learn-how-you-learn) and a [conference paper/code repo](https://github.com/duolingo/halflife-regression) on their half-life regression technique,
 - the Leitner and Pimsleur spacing schemes (also discussed in some length in Duolingo’s paper).
+- Also worth noting is Michael Mozer’s team’s Bayesian multiscale models, e.g., [Mozer, Pashler, Cepeda, Lindsey, and Vul](http://www.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/MozerPashlerCepedaLindseyVul2009.pdf)’s 2009 <cite>NIPS</cite> paper and subsequent work.
 
 Many of these are inspired by Hermann Ebbinghaus’ discovery of the [exponential forgetting curve](https://en.wikipedia.org/w/index.php?title=Forgetting_curve&oldid=766120598#History), published in 1885, when he was thirty-five. He [memorized random](https://en.wikipedia.org/w/index.php?title=Hermann_Ebbinghaus&oldid=773908952#Research_on_memory) consonant–vowel–consonant trigrams (‘PED’, e.g.) and found, among other things, that his recall decayed exponentially with some time-constant.
 
 Anki and SuperMemo use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little [field guide](https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174) to Anki’s, with links to the source code—but they are optimized to minimize daily review time while maximizing retention. But because each fact has simply a date of next review, these algorithms do not gracefully accommodate over- or under-reviewing. Even when used as prescribed, they can schedule many facts for review on one day but few on others. (I must note that all three of these issues—over-reviewing (cramming), under-reviewing, and lumpy reviews—have well-supported solutions in Anki: they are tweaks on the rules.)
 
-Duolingo’s half-life regression explicitly models the probability of you recalling a fact as \\(2^{-Δ/h}\\), where Δ is the time since your last review and \\(h\\) is a *half-life*. In this model, your chances of failing a quiz after \\(h\\) days is 50%, which drops to 25% after \\(2 h\\) days. They estimate this half-life by combining your past performance and fact metadata in a machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.
+Duolingo’s half-life regression explicitly models the probability of you recalling a fact as \\(2^{-Δ/h}\\), where Δ is the time since your last review and \\(h\\) is a *half-life*. In this model, your chances of failing a quiz after \\(h\\) days is 50%, which drops to 25% after \\(2 h\\) days. They estimate this half-life by combining your past performance and fact metadata in a large-scale machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.
 
-Like Duolingo’s approach, Ebisu can provide a sorted list of facts, from most in danger of being forgotten to least, by explicitly tracking the exponential forgetting curve. However, Ebisu formulates the problem very differently—while memory is understood to decay exponentially, Ebisu posits a *probability distribution* on the half-life and uses quiz results to continually update its beliefs about the half-life in a fully Bayesian way. These updates, while a little more computationally-burdensome than Anki’s scheduler, are much lighter-weight than Duolingo’s industrial-strength approach.
+The Mozer group’s algorithms also fit a hierarchical Bayesian model that links quiz performance to memory, taking into account inter-fact and inter-student variability, but the training step is again computationally-intensive.
 
-This gives small quiz apps the same intelligent scheduling as Duolingo’s approach—recall probabilities for each fact—but with fast incorporation of quiz results.
+Like Duolingo and Mozer’s approaches, Ebisu explicitly tracks the exponential forgetting curve to provide a list of facts sorted by most to least likely to be forgotten. However, Ebisu formulates the problem very differently—while memory is understood to decay exponentially, Ebisu posits a *probability distribution* on the half-life and uses quiz results to update its beliefs in a fully Bayesian way. These updates, while a little more computationally-burdensome than Anki’s scheduler, are much lighter-weight than Duolingo’s industrial-strength approach.
 
-> Nerdy details in a nutshell: Ebisu posits a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it evaluates the [Gamma function](http://mathworld.wolfram.com/GammaFunction.html) to predict the current recall probability. A *quiz* is modeled as a Beroulli trial, whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta posterior by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the Gamma function.
+This gives small quiz apps the same intelligent scheduling as Duolingo’s approach—recall probabilities for each fact—but with real-time incorporation of quiz results.
 
-Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how facts are related the way Duolingo can with its sentences. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.
+To appreciate this further, consider this example. Imagine a fact with half-life of a week: after a week we expect the recall probability to drop to 50%. However, Ebisu can entertain an infinite range of beliefs about this recall probability: it can be very uncertain that it’ll be 50% (the “α=β=3” model below), or it can be very confident in that prediction (“α=β=12” case):
+![figures/models.png](figures/models.png)
+Under either of these models of recall probability, we can ask Ebisu what the expected half-life is after the student is quizzed on this fact a day, a week, or a month after their last review, and whether they passed or failed the quiz:
+![figures/halflife.png](figures/halflife.png)
+If the student correctly answers the quiz, Ebisu expects the new half-life to be greater than a week. If the student answers correctly after just a day, the half-life rises a little bit, since we expected the student to remember this fact that soon after reviewing it. If the student surprises us by *failing* the quiz just a day after they last reviewed it, the projected half-life drops. The more tentative “α=β=3” model aggressively adjusts the half-life, while the more assured “α=β=12” model is more conservative in its update. (The vertical bars indicate Ebisu’s confidence about the new half-life. The code for these two charts is [below](#demo-code). Finally, each fact has an α and β associated with it and I explain what they mean mathematically in the next section.)
 
-## This document
+Similarly, if the student fails the quiz after a whole month of not reviewing it, this isn’t a surprise—the half-life drops a bit from the initial half-life of a week. If she does surprise us, passing the quiz after a month of not studying it, then Ebisu boosts its belief about the half-life. By a lot for the “α=β=3” model, less for the “α=β=12” one.
 
-This document is a literate program. It contains not only source code (currently only Python; JavaScript/compile-to-JavaScript and PostgreSQL versions are planned), but also an explanation of the statistics and mathematics underlying the algorithm.
-
-Therefore, there are three major parts of this document.
-
-1. A brief “too long; didn’t read” section that helps you get going with the library, with minimum of fuss.
-1. The math—if you like Beta-distributed random variables, conjugate priors, and marginalization, you’ll want to read this part. If you don’t, I’ll highlight the formulas that Ebisu actually implements.
-1. And finally, the source code itself, annotated and explained. If you want to hack on Ebisu’s code, this is the section for you.
-
-## TL;DR
-
-Install the Python library with `pip3 install ebisu` (or `pip install ebisu` if you only have Python3 🤠).
-
-Coming soon: API docs. In the meantime, please see this [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb).
+> Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how facts are related the way Duolingo can with its sentences. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.
 
 ## The math
 
@@ -219,7 +224,6 @@ The updated posterior becomes the new prior, parameterized by this \\([α', β',
 We are done. That’s all the math.
 
 
-
 ## Source code
 
 ### Core library
@@ -232,7 +236,7 @@ from . import alternate
 
 ```py
 # export ebisu/ebisu.py #
-def recallProbabilityMean(alpha, beta, t, tnow):
+def predictRecall(alpha, beta, t, tnow):
   # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`
   from scipy.special import gammaln
   from numpy import exp
@@ -242,7 +246,7 @@ def recallProbabilityMean(alpha, beta, t, tnow):
           gammaln(alpha) - gammaln(alpha + beta)))
 
 
-def recallProbabilityVar(alpha, beta, t, tnow):
+def predictRecallVar(alpha, beta, t, tnow):
   from numpy import exp
   from scipy.special import gammaln
   # `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``
@@ -256,7 +260,7 @@ def recallProbabilityVar(alpha, beta, t, tnow):
   return exp(md2) - exp(2 * md)
 
 
-def posteriorAnalytic(alpha, beta, t, result, tnow):
+def updateRecall(alpha, beta, t, result, tnow):
   from scipy.special import gammaln, gamma
   from numpy import exp
   dt = tnow / t
@@ -298,21 +302,18 @@ def meanVarToBeta(mean, var):
 def priorToHalflife(alpha, beta, t, percentile=0.5, maxt=100, mint=1e-3):
   from math import sqrt
   from scipy.optimize import brentq
-  h = brentq(
-      lambda now: recallProbabilityMean(alpha, beta, t, now) - percentile, mint,
-      maxt)
+  h = brentq(lambda now: predictRecall(alpha, beta, t, now) - percentile, mint,
+             maxt)
   # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.
   # To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that.
   # This 'variance' number should not be taken seriously, but it can be used for notional plotting.
-  v = recallProbabilityVar(alpha, beta, t, h)
+  v = predictRecallVar(alpha, beta, t, h)
 
   from scipy.stats import beta as fbeta
   lo, hi = fbeta.interval(.68, *meanVarToBeta(percentile, v))
 
-  h2 = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - lo, mint,
-              maxt)
-  h3 = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - hi, mint,
-              maxt)
+  h2 = brentq(lambda now: predictRecall(alpha, beta, t, now) - lo, mint, maxt)
+  h3 = brentq(lambda now: predictRecall(alpha, beta, t, now) - hi, mint, maxt)
 
   return h, ((abs(h2 - h) + abs(h3 - h)) / 2)**2
 ```
@@ -328,7 +329,7 @@ from .ebisu import meanVarToBeta
 import numpy as np
 
 
-def recallProbabilityMode(alpha, beta, t, tnow):
+def predictRecallMode(alpha, beta, t, tnow):
   """Returns the mode of the immediate (pseudo-Beta) prior"""
   # [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`
   dt = tnow / t
@@ -353,7 +354,7 @@ def recallProbabilityMode(alpha, beta, t, tnow):
   return 0.5 if dt == 1. else (0. if dt > 1 else 1.)
 
 
-def recallProbabilityMedian(alpha, beta, t, tnow, percentile=0.5):
+def predictRecallMedian(alpha, beta, t, tnow, percentile=0.5):
   """"""
   # [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
   from scipy.optimize import brentq
@@ -371,7 +372,7 @@ def recallProbabilityMedian(alpha, beta, t, tnow, percentile=0.5):
   return brentq(cdfPercentile, 0, 1)
 
 
-def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=1000000):
+def predictRecallMonteCarlo(alpha, beta, t, tnow, N=1000000):
   import scipy.stats as stats
   tPrior = stats.beta.rvs(alpha, beta, size=N)
   tnowPrior = tPrior**(tnow / t)
@@ -391,13 +392,13 @@ def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=1000000):
 # - Simplified analytic expression with fewer hyp2f1 (recurrence relations)
 
 
-def posteriorQuad(alpha,
-                  beta,
-                  t,
-                  result,
-                  tnow,
-                  analyticMarginal=True,
-                  maxiter=100):
+def updateRecallQuad(alpha,
+                     beta,
+                     t,
+                     result,
+                     tnow,
+                     analyticMarginal=True,
+                     maxiter=100):
   """Update a time-dependent Beta distribution with a new data sample"""
   from scipy.integrate import quad
 
@@ -441,7 +442,7 @@ def posteriorQuad(alpha,
   return newAlpha, newBeta, tnow
 
 
-def posteriorMonteCarlo(alpha, beta, t, result, tnow, N=10000):
+def updateRecallMonteCarlo(alpha, beta, t, result, tnow, N=10000):
   """Update a time-dependent Beta distribution with a new data sample"""
   # [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&oldid=769806318#Properties_of_the_Bernoulli_Distribution, third (last) equation
   # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
@@ -471,12 +472,12 @@ def posteriorMonteCarlo(alpha, beta, t, result, tnow, N=10000):
 ```py
 def betafitBeforeLikelihood(a, b, t1, x, t2):
   a2, b2 = meanVarToBeta(
-      recallProbabilityMean(a, b, t1, t2), recallProbabilityVar(a, b, t1, t2))
+      predictRecall(a, b, t1, t2), predictRecallVar(a, b, t1, t2))
   return a2 + x, b2 + 1 - x, t2
 
 
 betafitBeforeLikelihood(3.3, 4.4, 1., 1., 2.)
-posteriorAnalytic(3.3, 4.4, 1., 1., 2.)
+updateRecall(3.3, 4.4, 1., 1., 2.)
 ```
 
 ```py
@@ -521,9 +522,9 @@ class TestEbisu(unittest.TestCase):
 
     def inner(a, b, t0):
       for t in map(lambda dt: dt * t0, [0.1, .99, 1., 1.01, 5.5]):
-        mc = recallProbabilityMonteCarlo(a, b, t0, t, N=100 * 1000)
-        mean = recallProbabilityMean(a, b, t0, t)
-        var = recallProbabilityVar(a, b, t0, t)
+        mc = predictRecallMonteCarlo(a, b, t0, t, N=100 * 1000)
+        mean = predictRecall(a, b, t0, t)
+        var = predictRecallVar(a, b, t0, t)
         self.assertLess(relerr(mean, mc['mean']), 3e-2)
         self.assertLess(relerr(var, mc['var']), 3e-2)
 
@@ -541,19 +542,19 @@ class TestEbisu(unittest.TestCase):
       for t in map(lambda dt: dt * t0, [0.1, 1., 5.5]):
         for x in [0., 1.]:
           msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
-          mc = posteriorMonteCarlo(a, b, t0, x, t, N=1 * 1000 * 1000)
-          an = posteriorAnalytic(a, b, t0, x, t)
+          mc = updateRecallMonteCarlo(a, b, t0, x, t, N=1 * 1000 * 1000)
+          an = updateRecall(a, b, t0, x, t)
           self.assertLess(kl(an, mc), 1e-4, msg=msg)
 
           try:
-            quad1 = posteriorQuad(a, b, t0, x, t, analyticMarginal=True)
+            quad1 = updateRecallQuad(a, b, t0, x, t, analyticMarginal=True)
           except OverflowError:
             quad1 = None
           if quad1 is not None:
             self.assertLess(kl(quad1, mc), 1e-4, msg=msg)
 
           try:
-            quad2 = posteriorQuad(a, b, t0, x, t, analyticMarginal=False)
+            quad2 = updateRecallQuad(a, b, t0, x, t, analyticMarginal=False)
           except OverflowError:
             quad2 = None
           if quad2 is not None:
@@ -576,6 +577,7 @@ if __name__ == '__main__':
 
 ```py
 import scipy.stats as stats
+import numpy as np
 import matplotlib.pyplot as plt
 
 plt.style.use('ggplot')
@@ -592,50 +594,67 @@ t0 = 7.
 v2s = lambda var: np.sqrt(var) / 10
 
 ts = np.arange(1, 31.)
+ps = np.linspace(0, 1., 200)
+ablist = [3, 12]
 
-plt.close('all')
+plt.figure()
+[
+    plt.plot(
+        ps,
+        stats.beta.pdf(ps, ab, ab) / stats.beta.pdf(.5, ab, ab),
+        label='α=β={}'.format(ab)) for ab in ablist
+]
+plt.legend(loc=2)
+plt.xticks(np.linspace(0, 1, 5))
+plt.title('Confidence in recall probability after one half-life')
+plt.xlabel('Recall probability after one week')
+plt.ylabel('Prob. of recall prob. (scaled)')
+plt.savefig('figures/models.svg')
+plt.savefig('figures/models.png', dpi=300)
+plt.show()
+
 plt.figure()
 ax = plt.subplot(111)
 plt.axhline(y=t0, linewidth=1, color='0.5')
 [plt.errorbar(ts,
-          np.array(list(map(lambda t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t))[0],
+          np.array(list(map(lambda t: priorToHalflife(*updateRecall(a, a, t0, xobs, t))[0],
                             ts))),
-          v2s(np.array(list(map(lambda t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t))[1],
+          v2s(np.array(list(map(lambda t: priorToHalflife(*updateRecall(a, a, t0, xobs, t))[1],
                             ts)))),
-          fmt='x-' if xobs == 1 else 'o-',
+          marker='x' if xobs == 1 else 'o',
           color='C{}'.format(aidx),
-          label='a=b={}, {}'.format(a, 'pass' if xobs==1 else 'fail'))
- for (aidx, a) in enumerate([3, 6, 12])
+          label='α=β={}, {}'.format(a, 'pass' if xobs==1 else 'fail'))
+ for (aidx, a) in enumerate(ablist)
  for xobs in [1, 0]]
-plt.grid(True)
 plt.legend(loc=0)
-plt.title('New interval, for old interval={} days'.format(t0))
-plt.xlabel('Time test taken (days)')
-plt.ylabel('New interval (days)')
+plt.title('New half-life interval (old interval={} days)'.format(t0))
+plt.xlabel('Time of test (days after previous test)')
+plt.ylabel('New half-life interval (days)')
 plt.savefig('figures/halflife.svg')
-plt.savefig('figures/halflife.png', dpi=150)
+plt.savefig('figures/halflife.png', dpi=300)
 plt.show()
 ```
+![figures/models.png](figures/models.png)
 ![figures/halflife.png](figures/halflife.png)
 
 ```py
 plt.figure()
-modelA = posteriorAnalytic(3., 3., 7., 1, 15.)
-modelB = posteriorAnalytic(12., 12., 7., 1, 15.)
+modelA = updateRecall(3., 3., 7., 1, 15.)
+modelB = updateRecall(12., 12., 7., 1, 15.)
 hlA = priorToHalflife(*modelA)
 hlB = priorToHalflife(*modelB)
 plt.errorbar(
     ts,
-    recallProbabilityMean(*modelA, ts),
-    v2s(recallProbabilityVar(*modelA, ts)),
+    predictRecall(*modelA, ts),
+    v2s(predictRecallVar(*modelA, ts)),
     fmt='.-',
     label='Model A',
     color='C0')
 plt.plot(ts, 2**(-ts / hlA[0]), '--', label='approx A', color='C0')
 plt.errorbar(
     ts,
-    recallProbabilityMean(*modelB, ts),
-    v2s(recallProbabilityVar(*modelB, ts)),
+    predictRecall(*modelB, ts),
+    v2s(predictRecallVar(*modelB, ts)),
     fmt='.-',
     label='Model B',
     color='C1')
@@ -645,9 +664,9 @@ plt.ylim([0, 1])
 plt.grid(True)
 plt.xlabel('Time (days)')
 plt.ylabel('Recall probability')
-plt.title('Predicted forgetting curves (A: a=b=3, B: a=b=12)')
+plt.title('Predicted forgetting curves (A: α=β=3, B: α=β=12)')
 plt.savefig('figures/forgetting-curve.svg')
-plt.savefig('figures/forgetting-curve.png', dpi=150)
+plt.savefig('figures/forgetting-curve.png', dpi=300)
 plt.show()
 ```
 ![figures/forgetting-curve.png](figures/forgetting-curve.png)
@@ -670,3 +689,4 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 ## Acknowledgements
 
 [Modest CSS](http://markdowncss.github.io/modest/) for Markdown
+

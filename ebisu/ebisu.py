@@ -1,4 +1,4 @@
-def recallProbabilityMean(alpha, beta, t, tnow):
+def predictRecall(alpha, beta, t, tnow):
   # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`
   from scipy.special import gammaln
   from numpy import exp
@@ -8,7 +8,7 @@ def recallProbabilityMean(alpha, beta, t, tnow):
           gammaln(alpha) - gammaln(alpha + beta)))
 
 
-def recallProbabilityVar(alpha, beta, t, tnow):
+def predictRecallVar(alpha, beta, t, tnow):
   from numpy import exp
   from scipy.special import gammaln
   # `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``
@@ -22,7 +22,7 @@ def recallProbabilityVar(alpha, beta, t, tnow):
   return exp(md2) - exp(2 * md)
 
 
-def posteriorAnalytic(alpha, beta, t, result, tnow):
+def updateRecall(alpha, beta, t, result, tnow):
   from scipy.special import gammaln, gamma
   from numpy import exp
   dt = tnow / t
@@ -64,20 +64,17 @@ def meanVarToBeta(mean, var):
 def priorToHalflife(alpha, beta, t, percentile=0.5, maxt=100, mint=1e-3):
   from math import sqrt
   from scipy.optimize import brentq
-  h = brentq(
-      lambda now: recallProbabilityMean(alpha, beta, t, now) - percentile, mint,
-      maxt)
+  h = brentq(lambda now: predictRecall(alpha, beta, t, now) - percentile, mint,
+             maxt)
   # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.
   # To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that.
   # This 'variance' number should not be taken seriously, but it can be used for notional plotting.
-  v = recallProbabilityVar(alpha, beta, t, h)
+  v = predictRecallVar(alpha, beta, t, h)
 
   from scipy.stats import beta as fbeta
   lo, hi = fbeta.interval(.68, *meanVarToBeta(percentile, v))
 
-  h2 = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - lo, mint,
-              maxt)
-  h3 = brentq(lambda now: recallProbabilityMean(alpha, beta, t, now) - hi, mint,
-              maxt)
+  h2 = brentq(lambda now: predictRecall(alpha, beta, t, now) - lo, mint, maxt)
+  h3 = brentq(lambda now: predictRecall(alpha, beta, t, now) - hi, mint, maxt)
 
   return h, ((abs(h2 - h) + abs(h3 - h)) / 2)**2

@@ -93,22 +93,33 @@
 <li><a href="https://pypi.python.org/pypi/ebisu/">PyPI package</a></li>
 </ul>
 <h2 id="introduction">Introduction</h2>
-<p>Given a set of facts that a student is memorizing,</p>
+<p>Consider a student that is memorizing a set of facts.</p>
 <ul>
-<li>which facts need reviewing?, and</li>
-<li>how does the student’s performance on a quiz of those facts affect the latter’s future review schedule?</li>
+<li>Which facts need reviewing?</li>
+<li>How does the student’s performance on a review change the fact’s future review schedule?</li>
 </ul>
-<p>Ebisu is a public-domain library that answers these two questions for developers writing quiz apps.</p>
-<p>It aims to provide a simple API to deal with these two aspects of scheduling quizzes.</p>
-<p>Under the hood, though, it uses a simple and powerful statistical model of forgetting. It’s recommendations are backed by principled application of Bayesian statistics.</p>
-<p>Because of this, Ebisu allows you to ask, at any given moment, “what is the probability that the student has forgotten this fact?”, and it responds with a percentage. Furthermore, Ebisu gives a <em>confidence interval</em> around that percentage, giving you an estimate of how sure it is about about its recall score (kind of a “probability about my estimated probability of recall”—meta).</p>
-<p>This opens the way for quiz applications to move away from “daily review piles” caused by scheduling algorithms that expect the student to review all the facts scheduled for that day. For instance, a student might have only five minutes to study today—an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed. Apps can also provide an infinite stream of quizzes (nightmare!) for students cramming: Ebisu intelligently updates its estimate of memory even when over-reviewing.</p>
-<p>Currently, this library comes with a Python implementation, as well as detailed mathematical notes. I plan on porting the algorithm to at least:</p>
+<p>Ebisu is a public-domain library that answers these two questions. It is intended to be used by software developers writing quiz apps, and provides a simple API to deal with these two aspects of scheduling quizzes:</p>
+<ul>
+<li><code>predictRecall</code> gives the current recall probability for a given fact.</li>
+<li><code>updateRecall</code> adjusts the belief about future recall probability given a quiz result.</li>
+</ul>
+<p>Behind these two simple functions (plus a couple of additional helpful utilities), Ebisu is using a simple yet powerful model of forgetting founded on Bayesian statistics.</p>
+<p>With this system, quiz applications can hopefully move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today—an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed. Apps can also provide an infinite stream of quizzes (nightmare!) for students that are cramming: Ebisu intelligently updates its estimate of memory even when over-reviewing.</p>
+<p>This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as a Python implementation (requires Scipy and Numpy). I plan on porting the algorithm to at least:</p>
 <ul>
 <li>JavaScript, or a compiled-to-JavaScript language, for browsers, and</li>
 <li>PostgreSQL.</li>
 </ul>
-<p>This first version was built in Python because of the numerical batteries provided by Scipy, Numpy, PyMC, etc.</p>
+<p>The next section, the <a href="#tldr">TL;DR</a>, is a quick guide to setup and usage. See this if you know you want to use Ebisu in your app.</p>
+<p>Then in the <a href="#how-it-works">How It Works</a> section, I contrast Ebisu to other scheduling algorithms and describe, non-technically, why you should use it.</p>
+<p>Then there’s a long <a href="#the-math">Math</a> section that details Ebisu’s algorithm mathematically. if you like Beta-distributed random variables, conjugate priors, and marginalization, this is for you. If not, you’ll find the formulas to implement <code>predictRecall</code> and <code>updateRecall</code>.</p>
+<blockquote>
+<p>Nerdy details in a nutshell: Ebisu posits a <a href="https://en.wikipedia.org/wiki/Beta_distribution">Beta prior</a> on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it requires only a few <a href="http://mathworld.wolfram.com/GammaFunction.html">Gamma function</a> evaluations to predict the current recall probability. A <em>quiz</em> is modeled as a Beroulli trial, whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta distribution by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the Gamma function.</p>
+</blockquote>
+<p>Finally, the <a href="#source-code">Source Code</a> section presents the literate source of the library.</p>
+<h2 id="tldr">TL;DR</h2>
+<p>Install the Python library with <code>pip3 install ebisu</code> (or <code>pip install ebisu</code> if you only have Python3 🤠).</p>
+<p>Coming soon: API docs. In the meantime, please see this <a href="https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb">IPython Notebook crash course</a>.</p>
 <h2 id="how-it-works">How it works</h2>
 <p>There are many scheduling schemes, e.g.,</p>
 <ul>
@@ -117,6 +128,7 @@
 <li><a href="https://www.memrise.com">Memrise.com</a>, a closed-source webapp,</li>
 <li><a href="https://www.duolingo.com/">Duolingo</a>, which has published a <a href="http://making.duolingo.com/how-we-learn-how-you-learn">blog entry</a> and a <a href="https://github.com/duolingo/halflife-regression">conference paper/code repo</a> on their half-life regression technique,</li>
 <li>the Leitner and Pimsleur spacing schemes (also discussed in some length in Duolingo’s paper).</li>
+<li>Also worth noting is Michael Mozer’s team’s Bayesian multiscale models, e.g., <a href="http://www.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/MozerPashlerCepedaLindseyVul2009.pdf">Mozer, Pashler, Cepeda, Lindsey, and Vul</a>’s 2009 <cite>NIPS</cite> paper and subsequent work.</li>
 </ul>
 <p>Many of these are inspired by Hermann Ebbinghaus’ discovery of the <a href="https://en.wikipedia.org/w/index.php?title=Forgetting_curve&amp;oldid=766120598#History">exponential forgetting curve</a>, published in 1885, when he was thirty-five. He <a href="https://en.wikipedia.org/w/index.php?title=Hermann_Ebbinghaus&amp;oldid=773908952#Research_on_memory">memorized random</a> consonant–vowel–consonant trigrams (‘PED’, e.g.) and found, among other things, that his recall decayed exponentially with some time-constant.</p>
 <p>Anki and SuperMemo use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little <a href="https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174">field guide</a> to Anki’s, with links to the source code—but they are optimized to minimize daily review time while maximizing retention. But because each fact has simply a date of next review, these algorithms do not gracefully accommodate over- or under-reviewing. Even when used as prescribed, they can schedule many facts for review on one day but few on others. (I must note that all three of these issues—over-reviewing (cramming), under-reviewing, and lumpy reviews—have well-supported solutions in Anki: they are tweaks on the rules.)</p>
@@ -147,24 +159,19 @@
  <use xlink:href="#MJMAIN-32" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-68" x="500" y="0"></use>
 </g>
-</svg></span> days. They estimate this half-life by combining your past performance and fact metadata in a machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.</p>
-<p>Like Duolingo’s approach, Ebisu can provide a sorted list of facts, from most in danger of being forgotten to least, by explicitly tracking the exponential forgetting curve. However, Ebisu formulates the problem very differently—while memory is understood to decay exponentially, Ebisu posits a <em>probability distribution</em> on the half-life and uses quiz results to continually update its beliefs about the half-life in a fully Bayesian way. These updates, while a little more computationally-burdensome than Anki’s scheduler, are much lighter-weight than Duolingo’s industrial-strength approach.</p>
-<p>This gives small quiz apps the same intelligent scheduling as Duolingo’s approach—recall probabilities for each fact—but with fast incorporation of quiz results.</p>
+</svg></span> days. They estimate this half-life by combining your past performance and fact metadata in a large-scale machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.</p>
+<p>The Mozer group’s algorithms also fit a hierarchical Bayesian model that links quiz performance to memory, taking into account inter-fact and inter-student variability, but the training step is again computationally-intensive.</p>
+<p>Like Duolingo and Mozer’s approaches, Ebisu explicitly tracks the exponential forgetting curve to provide a list of facts sorted by most to least likely to be forgotten. However, Ebisu formulates the problem very differently—while memory is understood to decay exponentially, Ebisu posits a <em>probability distribution</em> on the half-life and uses quiz results to update its beliefs in a fully Bayesian way. These updates, while a little more computationally-burdensome than Anki’s scheduler, are much lighter-weight than Duolingo’s industrial-strength approach.</p>
+<p>This gives small quiz apps the same intelligent scheduling as Duolingo’s approach—recall probabilities for each fact—but with real-time incorporation of quiz results.</p>
+<p>To appreciate this further, consider this example. Imagine a fact with half-life of a week: after a week we expect the recall probability to drop to 50%. However, Ebisu can entertain an infinite range of beliefs about this recall probability: it can be very uncertain that it’ll be 50% (the “α=β=3” model below), or it can be very confident in that prediction (“α=β=12” case):<br>
+<img src="figures/models.png" alt="figures/models.png"><br>
+Under either of these models of recall probability, we can ask Ebisu what the expected half-life is after the student is quizzed on this fact a day, a week, or a month after their last review, and whether they passed or failed the quiz:<br>
+<img src="figures/halflife.png" alt="figures/halflife.png"><br>
+If the student correctly answers the quiz, Ebisu expects the new half-life to be greater than a week. If the student answers correctly after just a day, the half-life rises a little bit, since we expected the student to remember this fact that soon after reviewing it. If the student surprises us by <em>failing</em> the quiz just a day after they last reviewed it, the projected half-life drops. The more tentative “α=β=3” model aggressively adjusts the half-life, while the more assured “α=β=12” model is more conservative in its update. (The vertical bars indicate Ebisu’s confidence about the new half-life. The code for these two charts is <a href="#demo-code">below</a>. Finally, each fact has an α and β associated with it and I explain what they mean mathematically in the next section.)</p>
+<p>Similarly, if the student fails the quiz after a whole month of not reviewing it, this isn’t a surprise—the half-life drops a bit from the initial half-life of a week. If she does surprise us, passing the quiz after a month of not studying it, then Ebisu boosts its belief about the half-life. By a lot for the “α=β=3” model, less for the “α=β=12” one.</p>
 <blockquote>
-<p>Nerdy details in a nutshell: Ebisu posits a <a href="https://en.wikipedia.org/wiki/Beta_distribution">Beta prior</a> on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it evaluates the <a href="http://mathworld.wolfram.com/GammaFunction.html">Gamma function</a> to predict the current recall probability. A <em>quiz</em> is modeled as a Beroulli trial, whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta posterior by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the Gamma function.</p>
-</blockquote>
 <p>Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how facts are related the way Duolingo can with its sentences. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.</p>
-<h2 id="this-document">This document</h2>
-<p>This document is a literate program. It contains not only source code (currently only Python; JavaScript/compile-to-JavaScript and PostgreSQL versions are planned), but also an explanation of the statistics and mathematics underlying the algorithm.</p>
-<p>Therefore, there are three major parts of this document.</p>
-<ol>
-<li>A brief “too long; didn’t read” section that helps you get going with the library, with minimum of fuss.</li>
-<li>The math—if you like Beta-distributed random variables, conjugate priors, and marginalization, you’ll want to read this part. If you don’t, I’ll highlight the formulas that Ebisu actually implements.</li>
-<li>And finally, the source code itself, annotated and explained. If you want to hack on Ebisu’s code, this is the section for you.</li>
-</ol>
-<h2 id="tldr">TL;DR</h2>
-<p>Install the Python library with <code>pip3 install ebisu</code> (or <code>pip install ebisu</code> if you only have Python3 🤠).</p>
-<p>Coming soon: API docs. In the meantime, please see this <a href="https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb">IPython Notebook crash course</a>.</p>
+</blockquote>
 <h2 id="the-math">The math</h2>
 <p>Let’s begin with a quiz. One way or another, we’ve picked a fact to quiz the student on, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-5-Title">
 <title id="MathJax-SVG-5-Title">t</title>
@@ -2142,7 +2149,7 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
 <span class="im"><span class="hljs-keyword">from</span></span> .ebisu <span class="im"><span class="hljs-keyword">import</span></span> <span class="op">*</span>
 <span class="im"><span class="hljs-keyword">from</span></span> . <span class="im"><span class="hljs-keyword">import</span></span> alternate</code></pre></div>
 <div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="co"><span class="hljs-comment"># export ebisu/ebisu.py #</span></span>
-<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">recallProbabilityMean</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">predictRecall</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
   <span class="co"><span class="hljs-comment"># `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`</span></span>
   <span class="im"><span class="hljs-keyword">from</span></span> scipy.special <span class="im"><span class="hljs-keyword">import</span></span> gammaln
   <span class="im"><span class="hljs-keyword">from</span></span> numpy <span class="im"><span class="hljs-keyword">import</span></span> exp
@@ -2152,7 +2159,7 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
           gammaln(alpha) <span class="op">-</span> gammaln(alpha <span class="op">+</span> beta)))
 
 
-<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">recallProbabilityVar</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">predictRecallVar</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
   <span class="im"><span class="hljs-keyword">from</span></span> numpy <span class="im"><span class="hljs-keyword">import</span></span> exp
   <span class="im"><span class="hljs-keyword">from</span></span> scipy.special <span class="im"><span class="hljs-keyword">import</span></span> gammaln
   <span class="co"><span class="hljs-comment"># `Assuming[a&gt;0 &amp;&amp; b&gt;0 &amp;&amp; t&gt;0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``</span></span>
@@ -2166,7 +2173,7 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
   <span class="cf"><span class="hljs-keyword">return</span></span> exp(md2) <span class="op">-</span> exp(<span class="dv"><span class="hljs-number">2</span></span> <span class="op">*</span> md)
 
 
-<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">posteriorAnalytic</span><span class="hljs-params">(alpha, beta, t, result, tnow)</span>:</span>
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">updateRecall</span><span class="hljs-params">(alpha, beta, t, result, tnow)</span>:</span>
   <span class="im"><span class="hljs-keyword">from</span></span> scipy.special <span class="im"><span class="hljs-keyword">import</span></span> gammaln, gamma
   <span class="im"><span class="hljs-keyword">from</span></span> numpy <span class="im"><span class="hljs-keyword">import</span></span> exp
   dt <span class="op">=</span> tnow <span class="op">/</span> t
@@ -2208,21 +2215,18 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
 <span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">priorToHalflife</span><span class="hljs-params">(alpha, beta, t, percentile</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="fl"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">0.5</span></span></span></span><span class="hljs-function"><span class="hljs-params">, maxt</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="dv"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">100</span></span></span></span><span class="hljs-function"><span class="hljs-params">, mint</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="fl"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">1e-3</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
   <span class="im"><span class="hljs-keyword">from</span></span> math <span class="im"><span class="hljs-keyword">import</span></span> sqrt
   <span class="im"><span class="hljs-keyword">from</span></span> scipy.optimize <span class="im"><span class="hljs-keyword">import</span></span> brentq
-  h <span class="op">=</span> brentq(
-      <span class="kw"><span class="hljs-keyword">lambda</span></span> now: recallProbabilityMean(alpha, beta, t, now) <span class="op">-</span> percentile, mint,
-      maxt)
+  h <span class="op">=</span> brentq(<span class="kw"><span class="hljs-keyword">lambda</span></span> now: predictRecall(alpha, beta, t, now) <span class="op">-</span> percentile, mint,
+             maxt)
   <span class="co"><span class="hljs-comment"># `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.</span></span>
   <span class="co"><span class="hljs-comment"># To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that.</span></span>
   <span class="co"><span class="hljs-comment"># This 'variance' number should not be taken seriously, but it can be used for notional plotting.</span></span>
-  v <span class="op">=</span> recallProbabilityVar(alpha, beta, t, h)
+  v <span class="op">=</span> predictRecallVar(alpha, beta, t, h)
 
   <span class="im"><span class="hljs-keyword">from</span></span> scipy.stats <span class="im"><span class="hljs-keyword">import</span></span> beta <span class="im"><span class="hljs-keyword">as</span></span> fbeta
   lo, hi <span class="op">=</span> fbeta.interval(<span class="hljs-number">.</span><span class="dv"><span class="hljs-number">68</span></span>, <span class="op">*</span>meanVarToBeta(percentile, v))
 
-  h2 <span class="op">=</span> brentq(<span class="kw"><span class="hljs-keyword">lambda</span></span> now: recallProbabilityMean(alpha, beta, t, now) <span class="op">-</span> lo, mint,
-              maxt)
-  h3 <span class="op">=</span> brentq(<span class="kw"><span class="hljs-keyword">lambda</span></span> now: recallProbabilityMean(alpha, beta, t, now) <span class="op">-</span> hi, mint,
-              maxt)
+  h2 <span class="op">=</span> brentq(<span class="kw"><span class="hljs-keyword">lambda</span></span> now: predictRecall(alpha, beta, t, now) <span class="op">-</span> lo, mint, maxt)
+  h3 <span class="op">=</span> brentq(<span class="kw"><span class="hljs-keyword">lambda</span></span> now: predictRecall(alpha, beta, t, now) <span class="op">-</span> hi, mint, maxt)
 
   <span class="cf"><span class="hljs-keyword">return</span></span> h, ((<span class="bu">abs</span>(h2 <span class="op">-</span> h) <span class="op">+</span> <span class="bu">abs</span>(h3 <span class="op">-</span> h)) <span class="op">/</span> <span class="dv"><span class="hljs-number">2</span></span>)<span class="op">**</span><span class="dv"><span class="hljs-number">2</span></span></code></pre></div>
 <h3 id="alternate-ways-of-evaluating-the-same-results-as-above">Alternate ways of evaluating the same results as above</h3>
@@ -2232,7 +2236,7 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
 <span class="im"><span class="hljs-keyword">import</span></span> numpy <span class="im"><span class="hljs-keyword">as</span></span> np
 
 
-<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">recallProbabilityMode</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">predictRecallMode</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
   <span class="co"><span class="hljs-string">"""Returns the mode of the immediate (pseudo-Beta) prior"""</span></span>
   <span class="co"><span class="hljs-comment"># [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`</span></span>
   dt <span class="op">=</span> tnow <span class="op">/</span> t
@@ -2257,7 +2261,7 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
   <span class="cf"><span class="hljs-keyword">return</span></span> <span class="fl"><span class="hljs-number">0.5</span></span> <span class="cf"><span class="hljs-keyword">if</span></span> dt <span class="op">==</span> <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span> <span class="cf"><span class="hljs-keyword">else</span></span> (<span class="dv"><span class="hljs-number">0</span></span><span class="hljs-number">.</span> <span class="cf"><span class="hljs-keyword">if</span></span> dt <span class="op">&gt;</span> <span class="dv"><span class="hljs-number">1</span></span> <span class="cf"><span class="hljs-keyword">else</span></span> <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>)
 
 
-<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">recallProbabilityMedian</span><span class="hljs-params">(alpha, beta, t, tnow, percentile</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="fl"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">0.5</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">predictRecallMedian</span><span class="hljs-params">(alpha, beta, t, tnow, percentile</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="fl"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">0.5</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
   <span class="co"><span class="hljs-string">""""""</span></span>
   <span class="co"><span class="hljs-comment"># [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`</span></span>
   <span class="im"><span class="hljs-keyword">from</span></span> scipy.optimize <span class="im"><span class="hljs-keyword">import</span></span> brentq
@@ -2275,7 +2279,7 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
   <span class="cf"><span class="hljs-keyword">return</span></span> brentq(cdfPercentile, <span class="dv"><span class="hljs-number">0</span></span>, <span class="dv"><span class="hljs-number">1</span></span>)
 
 
-<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">recallProbabilityMonteCarlo</span><span class="hljs-params">(alpha, beta, t, tnow, N</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="dv"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">1000000</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">predictRecallMonteCarlo</span><span class="hljs-params">(alpha, beta, t, tnow, N</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="dv"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">1000000</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
   <span class="im"><span class="hljs-keyword">import</span></span> scipy.stats <span class="im"><span class="hljs-keyword">as</span></span> stats
   tPrior <span class="op">=</span> stats.beta.rvs(alpha, beta, size<span class="op">=</span>N)
   tnowPrior <span class="op">=</span> tPrior<span class="op">**</span>(tnow <span class="op">/</span> t)
@@ -2295,13 +2299,13 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
 <span class="co"><span class="hljs-comment"># - Simplified analytic expression with fewer hyp2f1 (recurrence relations)</span></span>
 
 
-<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">posteriorQuad</span><span class="hljs-params">(alpha,
-                  beta,
-                  t,
-                  result,
-                  tnow,
-                  analyticMarginal</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="va"><span class="hljs-function"><span class="hljs-params">True</span></span></span><span class="hljs-function"><span class="hljs-params">,
-                  maxiter</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="dv"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">100</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">updateRecallQuad</span><span class="hljs-params">(alpha,
+                     beta,
+                     t,
+                     result,
+                     tnow,
+                     analyticMarginal</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="va"><span class="hljs-function"><span class="hljs-params">True</span></span></span><span class="hljs-function"><span class="hljs-params">,
+                     maxiter</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="dv"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">100</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
   <span class="co"><span class="hljs-string">"""Update a time-dependent Beta distribution with a new data sample"""</span></span>
   <span class="im"><span class="hljs-keyword">from</span></span> scipy.integrate <span class="im"><span class="hljs-keyword">import</span></span> quad
 
@@ -2345,7 +2349,7 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
   <span class="cf"><span class="hljs-keyword">return</span></span> newAlpha, newBeta, tnow
 
 
-<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">posteriorMonteCarlo</span><span class="hljs-params">(alpha, beta, t, result, tnow, N</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="dv"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">10000</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">updateRecallMonteCarlo</span><span class="hljs-params">(alpha, beta, t, result, tnow, N</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="dv"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">10000</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
   <span class="co"><span class="hljs-string">"""Update a time-dependent Beta distribution with a new data sample"""</span></span>
   <span class="co"><span class="hljs-comment"># [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&amp;oldid=769806318#Properties_of_the_Bernoulli_Distribution, third (last) equation</span></span>
   <span class="co"><span class="hljs-comment"># [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&amp;oldid=770608018#Mathematical_definition</span></span>
@@ -2372,12 +2376,12 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
 <h3 id="test-code">Test code</h3>
 <div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">betafitBeforeLikelihood</span><span class="hljs-params">(a, b, t1, x, t2)</span>:</span>
   a2, b2 <span class="op">=</span> meanVarToBeta(
-      recallProbabilityMean(a, b, t1, t2), recallProbabilityVar(a, b, t1, t2))
+      predictRecall(a, b, t1, t2), predictRecallVar(a, b, t1, t2))
   <span class="cf"><span class="hljs-keyword">return</span></span> a2 <span class="op">+</span> x, b2 <span class="op">+</span> <span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> x, t2
 
 
 betafitBeforeLikelihood(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">2</span></span><span class="hljs-number">.</span>)
-posteriorAnalytic(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">2</span></span><span class="hljs-number">.</span>)</code></pre></div>
+updateRecall(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">2</span></span><span class="hljs-number">.</span>)</code></pre></div>
 <div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="co"><span class="hljs-comment"># export ebisu/tests/test_ebisu.py</span></span>
 <span class="im"><span class="hljs-keyword">from</span></span> unittest <span class="im"><span class="hljs-keyword">import</span></span> TestCase
 <span class="im"><span class="hljs-keyword">from</span></span> ebisu <span class="im"><span class="hljs-keyword">import</span></span> <span class="op">*</span>
@@ -2416,9 +2420,9 @@ posteriorAnalytic(<span class="fl"><span class="hljs-number">3.3</span></span>, 
 
     <span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">inner</span><span class="hljs-params">(a, b, t0)</span>:</span>
       <span class="cf"><span class="hljs-keyword">for</span></span> t <span class="kw"><span class="hljs-keyword">in</span></span> <span class="bu">map</span>(<span class="kw"><span class="hljs-keyword">lambda</span></span> dt: dt <span class="op">*</span> t0, [<span class="fl"><span class="hljs-number">0.1</span></span>, <span class="hljs-number">.</span><span class="dv"><span class="hljs-number">99</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="fl"><span class="hljs-number">1.01</span></span>, <span class="fl"><span class="hljs-number">5.5</span></span>]):
-        mc <span class="op">=</span> recallProbabilityMonteCarlo(a, b, t0, t, N<span class="op">=</span><span class="dv"><span class="hljs-number">100</span></span> <span class="op">*</span> <span class="dv"><span class="hljs-number">1000</span></span>)
-        mean <span class="op">=</span> recallProbabilityMean(a, b, t0, t)
-        var <span class="op">=</span> recallProbabilityVar(a, b, t0, t)
+        mc <span class="op">=</span> predictRecallMonteCarlo(a, b, t0, t, N<span class="op">=</span><span class="dv"><span class="hljs-number">100</span></span> <span class="op">*</span> <span class="dv"><span class="hljs-number">1000</span></span>)
+        mean <span class="op">=</span> predictRecall(a, b, t0, t)
+        var <span class="op">=</span> predictRecallVar(a, b, t0, t)
         <span class="va">self</span>.assertLess(relerr(mean, mc[<span class="st"><span class="hljs-string">'mean'</span></span>]), <span class="fl"><span class="hljs-number">3e-2</span></span>)
         <span class="va">self</span>.assertLess(relerr(var, mc[<span class="st"><span class="hljs-string">'var'</span></span>]), <span class="fl"><span class="hljs-number">3e-2</span></span>)
 
@@ -2436,19 +2440,19 @@ posteriorAnalytic(<span class="fl"><span class="hljs-number">3.3</span></span>, 
       <span class="cf"><span class="hljs-keyword">for</span></span> t <span class="kw"><span class="hljs-keyword">in</span></span> <span class="bu">map</span>(<span class="kw"><span class="hljs-keyword">lambda</span></span> dt: dt <span class="op">*</span> t0, [<span class="fl"><span class="hljs-number">0.1</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="fl"><span class="hljs-number">5.5</span></span>]):
         <span class="cf"><span class="hljs-keyword">for</span></span> x <span class="kw"><span class="hljs-keyword">in</span></span> [<span class="dv"><span class="hljs-number">0</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>]:
           msg <span class="op">=</span> <span class="st"><span class="hljs-string">'a=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">,b=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">,t0=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">,x=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">,t=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.<span class="bu">format</span>(a, b, t0, x, t)
-          mc <span class="op">=</span> posteriorMonteCarlo(a, b, t0, x, t, N<span class="op">=</span><span class="dv"><span class="hljs-number">1</span></span> <span class="op">*</span> <span class="dv"><span class="hljs-number">1000</span></span> <span class="op">*</span> <span class="dv"><span class="hljs-number">1000</span></span>)
-          an <span class="op">=</span> posteriorAnalytic(a, b, t0, x, t)
+          mc <span class="op">=</span> updateRecallMonteCarlo(a, b, t0, x, t, N<span class="op">=</span><span class="dv"><span class="hljs-number">1</span></span> <span class="op">*</span> <span class="dv"><span class="hljs-number">1000</span></span> <span class="op">*</span> <span class="dv"><span class="hljs-number">1000</span></span>)
+          an <span class="op">=</span> updateRecall(a, b, t0, x, t)
           <span class="va">self</span>.assertLess(kl(an, mc), <span class="fl"><span class="hljs-number">1e-4</span></span>, msg<span class="op">=</span>msg)
 
           <span class="cf"><span class="hljs-keyword">try</span></span>:
-            quad1 <span class="op">=</span> posteriorQuad(a, b, t0, x, t, analyticMarginal<span class="op">=</span><span class="va"><span class="hljs-keyword">True</span></span>)
+            quad1 <span class="op">=</span> updateRecallQuad(a, b, t0, x, t, analyticMarginal<span class="op">=</span><span class="va"><span class="hljs-keyword">True</span></span>)
           <span class="cf"><span class="hljs-keyword">except</span></span> <span class="pp">OverflowError</span>:
             quad1 <span class="op">=</span> <span class="va"><span class="hljs-keyword">None</span></span>
           <span class="cf"><span class="hljs-keyword">if</span></span> quad1 <span class="kw"><span class="hljs-keyword">is</span></span> <span class="kw"><span class="hljs-keyword">not</span></span> <span class="va"><span class="hljs-keyword">None</span></span>:
             <span class="va">self</span>.assertLess(kl(quad1, mc), <span class="fl"><span class="hljs-number">1e-4</span></span>, msg<span class="op">=</span>msg)
 
           <span class="cf"><span class="hljs-keyword">try</span></span>:
-            quad2 <span class="op">=</span> posteriorQuad(a, b, t0, x, t, analyticMarginal<span class="op">=</span><span class="va"><span class="hljs-keyword">False</span></span>)
+            quad2 <span class="op">=</span> updateRecallQuad(a, b, t0, x, t, analyticMarginal<span class="op">=</span><span class="va"><span class="hljs-keyword">False</span></span>)
           <span class="cf"><span class="hljs-keyword">except</span></span> <span class="pp">OverflowError</span>:
             quad2 <span class="op">=</span> <span class="va"><span class="hljs-keyword">None</span></span>
           <span class="cf"><span class="hljs-keyword">if</span></span> quad2 <span class="kw"><span class="hljs-keyword">is</span></span> <span class="kw"><span class="hljs-keyword">not</span></span> <span class="va"><span class="hljs-keyword">None</span></span>:
@@ -2467,6 +2471,7 @@ posteriorAnalytic(<span class="fl"><span class="hljs-number">3.3</span></span>, 
       unittest.TestLoader().loadTestsFromModule(TestEbisu()))</code></pre></div>
 <h3 id="demo-code">Demo code</h3>
 <div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="im"><span class="hljs-keyword">import</span></span> scipy.stats <span class="im"><span class="hljs-keyword">as</span></span> stats
+<span class="im"><span class="hljs-keyword">import</span></span> numpy <span class="im"><span class="hljs-keyword">as</span></span> np
 <span class="im"><span class="hljs-keyword">import</span></span> matplotlib.pyplot <span class="im"><span class="hljs-keyword">as</span></span> plt
 
 plt.style.use(<span class="st"><span class="hljs-string">'ggplot'</span></span>)
@@ -2483,47 +2488,64 @@ t0 <span class="op">=</span> <span class="dv"><span class="hljs-number">7</span>
 v2s <span class="op">=</span> <span class="kw"><span class="hljs-keyword">lambda</span></span> var: np.sqrt(var) <span class="op">/</span> <span class="dv"><span class="hljs-number">10</span></span>
 
 ts <span class="op">=</span> np.arange(<span class="dv"><span class="hljs-number">1</span></span>, <span class="dv"><span class="hljs-number">31</span></span><span class="hljs-number">.</span>)
+ps <span class="op">=</span> np.linspace(<span class="dv"><span class="hljs-number">0</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">200</span></span>)
+ablist <span class="op">=</span> [<span class="dv"><span class="hljs-number">3</span></span>, <span class="dv"><span class="hljs-number">12</span></span>]
 
-plt.close(<span class="st"><span class="hljs-string">'all'</span></span>)
+plt.figure()
+[
+    plt.plot(
+        ps,
+        stats.beta.pdf(ps, ab, ab) <span class="op">/</span> stats.beta.pdf(<span class="hljs-number">.</span><span class="dv"><span class="hljs-number">5</span></span>, ab, ab),
+        label<span class="op">=</span><span class="st"><span class="hljs-string">'α=β=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.<span class="bu">format</span>(ab)) <span class="cf"><span class="hljs-keyword">for</span></span> ab <span class="kw"><span class="hljs-keyword">in</span></span> ablist
+]
+plt.legend(loc<span class="op">=</span><span class="dv"><span class="hljs-number">2</span></span>)
+plt.xticks(np.linspace(<span class="dv"><span class="hljs-number">0</span></span>, <span class="dv"><span class="hljs-number">1</span></span>, <span class="dv"><span class="hljs-number">5</span></span>))
+plt.title(<span class="st"><span class="hljs-string">'Confidence in recall probability after one half-life'</span></span>)
+plt.xlabel(<span class="st"><span class="hljs-string">'Recall probability after one week'</span></span>)
+plt.ylabel(<span class="st"><span class="hljs-string">'Prob. of recall prob. (scaled)'</span></span>)
+plt.savefig(<span class="st"><span class="hljs-string">'figures/models.svg'</span></span>)
+plt.savefig(<span class="st"><span class="hljs-string">'figures/models.png'</span></span>, dpi<span class="op">=</span><span class="dv"><span class="hljs-number">300</span></span>)
+plt.show()
+
 plt.figure()
 ax <span class="op">=</span> plt.subplot(<span class="dv"><span class="hljs-number">111</span></span>)
 plt.axhline(y<span class="op">=</span>t0, linewidth<span class="op">=</span><span class="dv"><span class="hljs-number">1</span></span>, color<span class="op">=</span><span class="st"><span class="hljs-string">'0.5'</span></span>)
 [plt.errorbar(ts,
-          np.array(<span class="bu">list</span>(<span class="bu">map</span>(<span class="kw"><span class="hljs-keyword">lambda</span></span> t: priorToHalflife(<span class="op">*</span>posteriorAnalytic(a, a, t0, xobs, t))[<span class="dv"><span class="hljs-number">0</span></span>],
+          np.array(<span class="bu">list</span>(<span class="bu">map</span>(<span class="kw"><span class="hljs-keyword">lambda</span></span> t: priorToHalflife(<span class="op">*</span>updateRecall(a, a, t0, xobs, t))[<span class="dv"><span class="hljs-number">0</span></span>],
                             ts))),
-          v2s(np.array(<span class="bu">list</span>(<span class="bu">map</span>(<span class="kw"><span class="hljs-keyword">lambda</span></span> t: priorToHalflife(<span class="op">*</span>posteriorAnalytic(a, a, t0, xobs, t))[<span class="dv"><span class="hljs-number">1</span></span>],
+          v2s(np.array(<span class="bu">list</span>(<span class="bu">map</span>(<span class="kw"><span class="hljs-keyword">lambda</span></span> t: priorToHalflife(<span class="op">*</span>updateRecall(a, a, t0, xobs, t))[<span class="dv"><span class="hljs-number">1</span></span>],
                             ts)))),
-          fmt<span class="op">=</span><span class="st"><span class="hljs-string">'x-'</span></span> <span class="cf"><span class="hljs-keyword">if</span></span> xobs <span class="op">==</span> <span class="dv"><span class="hljs-number">1</span></span> <span class="cf"><span class="hljs-keyword">else</span></span> <span class="st"><span class="hljs-string">'o-'</span></span>,
+          marker<span class="op">=</span><span class="st"><span class="hljs-string">'x'</span></span> <span class="cf"><span class="hljs-keyword">if</span></span> xobs <span class="op">==</span> <span class="dv"><span class="hljs-number">1</span></span> <span class="cf"><span class="hljs-keyword">else</span></span> <span class="st"><span class="hljs-string">'o'</span></span>,
           color<span class="op">=</span><span class="st"><span class="hljs-string">'C</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.<span class="bu">format</span>(aidx),
-          label<span class="op">=</span><span class="st"><span class="hljs-string">'a=b=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">, </span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.<span class="bu">format</span>(a, <span class="st"><span class="hljs-string">'pass'</span></span> <span class="cf"><span class="hljs-keyword">if</span></span> xobs<span class="op">==</span><span class="dv"><span class="hljs-number">1</span></span> <span class="cf"><span class="hljs-keyword">else</span></span> <span class="st"><span class="hljs-string">'fail'</span></span>))
- <span class="cf"><span class="hljs-keyword">for</span></span> (aidx, a) <span class="kw"><span class="hljs-keyword">in</span></span> <span class="bu">enumerate</span>([<span class="dv"><span class="hljs-number">3</span></span>, <span class="dv"><span class="hljs-number">6</span></span>, <span class="dv"><span class="hljs-number">12</span></span>])
+          label<span class="op">=</span><span class="st"><span class="hljs-string">'α=β=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">, </span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.<span class="bu">format</span>(a, <span class="st"><span class="hljs-string">'pass'</span></span> <span class="cf"><span class="hljs-keyword">if</span></span> xobs<span class="op">==</span><span class="dv"><span class="hljs-number">1</span></span> <span class="cf"><span class="hljs-keyword">else</span></span> <span class="st"><span class="hljs-string">'fail'</span></span>))
+ <span class="cf"><span class="hljs-keyword">for</span></span> (aidx, a) <span class="kw"><span class="hljs-keyword">in</span></span> <span class="bu">enumerate</span>(ablist)
  <span class="cf"><span class="hljs-keyword">for</span></span> xobs <span class="kw"><span class="hljs-keyword">in</span></span> [<span class="dv"><span class="hljs-number">1</span></span>, <span class="dv"><span class="hljs-number">0</span></span>]]
-plt.grid(<span class="va"><span class="hljs-keyword">True</span></span>)
 plt.legend(loc<span class="op">=</span><span class="dv"><span class="hljs-number">0</span></span>)
-plt.title(<span class="st"><span class="hljs-string">'New interval, for old interval=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string"> days'</span></span>.<span class="bu">format</span>(t0))
-plt.xlabel(<span class="st"><span class="hljs-string">'Time test taken (days)'</span></span>)
-plt.ylabel(<span class="st"><span class="hljs-string">'New interval (days)'</span></span>)
+plt.title(<span class="st"><span class="hljs-string">'New half-life interval (old interval=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string"> days)'</span></span>.<span class="bu">format</span>(t0))
+plt.xlabel(<span class="st"><span class="hljs-string">'Time of test (days after previous test)'</span></span>)
+plt.ylabel(<span class="st"><span class="hljs-string">'New half-life interval (days)'</span></span>)
 plt.savefig(<span class="st"><span class="hljs-string">'figures/halflife.svg'</span></span>)
-plt.savefig(<span class="st"><span class="hljs-string">'figures/halflife.png'</span></span>, dpi<span class="op">=</span><span class="dv"><span class="hljs-number">150</span></span>)
+plt.savefig(<span class="st"><span class="hljs-string">'figures/halflife.png'</span></span>, dpi<span class="op">=</span><span class="dv"><span class="hljs-number">300</span></span>)
 plt.show()</code></pre></div>
-<p><img src="figures/halflife.png" alt="figures/halflife.png"></p>
+<p><img src="figures/models.png" alt="figures/models.png"><br>
+<img src="figures/halflife.png" alt="figures/halflife.png"></p>
 <div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs">plt.figure()
-modelA <span class="op">=</span> posteriorAnalytic(<span class="dv"><span class="hljs-number">3</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">3</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">7</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span>, <span class="dv"><span class="hljs-number">15</span></span><span class="hljs-number">.</span>)
-modelB <span class="op">=</span> posteriorAnalytic(<span class="dv"><span class="hljs-number">12</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">12</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">7</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span>, <span class="dv"><span class="hljs-number">15</span></span><span class="hljs-number">.</span>)
+modelA <span class="op">=</span> updateRecall(<span class="dv"><span class="hljs-number">3</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">3</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">7</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span>, <span class="dv"><span class="hljs-number">15</span></span><span class="hljs-number">.</span>)
+modelB <span class="op">=</span> updateRecall(<span class="dv"><span class="hljs-number">12</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">12</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">7</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span>, <span class="dv"><span class="hljs-number">15</span></span><span class="hljs-number">.</span>)
 hlA <span class="op">=</span> priorToHalflife(<span class="op">*</span>modelA)
 hlB <span class="op">=</span> priorToHalflife(<span class="op">*</span>modelB)
 plt.errorbar(
     ts,
-    recallProbabilityMean(<span class="op">*</span>modelA, ts),
-    v2s(recallProbabilityVar(<span class="op">*</span>modelA, ts)),
+    predictRecall(<span class="op">*</span>modelA, ts),
+    v2s(predictRecallVar(<span class="op">*</span>modelA, ts)),
     fmt<span class="op">=</span><span class="st"><span class="hljs-string">'.-'</span></span>,
     label<span class="op">=</span><span class="st"><span class="hljs-string">'Model A'</span></span>,
     color<span class="op">=</span><span class="st"><span class="hljs-string">'C0'</span></span>)
 plt.plot(ts, <span class="dv"><span class="hljs-number">2</span></span><span class="op">**</span>(<span class="op">-</span>ts <span class="op">/</span> hlA[<span class="dv"><span class="hljs-number">0</span></span>]), <span class="st"><span class="hljs-string">'--'</span></span>, label<span class="op">=</span><span class="st"><span class="hljs-string">'approx A'</span></span>, color<span class="op">=</span><span class="st"><span class="hljs-string">'C0'</span></span>)
 plt.errorbar(
     ts,
-    recallProbabilityMean(<span class="op">*</span>modelB, ts),
-    v2s(recallProbabilityVar(<span class="op">*</span>modelB, ts)),
+    predictRecall(<span class="op">*</span>modelB, ts),
+    v2s(predictRecallVar(<span class="op">*</span>modelB, ts)),
     fmt<span class="op">=</span><span class="st"><span class="hljs-string">'.-'</span></span>,
     label<span class="op">=</span><span class="st"><span class="hljs-string">'Model B'</span></span>,
     color<span class="op">=</span><span class="st"><span class="hljs-string">'C1'</span></span>)
@@ -2533,9 +2555,9 @@ plt.ylim([<span class="dv"><span class="hljs-number">0</span></span>, <span clas
 plt.grid(<span class="va"><span class="hljs-keyword">True</span></span>)
 plt.xlabel(<span class="st"><span class="hljs-string">'Time (days)'</span></span>)
 plt.ylabel(<span class="st"><span class="hljs-string">'Recall probability'</span></span>)
-plt.title(<span class="st"><span class="hljs-string">'Predicted forgetting curves (A: a=b=3, B: a=b=12)'</span></span>)
+plt.title(<span class="st"><span class="hljs-string">'Predicted forgetting curves (A: α=β=3, B: α=β=12)'</span></span>)
 plt.savefig(<span class="st"><span class="hljs-string">'figures/forgetting-curve.svg'</span></span>)
-plt.savefig(<span class="st"><span class="hljs-string">'figures/forgetting-curve.png'</span></span>, dpi<span class="op">=</span><span class="dv"><span class="hljs-number">150</span></span>)
+plt.savefig(<span class="st"><span class="hljs-string">'figures/forgetting-curve.png'</span></span>, dpi<span class="op">=</span><span class="dv"><span class="hljs-number">300</span></span>)
 plt.show()</code></pre></div>
 <p><img src="figures/forgetting-curve.png" alt="figures/forgetting-curve.png"></p>
 <h2 id="implementation-thoughts">Implementation thoughts</h2>

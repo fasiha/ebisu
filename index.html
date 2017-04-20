@@ -89,7 +89,7 @@
 <ul>
 <li><a href="https://fasiha.github.io/ebisu/">Literate document</a></li>
 <li><a href="https://github.com/fasiha/ebisu">GitHub repo</a></li>
-<li><a href="https://pypi.python.org/pypi/ebisu/0.1">PyPI package</a></li>
+<li><a href="https://pypi.python.org/pypi/ebisu/">PyPI package</a></li>
 </ul>
 <h2>Introduction</h2>
 <p>Given a set of facts that a student is memorizing,</p>
@@ -2166,7 +2166,7 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
   same2 = gammaln(alpha + <span class="hljs-number">2</span> * dt) - gammaln(alpha + beta + <span class="hljs-number">2</span> * dt)
   md = same1 - same0
   md2 = same2 - same0
-  <span class="hljs-keyword">return</span> exp(md2) - exp(<span class="hljs-number">2</span> * md2)
+  <span class="hljs-keyword">return</span> exp(md2) - exp(<span class="hljs-number">2</span> * md)
 
 
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">posteriorAnalytic</span><span class="hljs-params">(alpha, beta, t, result, tnow)</span>:</span>
@@ -2429,6 +2429,7 @@ posteriorAnalytic(<span class="hljs-number">3.3</span>, <span class="hljs-number
         mean = recallProbabilityMean(a, b, t0, t)
         var = recallProbabilityVar(a, b, t0, t)
         self.assertLess(relerr(mean, mc[<span class="hljs-string">'mean'</span>]), <span class="hljs-number">3e-2</span>)
+        self.assertLess(relerr(var, mc[<span class="hljs-string">'var'</span>]), <span class="hljs-number">3e-2</span>)
 
     inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">5.5</span>)
     inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">15.5</span>)

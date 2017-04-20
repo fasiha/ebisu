@@ -180,7 +180,7 @@ A quiz app can implement at least the expectation \\(E[π_t^δ]\\) above to iden
 **Important aside** Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple \\([α, β, t]\\) initially, for example when the student has first learned a fact. I propose setting \\(t\\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \\(t\\) to four hours or a day, respectively. Then, set \\(α = β ≥ 2\\): the \\(α = β\\) part will center the Beta distribution for \\(π_t\\) at 0.5, and then the actual value will constrain the variability of \\(π_t\\). Specifically, the \\(Beta(α, β)\\) distribution has
 - mean \\(α / (α + β)\\) or \\(0.5\\) if \\(α = β\\), and
 - variance \\(α · β / (α + β)^ 2 / (α + β + 1)\\) which simplifies to \\(1/(4 (2 α + 1))\\) when \\(α = β\\).
-  - (Recall the traditional explanation of \\(α\\) and \\(β\\) are the number of successes and failures, respectively, that have been observed by flipping a weighted coin—or in our application, the number of successful versus unsuccessful quiz results for a sequence of quizzes on the same fact \\(t\\) days apart.)
+    - (Recall the traditional explanation of \\(α\\) and \\(β\\) are the number of successes and failures, respectively, that have been observed by flipping a weighted coin—or in our application, the number of successful versus unsuccessful quiz results for a sequence of quizzes on the same fact \\(t\\) days apart.)
 
 A higher value for \\(α = β\\) encodes *higher* confidence in the expected half-life \\(t\\), which in turn makes the model (which we’ll detail below) *less* sensitive to quiz results. In our experiments below, \\(α = β = 12\\) is our least sensitive model, while \\(α = β = 3\\) is our most sensitive model. In the absence of strong feelings, a quiz app author can pick a number between these.
 
@@ -212,7 +212,7 @@ The posterior mean and variance when \\(x=0\\) (failed quiz) are:
 With the mean and variance of the posterior in hand, it is straightforward to find a well-approximating Beta distribution using the [method of moments](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters):
 - a new \\(α' = μ (μ (1-μ) / σ^2 - 1)\\) and
 - \\(β' = (1-μ) (μ (1-μ) / σ^2 - 1)\\),
-  - for \\(μ = E[π|x]\\) and \\(σ^2 = Var[π|x]\\).
+    - for \\(μ = E[π|x]\\) and \\(σ^2 = Var[π|x]\\).
 
 The updated posterior becomes the new prior, parameterized by this \\([α', β', t_2]\\), where \\(t_2\\) is the time elapsed between this fact’s last quiz and the one just used in the update.
 
@@ -661,11 +661,11 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 ## Requirements for building all aspects of this repo
 
 - Python
-  - scipy, numpy
-  - nose for tests
-- [cmark-gfm](https://github.com/github/cmark)
+    - scipy, numpy
+    - nose for tests
+- [Pandoc](http://pandoc.org)
 - JavaScript
-  - [Yarn](https://yarnpkg.com)
+    - [Yarn](https://yarnpkg.com)
 
 ## Acknowledgements
 

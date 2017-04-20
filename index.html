@@ -84,15 +84,15 @@
                             min-width: 0;
                             min-height: 0;
                             width: 100%
-                            }</style></head><body><h1>Ebisu: intelligent quiz scheduling</h1>
-<h2>Important links</h2>
+                            }</style></head><body><h1 id="ebisu-intelligent-quiz-scheduling">Ebisu: intelligent quiz scheduling</h1>
+<h2 id="important-links">Important links</h2>
 <ul>
 <li><a href="https://fasiha.github.io/ebisu/">Literate document</a></li>
 <li><a href="https://github.com/fasiha/ebisu">GitHub repo</a></li>
 <li><a href="https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb">IPython Notebook crash course</a></li>
 <li><a href="https://pypi.python.org/pypi/ebisu/">PyPI package</a></li>
 </ul>
-<h2>Introduction</h2>
+<h2 id="introduction">Introduction</h2>
 <p>Given a set of facts that a student is memorizing,</p>
 <ul>
 <li>which facts need reviewing?, and</li>
@@ -109,7 +109,7 @@
 <li>PostgreSQL.</li>
 </ul>
 <p>This first version was built in Python because of the numerical batteries provided by Scipy, Numpy, PyMC, etc.</p>
-<h2>How it works</h2>
+<h2 id="how-it-works">How it works</h2>
 <p>There are many scheduling schemes, e.g.,</p>
 <ul>
 <li><a href="https://apps.ankiweb.net/">Anki</a>, an open-source Python flashcard app (and a closed-source mobile app),</li>
@@ -154,7 +154,7 @@
 <p>Nerdy details in a nutshell: Ebisu posits a <a href="https://en.wikipedia.org/wiki/Beta_distribution">Beta prior</a> on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it evaluates the <a href="http://mathworld.wolfram.com/GammaFunction.html">Gamma function</a> to predict the current recall probability. A <em>quiz</em> is modeled as a Beroulli trial, whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta posterior by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the Gamma function.</p>
 </blockquote>
 <p>Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how facts are related the way Duolingo can with its sentences. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.</p>
-<h2>This document</h2>
+<h2 id="this-document">This document</h2>
 <p>This document is a literate program. It contains not only source code (currently only Python; JavaScript/compile-to-JavaScript and PostgreSQL versions are planned), but also an explanation of the statistics and mathematics underlying the algorithm.</p>
 <p>Therefore, there are three major parts of this document.</p>
 <ol>
@@ -162,10 +162,10 @@
 <li>The math—if you like Beta-distributed random variables, conjugate priors, and marginalization, you’ll want to read this part. If you don’t, I’ll highlight the formulas that Ebisu actually implements.</li>
 <li>And finally, the source code itself, annotated and explained. If you want to hack on Ebisu’s code, this is the section for you.</li>
 </ol>
-<h2>TL;DR</h2>
+<h2 id="tldr">TL;DR</h2>
 <p>Install the Python library with <code>pip3 install ebisu</code> (or <code>pip install ebisu</code> if you only have Python3 🤠).</p>
 <p>Coming soon: API docs. In the meantime, please see this <a href="https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb">IPython Notebook crash course</a>.</p>
-<h2>The math</h2>
+<h2 id="the-math">The math</h2>
 <p>Let’s begin with a quiz. One way or another, we’ve picked a fact to quiz the student on, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-5-Title">
 <title id="MathJax-SVG-5-Title">t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -248,7 +248,7 @@
  <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
 </g>
-</svg></span> follow a Beta distribution, that is, if
+</svg></span> follow a Beta distribution, that is, if<br>
 <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.465ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7519.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-16-Title">
 <title id="MathJax-SVG-16-Title">π_t ∼ Beta(α_t, β_t)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -271,7 +271,7 @@
 </g>
  <use xlink:href="#MJMAIN-29" x="7130" y="0"></use>
 </g>
-</svg></span>
+</svg></span><br>
 for specific <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.314ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 996.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-17-Title">
 <title id="MathJax-SVG-17-Title">α_t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -284,7 +284,7 @@ for specific <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink
  <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="801" y="-326"></use>
 </g>
-</svg></span>, then observing the quiz result updates our belief about the recall probability to be:
+</svg></span>, then observing the quiz result updates our belief about the recall probability to be:<br>
 <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.909ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 15030.3 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-19-Title">
 <title id="MathJax-SVG-19-Title">π_t | x_t ∼ Beta(α_t + x_t, β_t + 1 - x_t).</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -408,7 +408,7 @@ for specific <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink
  <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
 </g>
-</svg></span> (probability of  recall at time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-29-Title">
+</svg></span> (probability of recall at time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-29-Title">
 <title id="MathJax-SVG-29-Title">t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
@@ -442,7 +442,7 @@ for specific <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
 </g>
-</svg></span> is
+</svg></span> is<br>
 <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.932ex" height="3.176ex" style="vertical-align: -0.671ex;" viewBox="0 -1078.4 4706.8 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-35-Title">
 <title id="MathJax-SVG-35-Title">π_t = 2^{-t/h},</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -460,7 +460,7 @@ for specific <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink
 </g>
  <use xlink:href="#MJMAIN-2C" x="4428" y="0"></use>
 </g>
-</svg></span>
+</svg></span><br>
 for some notional half-life <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.339ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 576.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-36-Title">
 <title id="MathJax-SVG-36-Title">h</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -476,7 +476,7 @@ for some notional half-life <span class="mjpage"><svg xmlns:xlink="http://www.w3
  <use xlink:href="#MJMAIN-22C5" x="2816" y="0"></use>
  <use xlink:href="#MJMATHI-74" x="3316" y="0"></use>
 </g>
-</svg></span>. Then,
+</svg></span>. Then,<br>
 <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="37.4ex" height="3.509ex" style="vertical-align: -1.005ex;" viewBox="0 -1078.4 16102.7 1510.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-38-Title">
 <title id="MathJax-SVG-38-Title">π_{t_2} = π_{δ t} = 2^{-δt/h} = (2^{-t/h})^δ = (π_t)^δ.</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -531,7 +531,7 @@ for some notional half-life <span class="mjpage"><svg xmlns:xlink="http://www.w3
 </g>
  <use xlink:href="#MJMAIN-2E" x="15824" y="0"></use>
 </g>
-</svg></span>
+</svg></span><br>
 That is, to fast-forward or rewind <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-39-Title">
 <title id="MathJax-SVG-39-Title">π_t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -646,40 +646,39 @@ That is, to fast-forward or rewind <span class="mjpage"><svg xmlns:xlink="http:/
 </g>
 </g>
 </svg></span>), that density moves from the middle of the plot to the right, meaning a high probability of recall. However, if the student is quizzed three weeks after review, the original density moves to the left: it’s likely the student will fail the quiz.</p>
-<pre><code class="language-py hljs python"><span class="hljs-keyword">import</span> matplotlib.pyplot <span class="hljs-keyword">as</span> plt
-plt.style.use(<span class="hljs-string">'ggplot'</span>)
-plt.rcParams[<span class="hljs-string">'svg.fonttype'</span>] = <span class="hljs-string">'none'</span>
+<div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="im"><span class="hljs-keyword">import</span></span> matplotlib.pyplot <span class="im"><span class="hljs-keyword">as</span></span> plt
+plt.style.use(<span class="st"><span class="hljs-string">'ggplot'</span></span>)
+plt.rcParams[<span class="st"><span class="hljs-string">'svg.fonttype'</span></span>] <span class="op">=</span> <span class="st"><span class="hljs-string">'none'</span></span>
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">generatePis</span><span class="hljs-params">(deltaT, alpha=<span class="hljs-number">12.0</span>, beta=<span class="hljs-number">12.0</span>)</span>:</span>
-  <span class="hljs-keyword">import</span> scipy.stats <span class="hljs-keyword">as</span> stats
-  <span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
-  <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> beta <span class="hljs-keyword">as</span> fbeta
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">generatePis</span><span class="hljs-params">(deltaT, alpha</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="fl"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">12.0</span></span></span></span><span class="hljs-function"><span class="hljs-params">, beta</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="fl"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">12.0</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
+  <span class="im"><span class="hljs-keyword">import</span></span> scipy.stats <span class="im"><span class="hljs-keyword">as</span></span> stats
+  <span class="im"><span class="hljs-keyword">import</span></span> numpy <span class="im"><span class="hljs-keyword">as</span></span> np
+  <span class="im"><span class="hljs-keyword">from</span></span> scipy.special <span class="im"><span class="hljs-keyword">import</span></span> beta <span class="im"><span class="hljs-keyword">as</span></span> fbeta
 
-  piT = stats.beta.rvs(alpha, beta, size=<span class="hljs-number">50</span> * <span class="hljs-number">1000</span>)
-  piT2 = piT**deltaT
+  piT <span class="op">=</span> stats.beta.rvs(alpha, beta, size<span class="op">=</span><span class="dv"><span class="hljs-number">50</span></span> <span class="op">*</span> <span class="dv"><span class="hljs-number">1000</span></span>)
+  piT2 <span class="op">=</span> piT<span class="op">**</span>deltaT
 
-  plt.hist(piT2, bins=<span class="hljs-number">20</span>, label=<span class="hljs-string">'δ={}'</span>.format(deltaT), alpha=<span class="hljs-number">0.25</span>, normed=<span class="hljs-keyword">True</span>)
-  <span class="hljs-comment"># p = np.linspace(0, 1, num=1000)</span>
-  <span class="hljs-comment"># a, b, _, _ = stats.beta.fit(piT2, floc=0, fscale=1)</span>
-  <span class="hljs-comment"># plt.plot(p, stats.beta.pdf(p, a, b), ls='dotted', lw=4, alpha=0.5, color='0.5')</span>
-  <span class="hljs-comment"># pr = lambda a,b,d,p: p**((a-d)/d) * (1-p**(1/d))**(b-1) / d / fbeta(a,b)</span>
-  <span class="hljs-comment"># plt.plot(p, pr(alpha,beta,deltaT,p), ls='dashed', color='0.25', alpha=0.35)</span>
+  plt.hist(piT2, bins<span class="op">=</span><span class="dv"><span class="hljs-number">20</span></span>, label<span class="op">=</span><span class="st"><span class="hljs-string">'δ=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.<span class="bu">format</span>(deltaT), alpha<span class="op">=</span><span class="fl"><span class="hljs-number">0.25</span></span>, normed<span class="op">=</span><span class="va"><span class="hljs-keyword">True</span></span>)
+  <span class="co"><span class="hljs-comment"># p = np.linspace(0, 1, num=1000)</span></span>
+  <span class="co"><span class="hljs-comment"># a, b, _, _ = stats.beta.fit(piT2, floc=0, fscale=1)</span></span>
+  <span class="co"><span class="hljs-comment"># plt.plot(p, stats.beta.pdf(p, a, b), ls='dotted', lw=4, alpha=0.5, color='0.5')</span></span>
+  <span class="co"><span class="hljs-comment"># pr = lambda a,b,d,p: p**((a-d)/d) * (1-p**(1/d))**(b-1) / d / fbeta(a,b)</span></span>
+  <span class="co"><span class="hljs-comment"># plt.plot(p, pr(alpha,beta,deltaT,p), ls='dashed', color='0.25', alpha=0.35)</span></span>
 
-  <span class="hljs-keyword">return</span> piT2
+  <span class="cf"><span class="hljs-keyword">return</span></span> piT2
 
 
-generatePis(<span class="hljs-number">0.3</span>)
-generatePis(<span class="hljs-number">1.</span>)
-generatePis(<span class="hljs-number">3.</span>)
-plt.xlabel(<span class="hljs-string">'π (recall probability)'</span>)
-plt.ylabel(<span class="hljs-string">'Probability(π)'</span>)
-plt.title(<span class="hljs-string">'Histograms of π_t^δ for different δ'</span>)
-plt.legend(loc=<span class="hljs-number">0</span>)
-plt.savefig(<span class="hljs-string">'figures/pidelta.svg'</span>)
-plt.savefig(<span class="hljs-string">'figures/pidelta.png'</span>, dpi=<span class="hljs-number">150</span>)
-plt.show()
-</code></pre>
+generatePis(<span class="fl"><span class="hljs-number">0.3</span></span>)
+generatePis(<span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>)
+generatePis(<span class="dv"><span class="hljs-number">3</span></span><span class="hljs-number">.</span>)
+plt.xlabel(<span class="st"><span class="hljs-string">'π (recall probability)'</span></span>)
+plt.ylabel(<span class="st"><span class="hljs-string">'Probability(π)'</span></span>)
+plt.title(<span class="st"><span class="hljs-string">'Histograms of π_t^δ for different δ'</span></span>)
+plt.legend(loc<span class="op">=</span><span class="dv"><span class="hljs-number">0</span></span>)
+plt.savefig(<span class="st"><span class="hljs-string">'figures/pidelta.svg'</span></span>)
+plt.savefig(<span class="st"><span class="hljs-string">'figures/pidelta.png'</span></span>, dpi<span class="op">=</span><span class="dv"><span class="hljs-number">150</span></span>)
+plt.show()</code></pre></div>
 <p><img src="figures/pidelta.png" alt="figures/pidelta.png"></p>
 <p>You’ll have to take my word for it that the histograms where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.293ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 2279.1 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-51-Title">
 <title id="MathJax-SVG-51-Title">δ≠1</title>
@@ -782,7 +781,7 @@ plt.show()
  <use xlink:href="#MJMATHI-3B2" x="3592" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="4158" y="0"></use>
 </g>
-</svg></span>,
+</svg></span>,<br>
 <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="31.383ex" height="6.009ex" style="vertical-align: -2.505ex;" viewBox="0 -1508.9 13512.2 2587.3" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-62-Title">
 <title id="MathJax-SVG-62-Title">P_{Y}(y) = P_{x}(g^{-1}(y)) · \frac{∂}{∂y} g^{-1}(y),</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -831,8 +830,8 @@ plt.show()
  <use xlink:href="#MJMAIN-29" x="12844" y="0"></use>
  <use xlink:href="#MJMAIN-2C" x="13233" y="0"></use>
 </g>
-</svg></span>
-and this after some Wolfram Alpha and hand-manipulation becomes
+</svg></span><br>
+and this after some Wolfram Alpha and hand-manipulation becomes<br>
 <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="44.588ex" height="3.343ex" style="vertical-align: -0.838ex;" viewBox="0 -1078.4 19197.6 1439.2" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-63-Title">
 <title id="MathJax-SVG-63-Title">P_{Y}(y) = y^{(α-δ)/δ} · (1-y^{1/δ})^{β-1} / (δ · B(α, β)),</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -887,7 +886,7 @@ and this after some Wolfram Alpha and hand-manipulation becomes
  <use xlink:href="#MJMAIN-29" x="18529" y="0"></use>
  <use xlink:href="#MJMAIN-2C" x="18919" y="0"></use>
 </g>
-</svg></span>
+</svg></span><br>
 where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="31.584ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 13598.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-64-Title">
 <title id="MathJax-SVG-64-Title">B(α, β) = Γ(α) · Γ(β) / Γ(α + β)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -958,7 +957,7 @@ where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width
  <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
 </g>
-</svg></span>:
+</svg></span>:<br>
 <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="32.558ex" height="6.843ex" style="vertical-align: -2.671ex;" viewBox="0 -1796 14018.1 2946.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-70-Title">
 <title id="MathJax-SVG-70-Title">P(π_t^δ) = \frac{π^{(α - δ)/δ} · (1-π^{1/δ})^{β-1}}{δ · B(α, β)}.</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -1020,7 +1019,7 @@ where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width
 </g>
  <use xlink:href="#MJMAIN-2E" x="13739" y="0"></use>
 </g>
-</svg></span>
+</svg></span><br>
 I tried but failed to rewrite this as a Beta distribution, and indeed, we can show numerically that this density does indeed diverge from the best-approximating Beta density.</p>
 <p>We will use the density of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.287ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 984.8 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-71-Title">
 <title id="MathJax-SVG-71-Title">π_t^δ</title>
@@ -1105,11 +1104,11 @@ I tried but failed to rewrite this as a Beta distribution, and indeed, we can sh
  <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
 </g>
 </g>
-</svg></span> is the time currently elapsed since the last review. The expected recall probability right now is
+</svg></span> is the time currently elapsed since the last review. The expected recall probability right now is<br>
 <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.889ex" height="12.843ex" style="vertical-align: -5.838ex;" viewBox="0 -3015.9 15021.7 5529.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-78-Title">
-<title id="MathJax-SVG-78-Title">\begin{align}
-E[π_t^δ] &amp;= \int_0^1 P(π_t^δ) · π \, dπ \\
-&amp;= \frac{Γ(α + β)}{Γ(α)} · \frac{Γ(α + δ)}{Γ(α + β + δ)}.
+<title id="MathJax-SVG-78-Title">\begin{align} 
+E[π_t^δ] &amp;= \int_0^1 P(π_t^δ) · π \, dπ \\ 
+&amp;= \frac{Γ(α + β)}{Γ(α)} · \frac{Γ(α + δ)}{Γ(α + β + δ)}. 
 \end{align}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
 <g transform="translate(167,0)">
@@ -1214,11 +1213,11 @@ E[π_t^δ] &amp;= \int_0^1 P(π_t^δ) · π \, dπ \\
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
 </g>
-</svg></span>:
+</svg></span>:<br>
 <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="38.237ex" height="9.676ex" style="vertical-align: -4.003ex; margin-bottom: -0.335ex;" viewBox="0 -2298.3 16463 4166" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-81-Title">
-<title id="MathJax-SVG-81-Title">\begin{align}
-Var[π_t^δ] &amp;= \int_0^1 P(π_t^δ) · (π - E[π_t^δ])^2 \, dπ \\
-&amp;= E[π_t^{2 δ}] - (E[π_t^δ])^2.
+<title id="MathJax-SVG-81-Title">\begin{align} 
+Var[π_t^δ] &amp;= \int_0^1 P(π_t^δ) · (π - E[π_t^δ])^2 \, dπ \\ 
+&amp;= E[π_t^{2 δ}] - (E[π_t^δ])^2. 
 \end{align}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
 <g transform="translate(167,0)">
@@ -1343,7 +1342,7 @@ Var[π_t^δ] &amp;= \int_0^1 P(π_t^δ) · (π - E[π_t^δ])^2 \, dπ \\
 </g>
 </svg></span> shows up in this way surprised me.</p>
 <blockquote>
-<p>Verifying this in Mathematica/Wolfram Alpha is a bit more involved. First,
+<p>Verifying this in Mathematica/Wolfram Alpha is a bit more involved. First,<br>
 <code>Assuming[a&gt;0 &amp;&amp; b&gt;0 &amp;&amp; t&gt;0, {Integrate[p^((a - d)/d) * (1 - p^(1/d))^(b - 1) / (d * Gamma[a]*Gamma[b]/Gamma[a+b]) * (p-m)^2, {p, 0, 1}]}]</code> gives the result in terms of mean <code>m</code> = <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.357ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 2306.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-86-Title">
 <title id="MathJax-SVG-86-Title">E[π_t^δ]</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -1526,8 +1525,7 @@ Var[π_t^δ] &amp;= \int_0^1 P(π_t^δ) · (π - E[π_t^δ])^2 \, dπ \\
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
 </g>
 </svg></span> days apart.)</li>
-</ul>
-</li>
+</ul></li>
 </ul>
 <p>A higher value for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-105-Title">
 <title id="MathJax-SVG-105-Title">α = β</title>
@@ -1571,8 +1569,8 @@ Var[π_t^δ] &amp;= \int_0^1 P(π_t^δ) · (π - E[π_t^δ])^2 \, dπ \\
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
 </g>
-</svg></span>, convert these to the <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">closest Beta distribution</a> and straightforwardly update with the Bernoulli likelihood (straightforward because of conjugacy). However, it is better to delay the Beta fit till we have the posterior, and do the likelihood update analytically. Lucky for us, this is tractable and we will see code later that demonstrates the  boost in accuracy with respect to a computationally-expensive Monte Carlo simulation.</p>
-<p>By application of Bayes rule, the posterior is
+</svg></span>, convert these to the <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">closest Beta distribution</a> and straightforwardly update with the Bernoulli likelihood (straightforward because of conjugacy). However, it is better to delay the Beta fit till we have the posterior, and do the likelihood update analytically. Lucky for us, this is tractable and we will see code later that demonstrates the boost in accuracy with respect to a computationally-expensive Monte Carlo simulation.</p>
+<p>By application of Bayes rule, the posterior is<br>
 <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="44.783ex" height="7.343ex" style="vertical-align: -3.505ex;" viewBox="0 -1652.5 19281.7 3161.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-110-Title">
 <title id="MathJax-SVG-110-Title">Posterior(π|x) = \frac{Prior(π) · Lik(x|π)}{\int_0^1 Prior(π) · Lik(x|π) \, dπ},</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -1641,7 +1639,7 @@ Var[π_t^δ] &amp;= \int_0^1 P(π_t^δ) · (π - E[π_t^δ])^2 \, dπ \\
 </g>
  <use xlink:href="#MJMAIN-2C" x="19003" y="0"></use>
 </g>
-</svg></span>
+</svg></span><br>
 where “posterior” and “prior” are the Beta densities, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="3.597ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 1548.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-111-Title">
 <title id="MathJax-SVG-111-Title">Lik</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -1802,9 +1800,9 @@ where “posterior” and “prior” are the Beta densities, <span class="mjpag
 </g>
 </svg></span></p>
 <p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="61.844ex" height="9.509ex" style="vertical-align: -3.981ex; margin-bottom: -0.19ex;" viewBox="0 -2298.3 26627.1 4094.3" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-124-Title">
-<title id="MathJax-SVG-124-Title">\begin{align}
-Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \\
-&amp;= γ_3 / γ_1 - (E[π|x=1])^2.
+<title id="MathJax-SVG-124-Title">\begin{align} 
+Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \\ 
+&amp;= γ_3 / γ_1 - (E[π|x=1])^2. 
 \end{align}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
 <g transform="translate(167,0)">
@@ -2108,8 +2106,7 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
  <use xlink:href="#MJMAIN-5D" x="5809" y="0"></use>
 </g>
 </svg></span>.</li>
-</ul>
-</li>
+</ul></li>
 </ul>
 <p>The updated posterior becomes the new prior, parameterized by this <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.428ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 4059.4 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-132-Title">
 <title id="MathJax-SVG-132-Title">[α', β', t_2]</title>
@@ -2139,435 +2136,424 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
 </g>
 </svg></span> is the time elapsed between this fact’s last quiz and the one just used in the update.</p>
 <p>We are done. That’s all the math.</p>
-<h2>Source code</h2>
-<h3>Core library</h3>
-<pre><code class="language-py hljs python"><span class="hljs-comment"># export ebisu/__init__.py #</span>
-<span class="hljs-keyword">from</span> .ebisu <span class="hljs-keyword">import</span> *
-<span class="hljs-keyword">from</span> . <span class="hljs-keyword">import</span> alternate
-</code></pre>
-<pre><code class="language-py hljs python"><span class="hljs-comment"># export ebisu/ebisu.py #</span>
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">recallProbabilityMean</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
-  <span class="hljs-comment"># `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`</span>
-  <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln
-  <span class="hljs-keyword">from</span> numpy <span class="hljs-keyword">import</span> exp
-  dt = tnow / t
-  <span class="hljs-keyword">return</span> exp(
-      gammaln(alpha + dt) - gammaln(alpha + beta + dt) - (
-          gammaln(alpha) - gammaln(alpha + beta)))
+<h2 id="source-code">Source code</h2>
+<h3 id="core-library">Core library</h3>
+<div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="co"><span class="hljs-comment"># export ebisu/__init__.py #</span></span>
+<span class="im"><span class="hljs-keyword">from</span></span> .ebisu <span class="im"><span class="hljs-keyword">import</span></span> <span class="op">*</span>
+<span class="im"><span class="hljs-keyword">from</span></span> . <span class="im"><span class="hljs-keyword">import</span></span> alternate</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="co"><span class="hljs-comment"># export ebisu/ebisu.py #</span></span>
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">recallProbabilityMean</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
+  <span class="co"><span class="hljs-comment"># `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`</span></span>
+  <span class="im"><span class="hljs-keyword">from</span></span> scipy.special <span class="im"><span class="hljs-keyword">import</span></span> gammaln
+  <span class="im"><span class="hljs-keyword">from</span></span> numpy <span class="im"><span class="hljs-keyword">import</span></span> exp
+  dt <span class="op">=</span> tnow <span class="op">/</span> t
+  <span class="cf"><span class="hljs-keyword">return</span></span> exp(
+      gammaln(alpha <span class="op">+</span> dt) <span class="op">-</span> gammaln(alpha <span class="op">+</span> beta <span class="op">+</span> dt) <span class="op">-</span> (
+          gammaln(alpha) <span class="op">-</span> gammaln(alpha <span class="op">+</span> beta)))
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">recallProbabilityVar</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
-  <span class="hljs-keyword">from</span> numpy <span class="hljs-keyword">import</span> exp
-  <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln
-  <span class="hljs-comment"># `Assuming[a&gt;0 &amp;&amp; b&gt;0 &amp;&amp; t&gt;0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``</span>
-  <span class="hljs-comment"># And then plug in mean for `m` &amp; simplify to get:</span>
-  dt = tnow / t
-  same0 = gammaln(alpha) - gammaln(alpha + beta)
-  same1 = gammaln(alpha + dt) - gammaln(alpha + beta + dt)
-  same2 = gammaln(alpha + <span class="hljs-number">2</span> * dt) - gammaln(alpha + beta + <span class="hljs-number">2</span> * dt)
-  md = same1 - same0
-  md2 = same2 - same0
-  <span class="hljs-keyword">return</span> exp(md2) - exp(<span class="hljs-number">2</span> * md)
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">recallProbabilityVar</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
+  <span class="im"><span class="hljs-keyword">from</span></span> numpy <span class="im"><span class="hljs-keyword">import</span></span> exp
+  <span class="im"><span class="hljs-keyword">from</span></span> scipy.special <span class="im"><span class="hljs-keyword">import</span></span> gammaln
+  <span class="co"><span class="hljs-comment"># `Assuming[a&gt;0 &amp;&amp; b&gt;0 &amp;&amp; t&gt;0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``</span></span>
+  <span class="co"><span class="hljs-comment"># And then plug in mean for `m` &amp; simplify to get:</span></span>
+  dt <span class="op">=</span> tnow <span class="op">/</span> t
+  same0 <span class="op">=</span> gammaln(alpha) <span class="op">-</span> gammaln(alpha <span class="op">+</span> beta)
+  same1 <span class="op">=</span> gammaln(alpha <span class="op">+</span> dt) <span class="op">-</span> gammaln(alpha <span class="op">+</span> beta <span class="op">+</span> dt)
+  same2 <span class="op">=</span> gammaln(alpha <span class="op">+</span> <span class="dv"><span class="hljs-number">2</span></span> <span class="op">*</span> dt) <span class="op">-</span> gammaln(alpha <span class="op">+</span> beta <span class="op">+</span> <span class="dv"><span class="hljs-number">2</span></span> <span class="op">*</span> dt)
+  md <span class="op">=</span> same1 <span class="op">-</span> same0
+  md2 <span class="op">=</span> same2 <span class="op">-</span> same0
+  <span class="cf"><span class="hljs-keyword">return</span></span> exp(md2) <span class="op">-</span> exp(<span class="dv"><span class="hljs-number">2</span></span> <span class="op">*</span> md)
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">posteriorAnalytic</span><span class="hljs-params">(alpha, beta, t, result, tnow)</span>:</span>
-  <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln, gamma
-  <span class="hljs-keyword">from</span> numpy <span class="hljs-keyword">import</span> exp
-  dt = tnow / t
-  <span class="hljs-keyword">if</span> result == <span class="hljs-number">1</span>:
-    <span class="hljs-comment"># marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`</span>
-    <span class="hljs-comment"># mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`</span>
-    <span class="hljs-comment"># variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`</span>
-    <span class="hljs-comment"># Simplify all three to get the following:</span>
-    same = gammaln(alpha + beta + dt) - gammaln(alpha + dt)
-    muln = gammaln(alpha + <span class="hljs-number">2</span> * dt) - gammaln(alpha + beta + <span class="hljs-number">2</span> * dt) + same
-    mu = exp(muln)
-    var = exp(same + gammaln(alpha + <span class="hljs-number">3</span> * dt) -
-              gammaln(alpha + beta + <span class="hljs-number">3</span> * dt)) - exp(<span class="hljs-number">2</span> * muln)
-  <span class="hljs-keyword">else</span>:
-    <span class="hljs-comment"># Mathematica code is same as above, but replace one `p` with `(1-p)`</span>
-    <span class="hljs-comment"># marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`</span>
-    <span class="hljs-comment"># mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`</span>
-    <span class="hljs-comment"># var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`</span>
-    <span class="hljs-comment"># Then simplify and combine</span>
-    same0 = gamma(alpha) / gamma(alpha + beta)
-    same1 = gamma(alpha + dt) / gamma(alpha + beta + dt)
-    same2 = gamma(alpha + <span class="hljs-number">2</span> * dt) / gamma(alpha + beta + <span class="hljs-number">2</span> * dt)
-    same3 = gamma(alpha + <span class="hljs-number">3</span> * dt) / gamma(alpha + beta + <span class="hljs-number">3</span> * dt)
-    mu = (same1 - same2) / (same0 - same1)
-    var = (same3 * (same1 - same0) + same2 *
-           (same0 + same1 - same2) - same1**<span class="hljs-number">2</span>) / (same1 - same0)**<span class="hljs-number">2</span>
-  newAlpha, newBeta = meanVarToBeta(mu, var)
-  <span class="hljs-keyword">return</span> newAlpha, newBeta, tnow
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">posteriorAnalytic</span><span class="hljs-params">(alpha, beta, t, result, tnow)</span>:</span>
+  <span class="im"><span class="hljs-keyword">from</span></span> scipy.special <span class="im"><span class="hljs-keyword">import</span></span> gammaln, gamma
+  <span class="im"><span class="hljs-keyword">from</span></span> numpy <span class="im"><span class="hljs-keyword">import</span></span> exp
+  dt <span class="op">=</span> tnow <span class="op">/</span> t
+  <span class="cf"><span class="hljs-keyword">if</span></span> result <span class="op">==</span> <span class="dv"><span class="hljs-number">1</span></span>:
+    <span class="co"><span class="hljs-comment"># marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`</span></span>
+    <span class="co"><span class="hljs-comment"># mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`</span></span>
+    <span class="co"><span class="hljs-comment"># variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`</span></span>
+    <span class="co"><span class="hljs-comment"># Simplify all three to get the following:</span></span>
+    same <span class="op">=</span> gammaln(alpha <span class="op">+</span> beta <span class="op">+</span> dt) <span class="op">-</span> gammaln(alpha <span class="op">+</span> dt)
+    muln <span class="op">=</span> gammaln(alpha <span class="op">+</span> <span class="dv"><span class="hljs-number">2</span></span> <span class="op">*</span> dt) <span class="op">-</span> gammaln(alpha <span class="op">+</span> beta <span class="op">+</span> <span class="dv"><span class="hljs-number">2</span></span> <span class="op">*</span> dt) <span class="op">+</span> same
+    mu <span class="op">=</span> exp(muln)
+    var <span class="op">=</span> exp(same <span class="op">+</span> gammaln(alpha <span class="op">+</span> <span class="dv"><span class="hljs-number">3</span></span> <span class="op">*</span> dt) <span class="op">-</span>
+              gammaln(alpha <span class="op">+</span> beta <span class="op">+</span> <span class="dv"><span class="hljs-number">3</span></span> <span class="op">*</span> dt)) <span class="op">-</span> exp(<span class="dv"><span class="hljs-number">2</span></span> <span class="op">*</span> muln)
+  <span class="cf"><span class="hljs-keyword">else</span></span>:
+    <span class="co"><span class="hljs-comment"># Mathematica code is same as above, but replace one `p` with `(1-p)`</span></span>
+    <span class="co"><span class="hljs-comment"># marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`</span></span>
+    <span class="co"><span class="hljs-comment"># mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`</span></span>
+    <span class="co"><span class="hljs-comment"># var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`</span></span>
+    <span class="co"><span class="hljs-comment"># Then simplify and combine</span></span>
+    same0 <span class="op">=</span> gamma(alpha) <span class="op">/</span> gamma(alpha <span class="op">+</span> beta)
+    same1 <span class="op">=</span> gamma(alpha <span class="op">+</span> dt) <span class="op">/</span> gamma(alpha <span class="op">+</span> beta <span class="op">+</span> dt)
+    same2 <span class="op">=</span> gamma(alpha <span class="op">+</span> <span class="dv"><span class="hljs-number">2</span></span> <span class="op">*</span> dt) <span class="op">/</span> gamma(alpha <span class="op">+</span> beta <span class="op">+</span> <span class="dv"><span class="hljs-number">2</span></span> <span class="op">*</span> dt)
+    same3 <span class="op">=</span> gamma(alpha <span class="op">+</span> <span class="dv"><span class="hljs-number">3</span></span> <span class="op">*</span> dt) <span class="op">/</span> gamma(alpha <span class="op">+</span> beta <span class="op">+</span> <span class="dv"><span class="hljs-number">3</span></span> <span class="op">*</span> dt)
+    mu <span class="op">=</span> (same1 <span class="op">-</span> same2) <span class="op">/</span> (same0 <span class="op">-</span> same1)
+    var <span class="op">=</span> (same3 <span class="op">*</span> (same1 <span class="op">-</span> same0) <span class="op">+</span> same2 <span class="op">*</span>
+           (same0 <span class="op">+</span> same1 <span class="op">-</span> same2) <span class="op">-</span> same1<span class="op">**</span><span class="dv"><span class="hljs-number">2</span></span>) <span class="op">/</span> (same1 <span class="op">-</span> same0)<span class="op">**</span><span class="dv"><span class="hljs-number">2</span></span>
+  newAlpha, newBeta <span class="op">=</span> meanVarToBeta(mu, var)
+  <span class="cf"><span class="hljs-keyword">return</span></span> newAlpha, newBeta, tnow
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">meanVarToBeta</span><span class="hljs-params">(mean, var)</span>:</span>
-  <span class="hljs-comment"># [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters</span>
-  tmp = mean * (<span class="hljs-number">1</span> - mean) / var - <span class="hljs-number">1</span>
-  alpha = mean * tmp
-  beta = (<span class="hljs-number">1</span> - mean) * tmp
-  <span class="hljs-keyword">return</span> alpha, beta
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">meanVarToBeta</span><span class="hljs-params">(mean, var)</span>:</span>
+  <span class="co"><span class="hljs-comment"># [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters</span></span>
+  tmp <span class="op">=</span> mean <span class="op">*</span> (<span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> mean) <span class="op">/</span> var <span class="op">-</span> <span class="dv"><span class="hljs-number">1</span></span>
+  alpha <span class="op">=</span> mean <span class="op">*</span> tmp
+  beta <span class="op">=</span> (<span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> mean) <span class="op">*</span> tmp
+  <span class="cf"><span class="hljs-keyword">return</span></span> alpha, beta
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">priorToHalflife</span><span class="hljs-params">(alpha, beta, t, percentile=<span class="hljs-number">0.5</span>, maxt=<span class="hljs-number">100</span>, mint=<span class="hljs-number">1e-3</span>)</span>:</span>
-  <span class="hljs-keyword">from</span> math <span class="hljs-keyword">import</span> sqrt
-  <span class="hljs-keyword">from</span> scipy.optimize <span class="hljs-keyword">import</span> brentq
-  h = brentq(
-      <span class="hljs-keyword">lambda</span> now: recallProbabilityMean(alpha, beta, t, now) - percentile, mint,
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">priorToHalflife</span><span class="hljs-params">(alpha, beta, t, percentile</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="fl"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">0.5</span></span></span></span><span class="hljs-function"><span class="hljs-params">, maxt</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="dv"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">100</span></span></span></span><span class="hljs-function"><span class="hljs-params">, mint</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="fl"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">1e-3</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
+  <span class="im"><span class="hljs-keyword">from</span></span> math <span class="im"><span class="hljs-keyword">import</span></span> sqrt
+  <span class="im"><span class="hljs-keyword">from</span></span> scipy.optimize <span class="im"><span class="hljs-keyword">import</span></span> brentq
+  h <span class="op">=</span> brentq(
+      <span class="kw"><span class="hljs-keyword">lambda</span></span> now: recallProbabilityMean(alpha, beta, t, now) <span class="op">-</span> percentile, mint,
       maxt)
-  <span class="hljs-comment"># `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.</span>
-  <span class="hljs-comment"># To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that.</span>
-  <span class="hljs-comment"># This 'variance' number should not be taken seriously, but it can be used for notional plotting.</span>
-  v = recallProbabilityVar(alpha, beta, t, h)
+  <span class="co"><span class="hljs-comment"># `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.</span></span>
+  <span class="co"><span class="hljs-comment"># To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that.</span></span>
+  <span class="co"><span class="hljs-comment"># This 'variance' number should not be taken seriously, but it can be used for notional plotting.</span></span>
+  v <span class="op">=</span> recallProbabilityVar(alpha, beta, t, h)
 
-  <span class="hljs-keyword">from</span> scipy.stats <span class="hljs-keyword">import</span> beta <span class="hljs-keyword">as</span> fbeta
-  lo, hi = fbeta.interval(<span class="hljs-number">.68</span>, *meanVarToBeta(percentile, v))
+  <span class="im"><span class="hljs-keyword">from</span></span> scipy.stats <span class="im"><span class="hljs-keyword">import</span></span> beta <span class="im"><span class="hljs-keyword">as</span></span> fbeta
+  lo, hi <span class="op">=</span> fbeta.interval(<span class="hljs-number">.</span><span class="dv"><span class="hljs-number">68</span></span>, <span class="op">*</span>meanVarToBeta(percentile, v))
 
-  h2 = brentq(<span class="hljs-keyword">lambda</span> now: recallProbabilityMean(alpha, beta, t, now) - lo, mint,
+  h2 <span class="op">=</span> brentq(<span class="kw"><span class="hljs-keyword">lambda</span></span> now: recallProbabilityMean(alpha, beta, t, now) <span class="op">-</span> lo, mint,
               maxt)
-  h3 = brentq(<span class="hljs-keyword">lambda</span> now: recallProbabilityMean(alpha, beta, t, now) - hi, mint,
+  h3 <span class="op">=</span> brentq(<span class="kw"><span class="hljs-keyword">lambda</span></span> now: recallProbabilityMean(alpha, beta, t, now) <span class="op">-</span> hi, mint,
               maxt)
 
-  <span class="hljs-keyword">return</span> h, ((abs(h2 - h) + abs(h3 - h)) / <span class="hljs-number">2</span>)**<span class="hljs-number">2</span>
-</code></pre>
-<h3>Alternate ways of evaluating the same results as above</h3>
-<pre><code class="language-py hljs python"><span class="hljs-comment"># export ebisu/alternate.py #</span>
-<span class="hljs-keyword">from</span> .ebisu <span class="hljs-keyword">import</span> meanVarToBeta
-</code></pre>
-<pre><code class="language-py hljs python"><span class="hljs-comment"># export ebisu/alternate.py #</span>
-<span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
+  <span class="cf"><span class="hljs-keyword">return</span></span> h, ((<span class="bu">abs</span>(h2 <span class="op">-</span> h) <span class="op">+</span> <span class="bu">abs</span>(h3 <span class="op">-</span> h)) <span class="op">/</span> <span class="dv"><span class="hljs-number">2</span></span>)<span class="op">**</span><span class="dv"><span class="hljs-number">2</span></span></code></pre></div>
+<h3 id="alternate-ways-of-evaluating-the-same-results-as-above">Alternate ways of evaluating the same results as above</h3>
+<div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="co"><span class="hljs-comment"># export ebisu/alternate.py #</span></span>
+<span class="im"><span class="hljs-keyword">from</span></span> .ebisu <span class="im"><span class="hljs-keyword">import</span></span> meanVarToBeta</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="co"><span class="hljs-comment"># export ebisu/alternate.py #</span></span>
+<span class="im"><span class="hljs-keyword">import</span></span> numpy <span class="im"><span class="hljs-keyword">as</span></span> np
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">recallProbabilityMode</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
-  <span class="hljs-string">"""Returns the mode of the immediate (pseudo-Beta) prior"""</span>
-  <span class="hljs-comment"># [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`</span>
-  dt = tnow / t
-  pr = <span class="hljs-keyword">lambda</span> p: p**((alpha - dt) / dt) * (<span class="hljs-number">1</span> - p**(<span class="hljs-number">1</span> / dt))**(beta - <span class="hljs-number">1</span>)
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">recallProbabilityMode</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
+  <span class="co"><span class="hljs-string">"""Returns the mode of the immediate (pseudo-Beta) prior"""</span></span>
+  <span class="co"><span class="hljs-comment"># [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`</span></span>
+  dt <span class="op">=</span> tnow <span class="op">/</span> t
+  pr <span class="op">=</span> <span class="kw"><span class="hljs-keyword">lambda</span></span> p: p<span class="op">**</span>((alpha <span class="op">-</span> dt) <span class="op">/</span> dt) <span class="op">*</span> (<span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> p<span class="op">**</span>(<span class="dv"><span class="hljs-number">1</span></span> <span class="op">/</span> dt))<span class="op">**</span>(beta <span class="op">-</span> <span class="dv"><span class="hljs-number">1</span></span>)
 
-  <span class="hljs-comment"># See [peak]. The actual mode is `modeBase ** dt`, but since `modeBase` might be negative or otherwise invalid, check it.</span>
-  modeBase = (alpha - dt) / (alpha + beta - dt - <span class="hljs-number">1</span>)
-  <span class="hljs-keyword">if</span> modeBase &gt;= <span class="hljs-number">0</span> <span class="hljs-keyword">and</span> modeBase &lt;= <span class="hljs-number">1</span>:
-    <span class="hljs-comment"># Still need to confirm this is not a minimum (anti-mode). Do this with a coarse check of other points likely to be the mode.</span>
-    mode = modeBase**dt
-    modePr = pr(mode)
+  <span class="co"><span class="hljs-comment"># See [peak]. The actual mode is `modeBase ** dt`, but since `modeBase` might be negative or otherwise invalid, check it.</span></span>
+  modeBase <span class="op">=</span> (alpha <span class="op">-</span> dt) <span class="op">/</span> (alpha <span class="op">+</span> beta <span class="op">-</span> dt <span class="op">-</span> <span class="dv"><span class="hljs-number">1</span></span>)
+  <span class="cf"><span class="hljs-keyword">if</span></span> modeBase <span class="op">&gt;=</span> <span class="dv"><span class="hljs-number">0</span></span> <span class="kw"><span class="hljs-keyword">and</span></span> modeBase <span class="op">&lt;=</span> <span class="dv"><span class="hljs-number">1</span></span>:
+    <span class="co"><span class="hljs-comment"># Still need to confirm this is not a minimum (anti-mode). Do this with a coarse check of other points likely to be the mode.</span></span>
+    mode <span class="op">=</span> modeBase<span class="op">**</span>dt
+    modePr <span class="op">=</span> pr(mode)
 
-    eps = <span class="hljs-number">1e-3</span>
-    others = [
-        eps, mode - eps <span class="hljs-keyword">if</span> mode &gt; eps <span class="hljs-keyword">else</span> mode / <span class="hljs-number">2</span>, mode + eps
-        <span class="hljs-keyword">if</span> mode &lt; <span class="hljs-number">1</span> - eps <span class="hljs-keyword">else</span> (<span class="hljs-number">1</span> + mode) / <span class="hljs-number">2</span>, <span class="hljs-number">1</span> - eps
+    eps <span class="op">=</span> <span class="fl"><span class="hljs-number">1e-3</span></span>
+    others <span class="op">=</span> [
+        eps, mode <span class="op">-</span> eps <span class="cf"><span class="hljs-keyword">if</span></span> mode <span class="op">&gt;</span> eps <span class="cf"><span class="hljs-keyword">else</span></span> mode <span class="op">/</span> <span class="dv"><span class="hljs-number">2</span></span>, mode <span class="op">+</span> eps
+        <span class="cf"><span class="hljs-keyword">if</span></span> mode <span class="op">&lt;</span> <span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> eps <span class="cf"><span class="hljs-keyword">else</span></span> (<span class="dv"><span class="hljs-number">1</span></span> <span class="op">+</span> mode) <span class="op">/</span> <span class="dv"><span class="hljs-number">2</span></span>, <span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> eps
     ]
-    otherPr = map(pr, others)
-    <span class="hljs-keyword">if</span> max(otherPr) &lt;= modePr:
-      <span class="hljs-keyword">return</span> mode
-  <span class="hljs-comment"># If anti-mode detected, that means one of the edges is the mode, likely caused by a very large or very small `dt`. Just use `dt` to guess which extreme it was pushed to. If `dt` == 1.0, and we get to this point, likely we have malformed alpha/beta (i.e., &lt;1)</span>
-  <span class="hljs-keyword">return</span> <span class="hljs-number">0.5</span> <span class="hljs-keyword">if</span> dt == <span class="hljs-number">1.</span> <span class="hljs-keyword">else</span> (<span class="hljs-number">0.</span> <span class="hljs-keyword">if</span> dt &gt; <span class="hljs-number">1</span> <span class="hljs-keyword">else</span> <span class="hljs-number">1.</span>)
+    otherPr <span class="op">=</span> <span class="bu">map</span>(pr, others)
+    <span class="cf"><span class="hljs-keyword">if</span></span> <span class="bu">max</span>(otherPr) <span class="op">&lt;=</span> modePr:
+      <span class="cf"><span class="hljs-keyword">return</span></span> mode
+  <span class="co"><span class="hljs-comment"># If anti-mode detected, that means one of the edges is the mode, likely caused by a very large or very small `dt`. Just use `dt` to guess which extreme it was pushed to. If `dt` == 1.0, and we get to this point, likely we have malformed alpha/beta (i.e., &lt;1)</span></span>
+  <span class="cf"><span class="hljs-keyword">return</span></span> <span class="fl"><span class="hljs-number">0.5</span></span> <span class="cf"><span class="hljs-keyword">if</span></span> dt <span class="op">==</span> <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span> <span class="cf"><span class="hljs-keyword">else</span></span> (<span class="dv"><span class="hljs-number">0</span></span><span class="hljs-number">.</span> <span class="cf"><span class="hljs-keyword">if</span></span> dt <span class="op">&gt;</span> <span class="dv"><span class="hljs-number">1</span></span> <span class="cf"><span class="hljs-keyword">else</span></span> <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>)
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">recallProbabilityMedian</span><span class="hljs-params">(alpha, beta, t, tnow, percentile=<span class="hljs-number">0.5</span>)</span>:</span>
-  <span class="hljs-string">""""""</span>
-  <span class="hljs-comment"># [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`</span>
-  <span class="hljs-keyword">from</span> scipy.optimize <span class="hljs-keyword">import</span> brentq
-  <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> beta <span class="hljs-keyword">as</span> fbeta
-  <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> hyp2f1
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">recallProbabilityMedian</span><span class="hljs-params">(alpha, beta, t, tnow, percentile</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="fl"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">0.5</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
+  <span class="co"><span class="hljs-string">""""""</span></span>
+  <span class="co"><span class="hljs-comment"># [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`</span></span>
+  <span class="im"><span class="hljs-keyword">from</span></span> scipy.optimize <span class="im"><span class="hljs-keyword">import</span></span> brentq
+  <span class="im"><span class="hljs-keyword">from</span></span> scipy.special <span class="im"><span class="hljs-keyword">import</span></span> beta <span class="im"><span class="hljs-keyword">as</span></span> fbeta
+  <span class="im"><span class="hljs-keyword">from</span></span> scipy.special <span class="im"><span class="hljs-keyword">import</span></span> hyp2f1
 
-  dt = tnow / t
+  dt <span class="op">=</span> tnow <span class="op">/</span> t
 
-  <span class="hljs-comment"># See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.</span>
-  <span class="hljs-comment"># N.B. I prefer to try to find the mode (above) because it will be much faster than this.</span>
-  cdfPercentile = <span class="hljs-keyword">lambda</span> p: (p**(alpha/dt) *
-                             hyp2f1(alpha, <span class="hljs-number">1</span> - beta, <span class="hljs-number">1</span> + alpha, p**(<span class="hljs-number">1</span>/dt)) /
-                             alpha /
-                             fbeta(alpha,beta)) - percentile
-  <span class="hljs-keyword">return</span> brentq(cdfPercentile, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>)
-
-
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">recallProbabilityMonteCarlo</span><span class="hljs-params">(alpha, beta, t, tnow, N=<span class="hljs-number">1000000</span>)</span>:</span>
-  <span class="hljs-keyword">import</span> scipy.stats <span class="hljs-keyword">as</span> stats
-  tPrior = stats.beta.rvs(alpha, beta, size=N)
-  tnowPrior = tPrior**(tnow / t)
-  freqs, bins = np.histogram(tnowPrior, <span class="hljs-string">'auto'</span>)
-  bincenters = bins[:<span class="hljs-number">-1</span>] + np.diff(bins) / <span class="hljs-number">2</span>
-  <span class="hljs-keyword">return</span> dict(
-      mean=np.mean(tnowPrior),
-      median=np.median(tnowPrior),
-      mode=bincenters[freqs.argmax()],
-      var=np.var(tnowPrior))
+  <span class="co"><span class="hljs-comment"># See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.</span></span>
+  <span class="co"><span class="hljs-comment"># N.B. I prefer to try to find the mode (above) because it will be much faster than this.</span></span>
+  cdfPercentile <span class="op">=</span> <span class="kw"><span class="hljs-keyword">lambda</span></span> p: (p<span class="op">**</span>(alpha<span class="op">/</span>dt) <span class="op">*</span>
+                             hyp2f1(alpha, <span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> beta, <span class="dv"><span class="hljs-number">1</span></span> <span class="op">+</span> alpha, p<span class="op">**</span>(<span class="dv"><span class="hljs-number">1</span></span><span class="op">/</span>dt)) <span class="op">/</span>
+                             alpha <span class="op">/</span>
+                             fbeta(alpha,beta)) <span class="op">-</span> percentile
+  <span class="cf"><span class="hljs-keyword">return</span></span> brentq(cdfPercentile, <span class="dv"><span class="hljs-number">0</span></span>, <span class="dv"><span class="hljs-number">1</span></span>)
 
 
-<span class="hljs-comment"># So we have several ways of evaluating the posterior mean/var:</span>
-<span class="hljs-comment"># - Monte Carlo</span>
-<span class="hljs-comment"># - Quadrature integration</span>
-<span class="hljs-comment"># - Analytic expression, with several hyp2f1</span>
-<span class="hljs-comment"># - Simplified analytic expression with fewer hyp2f1 (recurrence relations)</span>
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">recallProbabilityMonteCarlo</span><span class="hljs-params">(alpha, beta, t, tnow, N</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="dv"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">1000000</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
+  <span class="im"><span class="hljs-keyword">import</span></span> scipy.stats <span class="im"><span class="hljs-keyword">as</span></span> stats
+  tPrior <span class="op">=</span> stats.beta.rvs(alpha, beta, size<span class="op">=</span>N)
+  tnowPrior <span class="op">=</span> tPrior<span class="op">**</span>(tnow <span class="op">/</span> t)
+  freqs, bins <span class="op">=</span> np.histogram(tnowPrior, <span class="st"><span class="hljs-string">'auto'</span></span>)
+  bincenters <span class="op">=</span> bins[:<span class="op"><span class="hljs-number">-</span></span><span class="dv"><span class="hljs-number">1</span></span>] <span class="op">+</span> np.diff(bins) <span class="op">/</span> <span class="dv"><span class="hljs-number">2</span></span>
+  <span class="cf"><span class="hljs-keyword">return</span></span> <span class="bu">dict</span>(
+      mean<span class="op">=</span>np.mean(tnowPrior),
+      median<span class="op">=</span>np.median(tnowPrior),
+      mode<span class="op">=</span>bincenters[freqs.argmax()],
+      var<span class="op">=</span>np.var(tnowPrior))
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">posteriorQuad</span><span class="hljs-params">(alpha,
+<span class="co"><span class="hljs-comment"># So we have several ways of evaluating the posterior mean/var:</span></span>
+<span class="co"><span class="hljs-comment"># - Monte Carlo</span></span>
+<span class="co"><span class="hljs-comment"># - Quadrature integration</span></span>
+<span class="co"><span class="hljs-comment"># - Analytic expression, with several hyp2f1</span></span>
+<span class="co"><span class="hljs-comment"># - Simplified analytic expression with fewer hyp2f1 (recurrence relations)</span></span>
+
+
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">posteriorQuad</span><span class="hljs-params">(alpha,
                   beta,
                   t,
                   result,
                   tnow,
-                  analyticMarginal=True,
-                  maxiter=<span class="hljs-number">100</span>)</span>:</span>
-  <span class="hljs-string">"""Update a time-dependent Beta distribution with a new data sample"""</span>
-  <span class="hljs-keyword">from</span> scipy.integrate <span class="hljs-keyword">import</span> quad
+                  analyticMarginal</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="va"><span class="hljs-function"><span class="hljs-params">True</span></span></span><span class="hljs-function"><span class="hljs-params">,
+                  maxiter</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="dv"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">100</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
+  <span class="co"><span class="hljs-string">"""Update a time-dependent Beta distribution with a new data sample"""</span></span>
+  <span class="im"><span class="hljs-keyword">from</span></span> scipy.integrate <span class="im"><span class="hljs-keyword">import</span></span> quad
 
-  dt = tnow / t
+  dt <span class="op">=</span> tnow <span class="op">/</span> t
 
-  <span class="hljs-keyword">if</span> result == <span class="hljs-number">1</span>:
-    marginalInt = <span class="hljs-keyword">lambda</span> p: p**((alpha - dt) / dt) * (<span class="hljs-number">1</span> - p**(<span class="hljs-number">1</span> / dt))**(beta - <span class="hljs-number">1</span>) * p
-  <span class="hljs-keyword">else</span>:
-    <span class="hljs-comment"># difference from above: -------------------------------------------^vvvv</span>
-    marginalInt = <span class="hljs-keyword">lambda</span> p: p**((alpha - dt) / dt) * (<span class="hljs-number">1</span> - p**(<span class="hljs-number">1</span> / dt))**(beta - <span class="hljs-number">1</span>) * (<span class="hljs-number">1</span> - p)
+  <span class="cf"><span class="hljs-keyword">if</span></span> result <span class="op">==</span> <span class="dv"><span class="hljs-number">1</span></span>:
+    marginalInt <span class="op">=</span> <span class="kw"><span class="hljs-keyword">lambda</span></span> p: p<span class="op">**</span>((alpha <span class="op">-</span> dt) <span class="op">/</span> dt) <span class="op">*</span> (<span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> p<span class="op">**</span>(<span class="dv"><span class="hljs-number">1</span></span> <span class="op">/</span> dt))<span class="op">**</span>(beta <span class="op">-</span> <span class="dv"><span class="hljs-number">1</span></span>) <span class="op">*</span> p
+  <span class="cf"><span class="hljs-keyword">else</span></span>:
+    <span class="co"><span class="hljs-comment"># difference from above: -------------------------------------------^vvvv</span></span>
+    marginalInt <span class="op">=</span> <span class="kw"><span class="hljs-keyword">lambda</span></span> p: p<span class="op">**</span>((alpha <span class="op">-</span> dt) <span class="op">/</span> dt) <span class="op">*</span> (<span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> p<span class="op">**</span>(<span class="dv"><span class="hljs-number">1</span></span> <span class="op">/</span> dt))<span class="op">**</span>(beta <span class="op">-</span> <span class="dv"><span class="hljs-number">1</span></span>) <span class="op">*</span> (<span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> p)
 
-  <span class="hljs-keyword">if</span> analyticMarginal:
-    <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> beta <span class="hljs-keyword">as</span> fbeta
-    <span class="hljs-keyword">if</span> result == <span class="hljs-number">1</span>:
-      marginal = dt * fbeta(alpha + dt, beta)
-    <span class="hljs-keyword">else</span>:
-      marginal = dt * (fbeta(alpha, beta) - fbeta(alpha + dt, beta))
-  <span class="hljs-keyword">else</span>:
-    marginalEst = quad(marginalInt, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>)
-    <span class="hljs-keyword">if</span> marginalEst[<span class="hljs-number">0</span>] &lt; marginalEst[<span class="hljs-number">1</span>] * <span class="hljs-number">10.</span>:
-      <span class="hljs-keyword">raise</span> OverflowError(
-          <span class="hljs-string">'Marginal integral error too high: value={}, error={}'</span>.format(
-              marginalEst[<span class="hljs-number">0</span>], marginalEst[<span class="hljs-number">1</span>]))
-    marginal = marginalEst[<span class="hljs-number">0</span>]
+  <span class="cf"><span class="hljs-keyword">if</span></span> analyticMarginal:
+    <span class="im"><span class="hljs-keyword">from</span></span> scipy.special <span class="im"><span class="hljs-keyword">import</span></span> beta <span class="im"><span class="hljs-keyword">as</span></span> fbeta
+    <span class="cf"><span class="hljs-keyword">if</span></span> result <span class="op">==</span> <span class="dv"><span class="hljs-number">1</span></span>:
+      marginal <span class="op">=</span> dt <span class="op">*</span> fbeta(alpha <span class="op">+</span> dt, beta)
+    <span class="cf"><span class="hljs-keyword">else</span></span>:
+      marginal <span class="op">=</span> dt <span class="op">*</span> (fbeta(alpha, beta) <span class="op">-</span> fbeta(alpha <span class="op">+</span> dt, beta))
+  <span class="cf"><span class="hljs-keyword">else</span></span>:
+    marginalEst <span class="op">=</span> quad(marginalInt, <span class="dv"><span class="hljs-number">0</span></span>, <span class="dv"><span class="hljs-number">1</span></span>)
+    <span class="cf"><span class="hljs-keyword">if</span></span> marginalEst[<span class="dv"><span class="hljs-number">0</span></span>] <span class="op">&lt;</span> marginalEst[<span class="dv"><span class="hljs-number">1</span></span>] <span class="op">*</span> <span class="dv"><span class="hljs-number">10</span></span><span class="hljs-number">.</span>:
+      <span class="cf"><span class="hljs-keyword">raise</span></span> <span class="pp">OverflowError</span>(
+          <span class="st"><span class="hljs-string">'Marginal integral error too high: value=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">, error=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.<span class="bu">format</span>(
+              marginalEst[<span class="dv"><span class="hljs-number">0</span></span>], marginalEst[<span class="dv"><span class="hljs-number">1</span></span>]))
+    marginal <span class="op">=</span> marginalEst[<span class="dv"><span class="hljs-number">0</span></span>]
 
-  muInt = <span class="hljs-keyword">lambda</span> p: marginalInt(p) * p
-  muEst = quad(muInt, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>)
-  <span class="hljs-keyword">if</span> muEst[<span class="hljs-number">0</span>] &lt; muEst[<span class="hljs-number">1</span>] * <span class="hljs-number">10.</span>:
-    <span class="hljs-keyword">raise</span> OverflowError(<span class="hljs-string">'Mean integral error too high: value={}, error={}'</span>.
-                        format(muEst[<span class="hljs-number">0</span>], muEst[<span class="hljs-number">1</span>]))
-  mu = muEst[<span class="hljs-number">0</span>] / marginal
+  muInt <span class="op">=</span> <span class="kw"><span class="hljs-keyword">lambda</span></span> p: marginalInt(p) <span class="op">*</span> p
+  muEst <span class="op">=</span> quad(muInt, <span class="dv"><span class="hljs-number">0</span></span>, <span class="dv"><span class="hljs-number">1</span></span>)
+  <span class="cf"><span class="hljs-keyword">if</span></span> muEst[<span class="dv"><span class="hljs-number">0</span></span>] <span class="op">&lt;</span> muEst[<span class="dv"><span class="hljs-number">1</span></span>] <span class="op">*</span> <span class="dv"><span class="hljs-number">10</span></span><span class="hljs-number">.</span>:
+    <span class="cf"><span class="hljs-keyword">raise</span></span> <span class="pp">OverflowError</span>(<span class="st"><span class="hljs-string">'Mean integral error too high: value=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">, error=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.
+                        <span class="bu">format</span>(muEst[<span class="dv"><span class="hljs-number">0</span></span>], muEst[<span class="dv"><span class="hljs-number">1</span></span>]))
+  mu <span class="op">=</span> muEst[<span class="dv"><span class="hljs-number">0</span></span>] <span class="op">/</span> marginal
 
-  varInt = <span class="hljs-keyword">lambda</span> p: marginalInt(p) * (p - mu)**<span class="hljs-number">2</span>
-  varEst = quad(varInt, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>)
-  <span class="hljs-keyword">if</span> varEst[<span class="hljs-number">0</span>] &lt; varEst[<span class="hljs-number">1</span>] * <span class="hljs-number">10.</span>:
-    <span class="hljs-keyword">raise</span> OverflowError(<span class="hljs-string">'Variance integral error too high: value={}, error={}'</span>.
-                        format(varEst[<span class="hljs-number">0</span>], varEst[<span class="hljs-number">1</span>]))
-  var = varEst[<span class="hljs-number">0</span>] / marginal
+  varInt <span class="op">=</span> <span class="kw"><span class="hljs-keyword">lambda</span></span> p: marginalInt(p) <span class="op">*</span> (p <span class="op">-</span> mu)<span class="op">**</span><span class="dv"><span class="hljs-number">2</span></span>
+  varEst <span class="op">=</span> quad(varInt, <span class="dv"><span class="hljs-number">0</span></span>, <span class="dv"><span class="hljs-number">1</span></span>)
+  <span class="cf"><span class="hljs-keyword">if</span></span> varEst[<span class="dv"><span class="hljs-number">0</span></span>] <span class="op">&lt;</span> varEst[<span class="dv"><span class="hljs-number">1</span></span>] <span class="op">*</span> <span class="dv"><span class="hljs-number">10</span></span><span class="hljs-number">.</span>:
+    <span class="cf"><span class="hljs-keyword">raise</span></span> <span class="pp">OverflowError</span>(<span class="st"><span class="hljs-string">'Variance integral error too high: value=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">, error=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.
+                        <span class="bu">format</span>(varEst[<span class="dv"><span class="hljs-number">0</span></span>], varEst[<span class="dv"><span class="hljs-number">1</span></span>]))
+  var <span class="op">=</span> varEst[<span class="dv"><span class="hljs-number">0</span></span>] <span class="op">/</span> marginal
 
-  newAlpha, newBeta = meanVarToBeta(mu, var)
-  <span class="hljs-keyword">return</span> newAlpha, newBeta, tnow
+  newAlpha, newBeta <span class="op">=</span> meanVarToBeta(mu, var)
+  <span class="cf"><span class="hljs-keyword">return</span></span> newAlpha, newBeta, tnow
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">posteriorMonteCarlo</span><span class="hljs-params">(alpha, beta, t, result, tnow, N=<span class="hljs-number">10000</span>)</span>:</span>
-  <span class="hljs-string">"""Update a time-dependent Beta distribution with a new data sample"""</span>
-  <span class="hljs-comment"># [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&amp;oldid=769806318#Properties_of_the_Bernoulli_Distribution, third (last) equation</span>
-  <span class="hljs-comment"># [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&amp;oldid=770608018#Mathematical_definition</span>
-  <span class="hljs-comment"># [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&amp;oldid=770608018#Weighted_sample_variance</span>
-  <span class="hljs-keyword">import</span> scipy.stats <span class="hljs-keyword">as</span> stats
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">posteriorMonteCarlo</span><span class="hljs-params">(alpha, beta, t, result, tnow, N</span></span><span class="op"><span class="hljs-function"><span class="hljs-params">=</span></span></span><span class="dv"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">10000</span></span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
+  <span class="co"><span class="hljs-string">"""Update a time-dependent Beta distribution with a new data sample"""</span></span>
+  <span class="co"><span class="hljs-comment"># [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&amp;oldid=769806318#Properties_of_the_Bernoulli_Distribution, third (last) equation</span></span>
+  <span class="co"><span class="hljs-comment"># [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&amp;oldid=770608018#Mathematical_definition</span></span>
+  <span class="co"><span class="hljs-comment"># [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&amp;oldid=770608018#Weighted_sample_variance</span></span>
+  <span class="im"><span class="hljs-keyword">import</span></span> scipy.stats <span class="im"><span class="hljs-keyword">as</span></span> stats
 
-  tPrior = stats.beta.rvs(alpha, beta, size=N)
+  tPrior <span class="op">=</span> stats.beta.rvs(alpha, beta, size<span class="op">=</span>N)
 
-  <span class="hljs-comment"># To see where this comes from, read the rest of this document!</span>
-  tnowPrior = tPrior**(tnow / t)
+  <span class="co"><span class="hljs-comment"># To see where this comes from, read the rest of this document!</span></span>
+  tnowPrior <span class="op">=</span> tPrior<span class="op">**</span>(tnow <span class="op">/</span> t)
 
-  <span class="hljs-comment"># This is the Bernoulli likelihood [bernoulliLikelihood]</span>
-  weights = (tnowPrior)**result * ((<span class="hljs-number">1</span> - tnowPrior)**(<span class="hljs-number">1</span> - result))
+  <span class="co"><span class="hljs-comment"># This is the Bernoulli likelihood [bernoulliLikelihood]</span></span>
+  weights <span class="op">=</span> (tnowPrior)<span class="op">**</span>result <span class="op">*</span> ((<span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> tnowPrior)<span class="op">**</span>(<span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> result))
 
-  <span class="hljs-comment"># See [weightedMean]</span>
-  weightedMean = np.sum(weights * tnowPrior) / np.sum(weights)
-  <span class="hljs-comment"># See [weightedVar]</span>
-  weightedVar = np.sum(weights *
-                       (tnowPrior - weightedMean)**<span class="hljs-number">2</span>) / np.sum(weights)
+  <span class="co"><span class="hljs-comment"># See [weightedMean]</span></span>
+  weightedMean <span class="op">=</span> np.<span class="bu">sum</span>(weights <span class="op">*</span> tnowPrior) <span class="op">/</span> np.<span class="bu">sum</span>(weights)
+  <span class="co"><span class="hljs-comment"># See [weightedVar]</span></span>
+  weightedVar <span class="op">=</span> np.<span class="bu">sum</span>(weights <span class="op">*</span>
+                       (tnowPrior <span class="op">-</span> weightedMean)<span class="op">**</span><span class="dv"><span class="hljs-number">2</span></span>) <span class="op">/</span> np.<span class="bu">sum</span>(weights)
 
-  newAlpha, newBeta = meanVarToBeta(weightedMean, weightedVar)
+  newAlpha, newBeta <span class="op">=</span> meanVarToBeta(weightedMean, weightedVar)
 
-  <span class="hljs-keyword">return</span> newAlpha, newBeta, tnow
-</code></pre>
-<h3>Test code</h3>
-<pre><code class="language-py hljs python"><span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">betafitBeforeLikelihood</span><span class="hljs-params">(a, b, t1, x, t2)</span>:</span>
-  a2, b2 = meanVarToBeta(
+  <span class="cf"><span class="hljs-keyword">return</span></span> newAlpha, newBeta, tnow</code></pre></div>
+<h3 id="test-code">Test code</h3>
+<div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">betafitBeforeLikelihood</span><span class="hljs-params">(a, b, t1, x, t2)</span>:</span>
+  a2, b2 <span class="op">=</span> meanVarToBeta(
       recallProbabilityMean(a, b, t1, t2), recallProbabilityVar(a, b, t1, t2))
-  <span class="hljs-keyword">return</span> a2 + x, b2 + <span class="hljs-number">1</span> - x, t2
+  <span class="cf"><span class="hljs-keyword">return</span></span> a2 <span class="op">+</span> x, b2 <span class="op">+</span> <span class="dv"><span class="hljs-number">1</span></span> <span class="op">-</span> x, t2
 
 
-betafitBeforeLikelihood(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">2.</span>)
-posteriorAnalytic(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">2.</span>)
-</code></pre>
-<pre><code class="language-py hljs python"><span class="hljs-comment"># export ebisu/tests/test_ebisu.py</span>
-<span class="hljs-keyword">from</span> unittest <span class="hljs-keyword">import</span> TestCase
-<span class="hljs-keyword">from</span> ebisu <span class="hljs-keyword">import</span> *
-<span class="hljs-keyword">from</span> ebisu.alternate <span class="hljs-keyword">import</span> *
-</code></pre>
-<pre><code class="language-py hljs python"><span class="hljs-comment"># export ebisu/tests/test_ebisu.py</span>
-<span class="hljs-keyword">import</span> unittest
+betafitBeforeLikelihood(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">2</span></span><span class="hljs-number">.</span>)
+posteriorAnalytic(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">2</span></span><span class="hljs-number">.</span>)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="co"><span class="hljs-comment"># export ebisu/tests/test_ebisu.py</span></span>
+<span class="im"><span class="hljs-keyword">from</span></span> unittest <span class="im"><span class="hljs-keyword">import</span></span> TestCase
+<span class="im"><span class="hljs-keyword">from</span></span> ebisu <span class="im"><span class="hljs-keyword">import</span></span> <span class="op">*</span>
+<span class="im"><span class="hljs-keyword">from</span></span> ebisu.alternate <span class="im"><span class="hljs-keyword">import</span></span> <span class="op">*</span></code></pre></div>
+<div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="co"><span class="hljs-comment"># export ebisu/tests/test_ebisu.py</span></span>
+<span class="im"><span class="hljs-keyword">import</span></span> unittest
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">relerr</span><span class="hljs-params">(dirt, gold)</span>:</span>
-  <span class="hljs-keyword">return</span> abs(dirt - gold) / abs(gold)
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">relerr</span><span class="hljs-params">(dirt, gold)</span>:</span>
+  <span class="cf"><span class="hljs-keyword">return</span></span> <span class="bu">abs</span>(dirt <span class="op">-</span> gold) <span class="op">/</span> <span class="bu">abs</span>(gold)
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">maxrelerr</span><span class="hljs-params">(dirts, golds)</span>:</span>
-  <span class="hljs-keyword">return</span> max(map(relerr, dirts, golds))
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">maxrelerr</span><span class="hljs-params">(dirts, golds)</span>:</span>
+  <span class="cf"><span class="hljs-keyword">return</span></span> <span class="bu">max</span>(<span class="bu">map</span>(relerr, dirts, golds))
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">klDivBeta</span><span class="hljs-params">(a, b, a2, b2)</span>:</span>
-  <span class="hljs-string">"""Kullback-Leibler divergence between two Beta distributions in nats"""</span>
-  <span class="hljs-comment"># Via http://bariskurt.com/kullback-leibler-divergence-between-two-dirichlet-and-beta-distributions/</span>
-  <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln, psi
-  <span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
-  left = np.array([a, b])
-  right = np.array([a2, b2])
-  <span class="hljs-keyword">return</span> gammaln(sum(left)) - gammaln(sum(right)) - sum(gammaln(left)) + sum(
-      gammaln(right)) + np.dot(left - right, psi(left) - psi(sum(left)))
+<span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">klDivBeta</span><span class="hljs-params">(a, b, a2, b2)</span>:</span>
+  <span class="co"><span class="hljs-string">"""Kullback-Leibler divergence between two Beta distributions in nats"""</span></span>
+  <span class="co"><span class="hljs-comment"># Via http://bariskurt.com/kullback-leibler-divergence-between-two-dirichlet-and-beta-distributions/</span></span>
+  <span class="im"><span class="hljs-keyword">from</span></span> scipy.special <span class="im"><span class="hljs-keyword">import</span></span> gammaln, psi
+  <span class="im"><span class="hljs-keyword">import</span></span> numpy <span class="im"><span class="hljs-keyword">as</span></span> np
+  left <span class="op">=</span> np.array([a, b])
+  right <span class="op">=</span> np.array([a2, b2])
+  <span class="cf"><span class="hljs-keyword">return</span></span> gammaln(<span class="bu">sum</span>(left)) <span class="op">-</span> gammaln(<span class="bu">sum</span>(right)) <span class="op">-</span> <span class="bu">sum</span>(gammaln(left)) <span class="op">+</span> <span class="bu">sum</span>(
+      gammaln(right)) <span class="op">+</span> np.dot(left <span class="op">-</span> right, psi(left) <span class="op">-</span> psi(<span class="bu">sum</span>(left)))
 
 
-<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">TestEbisu</span><span class="hljs-params">(unittest.TestCase)</span>:</span>
+<span class="kw"><span class="hljs-class"><span class="hljs-keyword">class</span></span></span><span class="hljs-class"> <span class="hljs-title">TestEbisu</span><span class="hljs-params">(unittest.TestCase)</span>:</span>
 
-  <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">test_kl</span><span class="hljs-params">(self)</span>:</span>
-    <span class="hljs-comment"># See https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Quantities_of_information_.28entropy.29 for these numbers</span>
-    self.assertAlmostEqual(klDivBeta(<span class="hljs-number">1.</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">3.</span>, <span class="hljs-number">3.</span>), <span class="hljs-number">0.598803</span>, places=<span class="hljs-number">5</span>)
-    self.assertAlmostEqual(klDivBeta(<span class="hljs-number">3.</span>, <span class="hljs-number">3.</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">1.</span>), <span class="hljs-number">0.267864</span>, places=<span class="hljs-number">5</span>)
+  <span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">test_kl</span><span class="hljs-params">(</span></span><span class="va"><span class="hljs-function"><span class="hljs-params">self</span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
+    <span class="co"><span class="hljs-comment"># See https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Quantities_of_information_.28entropy.29 for these numbers</span></span>
+    <span class="va">self</span>.assertAlmostEqual(klDivBeta(<span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">3</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">3</span></span><span class="hljs-number">.</span>), <span class="fl"><span class="hljs-number">0.598803</span></span>, places<span class="op">=</span><span class="dv"><span class="hljs-number">5</span></span>)
+    <span class="va">self</span>.assertAlmostEqual(klDivBeta(<span class="dv"><span class="hljs-number">3</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">3</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>), <span class="fl"><span class="hljs-number">0.267864</span></span>, places<span class="op">=</span><span class="dv"><span class="hljs-number">5</span></span>)
 
-  <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">test_prior</span><span class="hljs-params">(self)</span>:</span>
+  <span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">test_prior</span><span class="hljs-params">(</span></span><span class="va"><span class="hljs-function"><span class="hljs-params">self</span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
 
-    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">inner</span><span class="hljs-params">(a, b, t0)</span>:</span>
-      <span class="hljs-keyword">for</span> t <span class="hljs-keyword">in</span> map(<span class="hljs-keyword">lambda</span> dt: dt * t0, [<span class="hljs-number">0.1</span>, <span class="hljs-number">.99</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">1.01</span>, <span class="hljs-number">5.5</span>]):
-        mc = recallProbabilityMonteCarlo(a, b, t0, t, N=<span class="hljs-number">100</span> * <span class="hljs-number">1000</span>)
-        mean = recallProbabilityMean(a, b, t0, t)
-        var = recallProbabilityVar(a, b, t0, t)
-        self.assertLess(relerr(mean, mc[<span class="hljs-string">'mean'</span>]), <span class="hljs-number">3e-2</span>)
-        self.assertLess(relerr(var, mc[<span class="hljs-string">'var'</span>]), <span class="hljs-number">3e-2</span>)
+    <span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">inner</span><span class="hljs-params">(a, b, t0)</span>:</span>
+      <span class="cf"><span class="hljs-keyword">for</span></span> t <span class="kw"><span class="hljs-keyword">in</span></span> <span class="bu">map</span>(<span class="kw"><span class="hljs-keyword">lambda</span></span> dt: dt <span class="op">*</span> t0, [<span class="fl"><span class="hljs-number">0.1</span></span>, <span class="hljs-number">.</span><span class="dv"><span class="hljs-number">99</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="fl"><span class="hljs-number">1.01</span></span>, <span class="fl"><span class="hljs-number">5.5</span></span>]):
+        mc <span class="op">=</span> recallProbabilityMonteCarlo(a, b, t0, t, N<span class="op">=</span><span class="dv"><span class="hljs-number">100</span></span> <span class="op">*</span> <span class="dv"><span class="hljs-number">1000</span></span>)
+        mean <span class="op">=</span> recallProbabilityMean(a, b, t0, t)
+        var <span class="op">=</span> recallProbabilityVar(a, b, t0, t)
+        <span class="va">self</span>.assertLess(relerr(mean, mc[<span class="st"><span class="hljs-string">'mean'</span></span>]), <span class="fl"><span class="hljs-number">3e-2</span></span>)
+        <span class="va">self</span>.assertLess(relerr(var, mc[<span class="st"><span class="hljs-string">'var'</span></span>]), <span class="fl"><span class="hljs-number">3e-2</span></span>)
 
-    inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">5.5</span>)
-    inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">15.5</span>)
-    inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">.5</span>)
-    inner(<span class="hljs-number">34.4</span>, <span class="hljs-number">34.4</span>, <span class="hljs-number">5.5</span>)
-    inner(<span class="hljs-number">34.4</span>, <span class="hljs-number">34.4</span>, <span class="hljs-number">15.5</span>)
-    inner(<span class="hljs-number">34.4</span>, <span class="hljs-number">34.4</span>, <span class="hljs-number">.5</span>)
+    inner(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="fl"><span class="hljs-number">5.5</span></span>)
+    inner(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="fl"><span class="hljs-number">15.5</span></span>)
+    inner(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="hljs-number">.</span><span class="dv"><span class="hljs-number">5</span></span>)
+    inner(<span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">5.5</span></span>)
+    inner(<span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">15.5</span></span>)
+    inner(<span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">34.4</span></span>, <span class="hljs-number">.</span><span class="dv"><span class="hljs-number">5</span></span>)
 
-  <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">test_posterior</span><span class="hljs-params">(self)</span>:</span>
+  <span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">test_posterior</span><span class="hljs-params">(</span></span><span class="va"><span class="hljs-function"><span class="hljs-params">self</span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
 
-    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">inner</span><span class="hljs-params">(a, b, t0)</span>:</span>
-      kl = <span class="hljs-keyword">lambda</span> v, w: ((klDivBeta(v[<span class="hljs-number">0</span>], v[<span class="hljs-number">1</span>], w[<span class="hljs-number">0</span>], w[<span class="hljs-number">1</span>]) + klDivBeta(w[<span class="hljs-number">0</span>], w[<span class="hljs-number">1</span>], v[<span class="hljs-number">0</span>], v[<span class="hljs-number">1</span>])) / <span class="hljs-number">2.</span>)
-      <span class="hljs-keyword">for</span> t <span class="hljs-keyword">in</span> map(<span class="hljs-keyword">lambda</span> dt: dt * t0, [<span class="hljs-number">0.1</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">5.5</span>]):
-        <span class="hljs-keyword">for</span> x <span class="hljs-keyword">in</span> [<span class="hljs-number">0.</span>, <span class="hljs-number">1.</span>]:
-          msg = <span class="hljs-string">'a={},b={},t0={},x={},t={}'</span>.format(a, b, t0, x, t)
-          mc = posteriorMonteCarlo(a, b, t0, x, t, N=<span class="hljs-number">1</span> * <span class="hljs-number">1000</span> * <span class="hljs-number">1000</span>)
-          an = posteriorAnalytic(a, b, t0, x, t)
-          self.assertLess(kl(an, mc), <span class="hljs-number">1e-4</span>, msg=msg)
+    <span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">inner</span><span class="hljs-params">(a, b, t0)</span>:</span>
+      kl <span class="op">=</span> <span class="kw"><span class="hljs-keyword">lambda</span></span> v, w: ((klDivBeta(v[<span class="dv"><span class="hljs-number">0</span></span>], v[<span class="dv"><span class="hljs-number">1</span></span>], w[<span class="dv"><span class="hljs-number">0</span></span>], w[<span class="dv"><span class="hljs-number">1</span></span>]) <span class="op">+</span> klDivBeta(w[<span class="dv"><span class="hljs-number">0</span></span>], w[<span class="dv"><span class="hljs-number">1</span></span>], v[<span class="dv"><span class="hljs-number">0</span></span>], v[<span class="dv"><span class="hljs-number">1</span></span>])) <span class="op">/</span> <span class="dv"><span class="hljs-number">2</span></span><span class="hljs-number">.</span>)
+      <span class="cf"><span class="hljs-keyword">for</span></span> t <span class="kw"><span class="hljs-keyword">in</span></span> <span class="bu">map</span>(<span class="kw"><span class="hljs-keyword">lambda</span></span> dt: dt <span class="op">*</span> t0, [<span class="fl"><span class="hljs-number">0.1</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="fl"><span class="hljs-number">5.5</span></span>]):
+        <span class="cf"><span class="hljs-keyword">for</span></span> x <span class="kw"><span class="hljs-keyword">in</span></span> [<span class="dv"><span class="hljs-number">0</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>]:
+          msg <span class="op">=</span> <span class="st"><span class="hljs-string">'a=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">,b=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">,t0=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">,x=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">,t=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.<span class="bu">format</span>(a, b, t0, x, t)
+          mc <span class="op">=</span> posteriorMonteCarlo(a, b, t0, x, t, N<span class="op">=</span><span class="dv"><span class="hljs-number">1</span></span> <span class="op">*</span> <span class="dv"><span class="hljs-number">1000</span></span> <span class="op">*</span> <span class="dv"><span class="hljs-number">1000</span></span>)
+          an <span class="op">=</span> posteriorAnalytic(a, b, t0, x, t)
+          <span class="va">self</span>.assertLess(kl(an, mc), <span class="fl"><span class="hljs-number">1e-4</span></span>, msg<span class="op">=</span>msg)
 
-          <span class="hljs-keyword">try</span>:
-            quad1 = posteriorQuad(a, b, t0, x, t, analyticMarginal=<span class="hljs-keyword">True</span>)
-          <span class="hljs-keyword">except</span> OverflowError:
-            quad1 = <span class="hljs-keyword">None</span>
-          <span class="hljs-keyword">if</span> quad1 <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> <span class="hljs-keyword">None</span>:
-            self.assertLess(kl(quad1, mc), <span class="hljs-number">1e-4</span>, msg=msg)
+          <span class="cf"><span class="hljs-keyword">try</span></span>:
+            quad1 <span class="op">=</span> posteriorQuad(a, b, t0, x, t, analyticMarginal<span class="op">=</span><span class="va"><span class="hljs-keyword">True</span></span>)
+          <span class="cf"><span class="hljs-keyword">except</span></span> <span class="pp">OverflowError</span>:
+            quad1 <span class="op">=</span> <span class="va"><span class="hljs-keyword">None</span></span>
+          <span class="cf"><span class="hljs-keyword">if</span></span> quad1 <span class="kw"><span class="hljs-keyword">is</span></span> <span class="kw"><span class="hljs-keyword">not</span></span> <span class="va"><span class="hljs-keyword">None</span></span>:
+            <span class="va">self</span>.assertLess(kl(quad1, mc), <span class="fl"><span class="hljs-number">1e-4</span></span>, msg<span class="op">=</span>msg)
 
-          <span class="hljs-keyword">try</span>:
-            quad2 = posteriorQuad(a, b, t0, x, t, analyticMarginal=<span class="hljs-keyword">False</span>)
-          <span class="hljs-keyword">except</span> OverflowError:
-            quad2 = <span class="hljs-keyword">None</span>
-          <span class="hljs-keyword">if</span> quad2 <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> <span class="hljs-keyword">None</span>:
-            self.assertLess(kl(quad2, mc), <span class="hljs-number">1e-4</span>, msg=msg)
+          <span class="cf"><span class="hljs-keyword">try</span></span>:
+            quad2 <span class="op">=</span> posteriorQuad(a, b, t0, x, t, analyticMarginal<span class="op">=</span><span class="va"><span class="hljs-keyword">False</span></span>)
+          <span class="cf"><span class="hljs-keyword">except</span></span> <span class="pp">OverflowError</span>:
+            quad2 <span class="op">=</span> <span class="va"><span class="hljs-keyword">None</span></span>
+          <span class="cf"><span class="hljs-keyword">if</span></span> quad2 <span class="kw"><span class="hljs-keyword">is</span></span> <span class="kw"><span class="hljs-keyword">not</span></span> <span class="va"><span class="hljs-keyword">None</span></span>:
+            <span class="va">self</span>.assertLess(kl(quad2, mc), <span class="fl"><span class="hljs-number">1e-4</span></span>, msg<span class="op">=</span>msg)
 
-    inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">5.5</span>)
-    inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">15.5</span>)
-    inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">.5</span>)
-    inner(<span class="hljs-number">34.4</span>, <span class="hljs-number">34.4</span>, <span class="hljs-number">5.5</span>)
-    inner(<span class="hljs-number">34.4</span>, <span class="hljs-number">34.4</span>, <span class="hljs-number">15.5</span>)
-    inner(<span class="hljs-number">34.4</span>, <span class="hljs-number">34.4</span>, <span class="hljs-number">.5</span>)
+    inner(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="fl"><span class="hljs-number">5.5</span></span>)
+    inner(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="fl"><span class="hljs-number">15.5</span></span>)
+    inner(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="hljs-number">.</span><span class="dv"><span class="hljs-number">5</span></span>)
+    inner(<span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">5.5</span></span>)
+    inner(<span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">15.5</span></span>)
+    inner(<span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">34.4</span></span>, <span class="hljs-number">.</span><span class="dv"><span class="hljs-number">5</span></span>)
 
 
-<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">'__main__'</span>:
+<span class="cf"><span class="hljs-keyword">if</span></span> <span class="va">__name__</span> <span class="op">==</span> <span class="st"><span class="hljs-string">'__main__'</span></span>:
   unittest.TextTestRunner().run(
-      unittest.TestLoader().loadTestsFromModule(TestEbisu()))
-</code></pre>
-<h3>Demo code</h3>
-<pre><code class="language-py hljs python"><span class="hljs-keyword">import</span> scipy.stats <span class="hljs-keyword">as</span> stats
-<span class="hljs-keyword">import</span> matplotlib.pyplot <span class="hljs-keyword">as</span> plt
+      unittest.TestLoader().loadTestsFromModule(TestEbisu()))</code></pre></div>
+<h3 id="demo-code">Demo code</h3>
+<div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="im"><span class="hljs-keyword">import</span></span> scipy.stats <span class="im"><span class="hljs-keyword">as</span></span> stats
+<span class="im"><span class="hljs-keyword">import</span></span> matplotlib.pyplot <span class="im"><span class="hljs-keyword">as</span></span> plt
 
-plt.style.use(<span class="hljs-string">'ggplot'</span>)
-plt.rcParams[<span class="hljs-string">'svg.fonttype'</span>] = <span class="hljs-string">'none'</span>
+plt.style.use(<span class="st"><span class="hljs-string">'ggplot'</span></span>)
+plt.rcParams[<span class="st"><span class="hljs-string">'svg.fonttype'</span></span>] <span class="op">=</span> <span class="st"><span class="hljs-string">'none'</span></span>
 
-betaa = <span class="hljs-number">4.</span> / <span class="hljs-number">3</span>
-betab = <span class="hljs-number">4.</span> / <span class="hljs-number">3</span>
+betaa <span class="op">=</span> <span class="dv"><span class="hljs-number">4</span></span><span class="hljs-number">.</span> <span class="op">/</span> <span class="dv"><span class="hljs-number">3</span></span>
+betab <span class="op">=</span> <span class="dv"><span class="hljs-number">4</span></span><span class="hljs-number">.</span> <span class="op">/</span> <span class="dv"><span class="hljs-number">3</span></span>
 
-betaa = <span class="hljs-number">12.</span>
-betab = <span class="hljs-number">12.</span>
+betaa <span class="op">=</span> <span class="dv"><span class="hljs-number">12</span></span><span class="hljs-number">.</span>
+betab <span class="op">=</span> <span class="dv"><span class="hljs-number">12</span></span><span class="hljs-number">.</span>
 
-t0 = <span class="hljs-number">7.</span>
+t0 <span class="op">=</span> <span class="dv"><span class="hljs-number">7</span></span><span class="hljs-number">.</span>
 
-v2s = <span class="hljs-keyword">lambda</span> var: np.sqrt(var) / <span class="hljs-number">10</span>
+v2s <span class="op">=</span> <span class="kw"><span class="hljs-keyword">lambda</span></span> var: np.sqrt(var) <span class="op">/</span> <span class="dv"><span class="hljs-number">10</span></span>
 
-ts = np.arange(<span class="hljs-number">1</span>, <span class="hljs-number">31.</span>)
+ts <span class="op">=</span> np.arange(<span class="dv"><span class="hljs-number">1</span></span>, <span class="dv"><span class="hljs-number">31</span></span><span class="hljs-number">.</span>)
 
-plt.close(<span class="hljs-string">'all'</span>)
+plt.close(<span class="st"><span class="hljs-string">'all'</span></span>)
 plt.figure()
-ax = plt.subplot(<span class="hljs-number">111</span>)
-plt.axhline(y=t0, linewidth=<span class="hljs-number">1</span>, color=<span class="hljs-string">'0.5'</span>)
+ax <span class="op">=</span> plt.subplot(<span class="dv"><span class="hljs-number">111</span></span>)
+plt.axhline(y<span class="op">=</span>t0, linewidth<span class="op">=</span><span class="dv"><span class="hljs-number">1</span></span>, color<span class="op">=</span><span class="st"><span class="hljs-string">'0.5'</span></span>)
 [plt.errorbar(ts,
-          np.array(list(map(<span class="hljs-keyword">lambda</span> t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t))[<span class="hljs-number">0</span>],
+          np.array(<span class="bu">list</span>(<span class="bu">map</span>(<span class="kw"><span class="hljs-keyword">lambda</span></span> t: priorToHalflife(<span class="op">*</span>posteriorAnalytic(a, a, t0, xobs, t))[<span class="dv"><span class="hljs-number">0</span></span>],
                             ts))),
-          v2s(np.array(list(map(<span class="hljs-keyword">lambda</span> t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t))[<span class="hljs-number">1</span>],
+          v2s(np.array(<span class="bu">list</span>(<span class="bu">map</span>(<span class="kw"><span class="hljs-keyword">lambda</span></span> t: priorToHalflife(<span class="op">*</span>posteriorAnalytic(a, a, t0, xobs, t))[<span class="dv"><span class="hljs-number">1</span></span>],
                             ts)))),
-          fmt=<span class="hljs-string">'x-'</span> <span class="hljs-keyword">if</span> xobs == <span class="hljs-number">1</span> <span class="hljs-keyword">else</span> <span class="hljs-string">'o-'</span>,
-          color=<span class="hljs-string">'C{}'</span>.format(aidx),
-          label=<span class="hljs-string">'a=b={}, {}'</span>.format(a, <span class="hljs-string">'pass'</span> <span class="hljs-keyword">if</span> xobs==<span class="hljs-number">1</span> <span class="hljs-keyword">else</span> <span class="hljs-string">'fail'</span>))
- <span class="hljs-keyword">for</span> (aidx, a) <span class="hljs-keyword">in</span> enumerate([<span class="hljs-number">3</span>, <span class="hljs-number">6</span>, <span class="hljs-number">12</span>])
- <span class="hljs-keyword">for</span> xobs <span class="hljs-keyword">in</span> [<span class="hljs-number">1</span>, <span class="hljs-number">0</span>]]
-plt.grid(<span class="hljs-keyword">True</span>)
-plt.legend(loc=<span class="hljs-number">0</span>)
-plt.title(<span class="hljs-string">'New interval, for old interval={} days'</span>.format(t0))
-plt.xlabel(<span class="hljs-string">'Time test taken (days)'</span>)
-plt.ylabel(<span class="hljs-string">'New interval (days)'</span>)
-plt.savefig(<span class="hljs-string">'figures/halflife.svg'</span>)
-plt.savefig(<span class="hljs-string">'figures/halflife.png'</span>, dpi=<span class="hljs-number">150</span>)
-plt.show()
-</code></pre>
+          fmt<span class="op">=</span><span class="st"><span class="hljs-string">'x-'</span></span> <span class="cf"><span class="hljs-keyword">if</span></span> xobs <span class="op">==</span> <span class="dv"><span class="hljs-number">1</span></span> <span class="cf"><span class="hljs-keyword">else</span></span> <span class="st"><span class="hljs-string">'o-'</span></span>,
+          color<span class="op">=</span><span class="st"><span class="hljs-string">'C</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.<span class="bu">format</span>(aidx),
+          label<span class="op">=</span><span class="st"><span class="hljs-string">'a=b=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">, </span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.<span class="bu">format</span>(a, <span class="st"><span class="hljs-string">'pass'</span></span> <span class="cf"><span class="hljs-keyword">if</span></span> xobs<span class="op">==</span><span class="dv"><span class="hljs-number">1</span></span> <span class="cf"><span class="hljs-keyword">else</span></span> <span class="st"><span class="hljs-string">'fail'</span></span>))
+ <span class="cf"><span class="hljs-keyword">for</span></span> (aidx, a) <span class="kw"><span class="hljs-keyword">in</span></span> <span class="bu">enumerate</span>([<span class="dv"><span class="hljs-number">3</span></span>, <span class="dv"><span class="hljs-number">6</span></span>, <span class="dv"><span class="hljs-number">12</span></span>])
+ <span class="cf"><span class="hljs-keyword">for</span></span> xobs <span class="kw"><span class="hljs-keyword">in</span></span> [<span class="dv"><span class="hljs-number">1</span></span>, <span class="dv"><span class="hljs-number">0</span></span>]]
+plt.grid(<span class="va"><span class="hljs-keyword">True</span></span>)
+plt.legend(loc<span class="op">=</span><span class="dv"><span class="hljs-number">0</span></span>)
+plt.title(<span class="st"><span class="hljs-string">'New interval, for old interval=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string"> days'</span></span>.<span class="bu">format</span>(t0))
+plt.xlabel(<span class="st"><span class="hljs-string">'Time test taken (days)'</span></span>)
+plt.ylabel(<span class="st"><span class="hljs-string">'New interval (days)'</span></span>)
+plt.savefig(<span class="st"><span class="hljs-string">'figures/halflife.svg'</span></span>)
+plt.savefig(<span class="st"><span class="hljs-string">'figures/halflife.png'</span></span>, dpi<span class="op">=</span><span class="dv"><span class="hljs-number">150</span></span>)
+plt.show()</code></pre></div>
 <p><img src="figures/halflife.png" alt="figures/halflife.png"></p>
-<pre><code class="language-py hljs python">plt.figure()
-modelA = posteriorAnalytic(<span class="hljs-number">3.</span>, <span class="hljs-number">3.</span>, <span class="hljs-number">7.</span>, <span class="hljs-number">1</span>, <span class="hljs-number">15.</span>)
-modelB = posteriorAnalytic(<span class="hljs-number">12.</span>, <span class="hljs-number">12.</span>, <span class="hljs-number">7.</span>, <span class="hljs-number">1</span>, <span class="hljs-number">15.</span>)
-hlA = priorToHalflife(*modelA)
-hlB = priorToHalflife(*modelB)
+<div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs">plt.figure()
+modelA <span class="op">=</span> posteriorAnalytic(<span class="dv"><span class="hljs-number">3</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">3</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">7</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span>, <span class="dv"><span class="hljs-number">15</span></span><span class="hljs-number">.</span>)
+modelB <span class="op">=</span> posteriorAnalytic(<span class="dv"><span class="hljs-number">12</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">12</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">7</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span>, <span class="dv"><span class="hljs-number">15</span></span><span class="hljs-number">.</span>)
+hlA <span class="op">=</span> priorToHalflife(<span class="op">*</span>modelA)
+hlB <span class="op">=</span> priorToHalflife(<span class="op">*</span>modelB)
 plt.errorbar(
     ts,
-    recallProbabilityMean(*modelA, ts),
-    v2s(recallProbabilityVar(*modelA, ts)),
-    fmt=<span class="hljs-string">'.-'</span>,
-    label=<span class="hljs-string">'Model A'</span>,
-    color=<span class="hljs-string">'C0'</span>)
-plt.plot(ts, <span class="hljs-number">2</span>**(-ts / hlA[<span class="hljs-number">0</span>]), <span class="hljs-string">'--'</span>, label=<span class="hljs-string">'approx A'</span>, color=<span class="hljs-string">'C0'</span>)
+    recallProbabilityMean(<span class="op">*</span>modelA, ts),
+    v2s(recallProbabilityVar(<span class="op">*</span>modelA, ts)),
+    fmt<span class="op">=</span><span class="st"><span class="hljs-string">'.-'</span></span>,
+    label<span class="op">=</span><span class="st"><span class="hljs-string">'Model A'</span></span>,
+    color<span class="op">=</span><span class="st"><span class="hljs-string">'C0'</span></span>)
+plt.plot(ts, <span class="dv"><span class="hljs-number">2</span></span><span class="op">**</span>(<span class="op">-</span>ts <span class="op">/</span> hlA[<span class="dv"><span class="hljs-number">0</span></span>]), <span class="st"><span class="hljs-string">'--'</span></span>, label<span class="op">=</span><span class="st"><span class="hljs-string">'approx A'</span></span>, color<span class="op">=</span><span class="st"><span class="hljs-string">'C0'</span></span>)
 plt.errorbar(
     ts,
-    recallProbabilityMean(*modelB, ts),
-    v2s(recallProbabilityVar(*modelB, ts)),
-    fmt=<span class="hljs-string">'.-'</span>,
-    label=<span class="hljs-string">'Model B'</span>,
-    color=<span class="hljs-string">'C1'</span>)
-plt.plot(ts, <span class="hljs-number">2</span>**(-ts / hlB[<span class="hljs-number">0</span>]), <span class="hljs-string">'--'</span>, label=<span class="hljs-string">'approx B'</span>, color=<span class="hljs-string">'C1'</span>)
-plt.legend(loc=<span class="hljs-number">0</span>)
-plt.ylim([<span class="hljs-number">0</span>, <span class="hljs-number">1</span>])
-plt.grid(<span class="hljs-keyword">True</span>)
-plt.xlabel(<span class="hljs-string">'Time (days)'</span>)
-plt.ylabel(<span class="hljs-string">'Recall probability'</span>)
-plt.title(<span class="hljs-string">'Predicted forgetting curves (A: a=b=3, B: a=b=12)'</span>)
-plt.savefig(<span class="hljs-string">'figures/forgetting-curve.svg'</span>)
-plt.savefig(<span class="hljs-string">'figures/forgetting-curve.png'</span>, dpi=<span class="hljs-number">150</span>)
-plt.show()
-</code></pre>
+    recallProbabilityMean(<span class="op">*</span>modelB, ts),
+    v2s(recallProbabilityVar(<span class="op">*</span>modelB, ts)),
+    fmt<span class="op">=</span><span class="st"><span class="hljs-string">'.-'</span></span>,
+    label<span class="op">=</span><span class="st"><span class="hljs-string">'Model B'</span></span>,
+    color<span class="op">=</span><span class="st"><span class="hljs-string">'C1'</span></span>)
+plt.plot(ts, <span class="dv"><span class="hljs-number">2</span></span><span class="op">**</span>(<span class="op">-</span>ts <span class="op">/</span> hlB[<span class="dv"><span class="hljs-number">0</span></span>]), <span class="st"><span class="hljs-string">'--'</span></span>, label<span class="op">=</span><span class="st"><span class="hljs-string">'approx B'</span></span>, color<span class="op">=</span><span class="st"><span class="hljs-string">'C1'</span></span>)
+plt.legend(loc<span class="op">=</span><span class="dv"><span class="hljs-number">0</span></span>)
+plt.ylim([<span class="dv"><span class="hljs-number">0</span></span>, <span class="dv"><span class="hljs-number">1</span></span>])
+plt.grid(<span class="va"><span class="hljs-keyword">True</span></span>)
+plt.xlabel(<span class="st"><span class="hljs-string">'Time (days)'</span></span>)
+plt.ylabel(<span class="st"><span class="hljs-string">'Recall probability'</span></span>)
+plt.title(<span class="st"><span class="hljs-string">'Predicted forgetting curves (A: a=b=3, B: a=b=12)'</span></span>)
+plt.savefig(<span class="st"><span class="hljs-string">'figures/forgetting-curve.svg'</span></span>)
+plt.savefig(<span class="st"><span class="hljs-string">'figures/forgetting-curve.png'</span></span>, dpi<span class="op">=</span><span class="dv"><span class="hljs-number">150</span></span>)
+plt.show()</code></pre></div>
 <p><img src="figures/forgetting-curve.png" alt="figures/forgetting-curve.png"></p>
-<h2>Implementation thoughts</h2>
+<h2 id="implementation-thoughts">Implementation thoughts</h2>
 <p>Lua, Erlang, Elixir, Red, F#, OCaml, Reason, PureScript, JS, TypeScript, Rust, …</p>
 <p>Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …</p>
-<h2>Requirements for building all aspects of this repo</h2>
+<h2 id="requirements-for-building-all-aspects-of-this-repo">Requirements for building all aspects of this repo</h2>
 <ul>
 <li>Python
 <ul>
 <li>scipy, numpy</li>
 <li>nose for tests</li>
-</ul>
-</li>
-<li><a href="https://github.com/github/cmark">cmark-gfm</a></li>
+</ul></li>
+<li><a href="http://pandoc.org">Pandoc</a></li>
 <li>JavaScript
 <ul>
 <li><a href="https://yarnpkg.com">Yarn</a></li>
+</ul></li>
 </ul>
-</li>
-</ul>
-<h2>Acknowledgements</h2>
+<h2 id="acknowledgements">Acknowledgements</h2>
 <p><a href="http://markdowncss.github.io/modest/">Modest CSS</a> for Markdown</p>
 <svg style="display: none;"><defs id="MathJax_SVG_glyphs"><path stroke-width="1" id="MJMAIN-32" d="M109 429Q82 429 66 447T50 491Q50 562 103 614T235 666Q326 666 387 610T449 465Q449 422 429 383T381 315T301 241Q265 210 201 149L142 93L218 92Q375 92 385 97Q392 99 409 186V189H449V186Q448 183 436 95T421 3V0H50V19V31Q50 38 56 46T86 81Q115 113 136 137Q145 147 170 174T204 211T233 244T261 278T284 308T305 340T320 369T333 401T340 431T343 464Q343 527 309 573T212 619Q179 619 154 602T119 569T109 550Q109 549 114 549Q132 549 151 535T170 489Q170 464 154 447T109 429Z"></path><path stroke-width="1" id="MJMAIN-2212" d="M84 237T84 250T98 270H679Q694 262 694 250T679 230H98Q84 237 84 250Z"></path><path stroke-width="1" id="MJMAIN-394" d="M51 0Q46 4 46 7Q46 9 215 357T388 709Q391 716 416 716Q439 716 444 709Q447 705 616 357T786 7Q786 4 781 0H51ZM507 344L384 596L137 92L383 91H630Q630 93 507 344Z"></path><path stroke-width="1" id="MJMAIN-2F" d="M423 750Q432 750 438 744T444 730Q444 725 271 248T92 -240Q85 -250 75 -250Q68 -250 62 -245T56 -231Q56 -221 230 257T407 740Q411 750 423 750Z"></path><path stroke-width="1" id="MJMATHI-68" d="M137 683Q138 683 209 688T282 694Q294 694 294 685Q294 674 258 534Q220 386 220 383Q220 381 227 388Q288 442 357 442Q411 442 444 415T478 336Q478 285 440 178T402 50Q403 36 407 31T422 26Q450 26 474 56T513 138Q516 149 519 151T535 153Q555 153 555 145Q555 144 551 130Q535 71 500 33Q466 -10 419 -10H414Q367 -10 346 17T325 74Q325 90 361 192T398 345Q398 404 354 404H349Q266 404 205 306L198 293L164 158Q132 28 127 16Q114 -11 83 -11Q69 -11 59 -2T48 16Q48 30 121 320L195 616Q195 629 188 632T149 637H128Q122 643 122 645T124 664Q129 683 137 683Z"></path><path stroke-width="1" id="MJMATHI-74" d="M26 385Q19 392 19 395Q19 399 22 411T27 425Q29 430 36 430T87 431H140L159 511Q162 522 166 540T173 566T179 586T187 603T197 615T211 624T229 626Q247 625 254 615T261 596Q261 589 252 549T232 470L222 433Q222 431 272 431H323Q330 424 330 420Q330 398 317 385H210L174 240Q135 80 135 68Q135 26 162 26Q197 26 230 60T283 144Q285 150 288 151T303 153H307Q322 153 322 145Q322 142 319 133Q314 117 301 95T267 48T216 6T155 -11Q125 -11 98 4T59 56Q57 64 57 83V101L92 241Q127 382 128 383Q128 385 77 385H26Z"></path><path stroke-width="1" id="MJMATHI-78" d="M52 289Q59 331 106 386T222 442Q257 442 286 424T329 379Q371 442 430 442Q467 442 494 420T522 361Q522 332 508 314T481 292T458 288Q439 288 427 299T415 328Q415 374 465 391Q454 404 425 404Q412 404 406 402Q368 386 350 336Q290 115 290 78Q290 50 306 38T341 26Q378 26 414 59T463 140Q466 150 469 151T485 153H489Q504 153 504 145Q504 144 502 134Q486 77 440 33T333 -11Q263 -11 227 52Q186 -10 133 -10H127Q78 -10 57 16T35 71Q35 103 54 123T99 143Q142 143 142 101Q142 81 130 66T107 46T94 41L91 40Q91 39 97 36T113 29T132 26Q168 26 194 71Q203 87 217 139T245 247T261 313Q266 340 266 352Q266 380 251 392T217 404Q177 404 142 372T93 290Q91 281 88 280T72 278H58Q52 284 52 289Z"></path><path stroke-width="1" id="MJMAIN-223C" d="M55 166Q55 241 101 304T222 367Q260 367 296 349T362 304T421 252T484 208T554 189Q616 189 655 236T694 338Q694 350 698 358T708 367Q722 367 722 334Q722 260 677 197T562 134H554Q517 134 481 152T414 196T355 248T292 293T223 311Q179 311 145 286Q109 257 96 218T80 156T69 133Q55 133 55 166Z"></path><path stroke-width="1" id="MJMATHI-42" d="M231 637Q204 637 199 638T194 649Q194 676 205 682Q206 683 335 683Q594 683 608 681Q671 671 713 636T756 544Q756 480 698 429T565 360L555 357Q619 348 660 311T702 219Q702 146 630 78T453 1Q446 0 242 0Q42 0 39 2Q35 5 35 10Q35 17 37 24Q42 43 47 45Q51 46 62 46H68Q95 46 128 49Q142 52 147 61Q150 65 219 339T288 628Q288 635 231 637ZM649 544Q649 574 634 600T585 634Q578 636 493 637Q473 637 451 637T416 636H403Q388 635 384 626Q382 622 352 506Q352 503 351 500L320 374H401Q482 374 494 376Q554 386 601 434T649 544ZM595 229Q595 273 572 302T512 336Q506 337 429 337Q311 337 310 336Q310 334 293 263T258 122L240 52Q240 48 252 48T333 46Q422 46 429 47Q491 54 543 105T595 229Z"></path><path stroke-width="1" id="MJMATHI-65" d="M39 168Q39 225 58 272T107 350T174 402T244 433T307 442H310Q355 442 388 420T421 355Q421 265 310 237Q261 224 176 223Q139 223 138 221Q138 219 132 186T125 128Q125 81 146 54T209 26T302 45T394 111Q403 121 406 121Q410 121 419 112T429 98T420 82T390 55T344 24T281 -1T205 -11Q126 -11 83 42T39 168ZM373 353Q367 405 305 405Q272 405 244 391T199 357T170 316T154 280T149 261Q149 260 169 260Q282 260 327 284T373 353Z"></path><path stroke-width="1" id="MJMATHI-72" d="M21 287Q22 290 23 295T28 317T38 348T53 381T73 411T99 433T132 442Q161 442 183 430T214 408T225 388Q227 382 228 382T236 389Q284 441 347 441H350Q398 441 422 400Q430 381 430 363Q430 333 417 315T391 292T366 288Q346 288 334 299T322 328Q322 376 378 392Q356 405 342 405Q286 405 239 331Q229 315 224 298T190 165Q156 25 151 16Q138 -11 108 -11Q95 -11 87 -5T76 7T74 17Q74 30 114 189T154 366Q154 405 128 405Q107 405 92 377T68 316T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-6E" d="M21 287Q22 293 24 303T36 341T56 388T89 425T135 442Q171 442 195 424T225 390T231 369Q231 367 232 367L243 378Q304 442 382 442Q436 442 469 415T503 336T465 179T427 52Q427 26 444 26Q450 26 453 27Q482 32 505 65T540 145Q542 153 560 153Q580 153 580 145Q580 144 576 130Q568 101 554 73T508 17T439 -10Q392 -10 371 17T350 73Q350 92 386 193T423 345Q423 404 379 404H374Q288 404 229 303L222 291L189 157Q156 26 151 16Q138 -11 108 -11Q95 -11 87 -5T76 7T74 17Q74 30 112 180T152 343Q153 348 153 366Q153 405 129 405Q91 405 66 305Q60 285 60 284Q58 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-6F" d="M201 -11Q126 -11 80 38T34 156Q34 221 64 279T146 380Q222 441 301 441Q333 441 341 440Q354 437 367 433T402 417T438 387T464 338T476 268Q476 161 390 75T201 -11ZM121 120Q121 70 147 48T206 26Q250 26 289 58T351 142Q360 163 374 216T388 308Q388 352 370 375Q346 405 306 405Q243 405 195 347Q158 303 140 230T121 120Z"></path><path stroke-width="1" id="MJMATHI-75" d="M21 287Q21 295 30 318T55 370T99 420T158 442Q204 442 227 417T250 358Q250 340 216 246T182 105Q182 62 196 45T238 27T291 44T328 78L339 95Q341 99 377 247Q407 367 413 387T427 416Q444 431 463 431Q480 431 488 421T496 402L420 84Q419 79 419 68Q419 43 426 35T447 26Q469 29 482 57T512 145Q514 153 532 153Q551 153 551 144Q550 139 549 130T540 98T523 55T498 17T462 -8Q454 -10 438 -10Q372 -10 347 46Q345 45 336 36T318 21T296 6T267 -6T233 -11Q189 -11 155 7Q103 38 103 113Q103 170 138 262T173 379Q173 380 173 381Q173 390 173 393T169 400T158 404H154Q131 404 112 385T82 344T65 302T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-6C" d="M117 59Q117 26 142 26Q179 26 205 131Q211 151 215 152Q217 153 225 153H229Q238 153 241 153T246 151T248 144Q247 138 245 128T234 90T214 43T183 6T137 -11Q101 -11 70 11T38 85Q38 97 39 102L104 360Q167 615 167 623Q167 626 166 628T162 632T157 634T149 635T141 636T132 637T122 637Q112 637 109 637T101 638T95 641T94 647Q94 649 96 661Q101 680 107 682T179 688Q194 689 213 690T243 693T254 694Q266 694 266 686Q266 675 193 386T118 83Q118 81 118 75T117 65V59Z"></path><path stroke-width="1" id="MJMATHI-69" d="M184 600Q184 624 203 642T247 661Q265 661 277 649T290 619Q290 596 270 577T226 557Q211 557 198 567T184 600ZM21 287Q21 295 30 318T54 369T98 420T158 442Q197 442 223 419T250 357Q250 340 236 301T196 196T154 83Q149 61 149 51Q149 26 166 26Q175 26 185 29T208 43T235 78T260 137Q263 149 265 151T282 153Q302 153 302 143Q302 135 293 112T268 61T223 11T161 -11Q129 -11 102 10T74 74Q74 91 79 106T122 220Q160 321 166 341T173 380Q173 404 156 404H154Q124 404 99 371T61 287Q60 286 59 284T58 281T56 279T53 278T49 278T41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMAIN-28" d="M94 250Q94 319 104 381T127 488T164 576T202 643T244 695T277 729T302 750H315H319Q333 750 333 741Q333 738 316 720T275 667T226 581T184 443T167 250T184 58T225 -81T274 -167T316 -220T333 -241Q333 -250 318 -250H315H302L274 -226Q180 -141 137 -14T94 250Z"></path><path stroke-width="1" id="MJMATHI-3C0" d="M132 -11Q98 -11 98 22V33L111 61Q186 219 220 334L228 358H196Q158 358 142 355T103 336Q92 329 81 318T62 297T53 285Q51 284 38 284Q19 284 19 294Q19 300 38 329T93 391T164 429Q171 431 389 431Q549 431 553 430Q573 423 573 402Q573 371 541 360Q535 358 472 358H408L405 341Q393 269 393 222Q393 170 402 129T421 65T431 37Q431 20 417 5T381 -10Q370 -10 363 -7T347 17T331 77Q330 86 330 121Q330 170 339 226T357 318T367 358H269L268 354Q268 351 249 275T206 114T175 17Q164 -11 132 -11Z"></path><path stroke-width="1" id="MJMAIN-29" d="M60 749L64 750Q69 750 74 750H86L114 726Q208 641 251 514T294 250Q294 182 284 119T261 12T224 -76T186 -143T145 -194T113 -227T90 -246Q87 -249 86 -250H74Q66 -250 63 -250T58 -247T55 -238Q56 -237 66 -225Q221 -64 221 250T66 725Q56 737 55 738Q55 746 60 749Z"></path><path stroke-width="1" id="MJMAIN-31" d="M213 578L200 573Q186 568 160 563T102 556H83V602H102Q149 604 189 617T245 641T273 663Q275 666 285 666Q294 666 302 660V361L303 61Q310 54 315 52T339 48T401 46H427V0H416Q395 3 257 3Q121 3 100 0H88V46H114Q136 46 152 46T177 47T193 50T201 52T207 57T213 61V578Z"></path><path stroke-width="1" id="MJMATHI-61" d="M33 157Q33 258 109 349T280 441Q331 441 370 392Q386 422 416 422Q429 422 439 414T449 394Q449 381 412 234T374 68Q374 43 381 35T402 26Q411 27 422 35Q443 55 463 131Q469 151 473 152Q475 153 483 153H487Q506 153 506 144Q506 138 501 117T481 63T449 13Q436 0 417 -8Q409 -10 393 -10Q359 -10 336 5T306 36L300 51Q299 52 296 50Q294 48 292 46Q233 -10 172 -10Q117 -10 75 30T33 157ZM351 328Q351 334 346 350T323 385T277 405Q242 405 210 374T160 293Q131 214 119 129Q119 126 119 118T118 106Q118 61 136 44T179 26Q217 26 254 59T298 110Q300 114 325 217T351 328Z"></path><path stroke-width="1" id="MJMATHI-3B1" d="M34 156Q34 270 120 356T309 442Q379 442 421 402T478 304Q484 275 485 237V208Q534 282 560 374Q564 388 566 390T582 393Q603 393 603 385Q603 376 594 346T558 261T497 161L486 147L487 123Q489 67 495 47T514 26Q528 28 540 37T557 60Q559 67 562 68T577 70Q597 70 597 62Q597 56 591 43Q579 19 556 5T512 -10H505Q438 -10 414 62L411 69L400 61Q390 53 370 41T325 18T267 -2T203 -11Q124 -11 79 39T34 156ZM208 26Q257 26 306 47T379 90L403 112Q401 255 396 290Q382 405 304 405Q235 405 183 332Q156 292 139 224T121 120Q121 71 146 49T208 26Z"></path><path stroke-width="1" id="MJMAIN-2C" d="M78 35T78 60T94 103T137 121Q165 121 187 96T210 8Q210 -27 201 -60T180 -117T154 -158T130 -185T117 -194Q113 -194 104 -185T95 -172Q95 -168 106 -156T131 -126T157 -76T173 -3V9L172 8Q170 7 167 6T161 3T152 1T140 0Q113 0 96 17Z"></path><path stroke-width="1" id="MJMATHI-3B2" d="M29 -194Q23 -188 23 -186Q23 -183 102 134T186 465Q208 533 243 584T309 658Q365 705 429 705H431Q493 705 533 667T573 570Q573 465 469 396L482 383Q533 332 533 252Q533 139 448 65T257 -10Q227 -10 203 -2T165 17T143 40T131 59T126 65L62 -188Q60 -194 42 -194H29ZM353 431Q392 431 427 419L432 422Q436 426 439 429T449 439T461 453T472 471T484 495T493 524T501 560Q503 569 503 593Q503 611 502 616Q487 667 426 667Q384 667 347 643T286 582T247 514T224 455Q219 439 186 308T152 168Q151 163 151 147Q151 99 173 68Q204 26 260 26Q302 26 349 51T425 137Q441 171 449 214T457 279Q457 337 422 372Q380 358 347 358H337Q258 358 258 389Q258 396 261 403Q275 431 353 431Z"></path><path stroke-width="1" id="MJMAIN-7C" d="M139 -249H137Q125 -249 119 -235V251L120 737Q130 750 139 750Q152 750 159 735V-235Q151 -249 141 -249H139Z"></path><path stroke-width="1" id="MJMAIN-2B" d="M56 237T56 250T70 270H369V420L370 570Q380 583 389 583Q402 583 409 568V270H707Q722 262 722 250T707 230H409V-68Q401 -82 391 -82H389H387Q375 -82 369 -68V230H70Q56 237 56 250Z"></path><path stroke-width="1" id="MJMAIN-2E" d="M78 60Q78 84 95 102T138 120Q162 120 180 104T199 61Q199 36 182 18T139 0T96 17T78 60Z"></path><path stroke-width="1" id="MJMAIN-3D" d="M56 347Q56 360 70 367H707Q722 359 722 347Q722 336 708 328L390 327H72Q56 332 56 347ZM56 153Q56 168 72 173H708Q722 163 722 153Q722 140 707 133H70Q56 140 56 153Z"></path><path stroke-width="1" id="MJMATHI-3B4" d="M195 609Q195 656 227 686T302 717Q319 716 351 709T407 697T433 690Q451 682 451 662Q451 644 438 628T403 612Q382 612 348 641T288 671T249 657T235 628Q235 584 334 463Q401 379 401 292Q401 169 340 80T205 -10H198Q127 -10 83 36T36 153Q36 286 151 382Q191 413 252 434Q252 435 245 449T230 481T214 521T201 566T195 609ZM112 130Q112 83 136 55T204 27Q233 27 256 51T291 111T309 178T316 232Q316 267 309 298T295 344T269 400L259 396Q215 381 183 342T137 256T118 179T112 130Z"></path><path stroke-width="1" id="MJMAIN-22C5" d="M78 250Q78 274 95 292T138 310Q162 310 180 294T199 251Q199 226 182 208T139 190T96 207T78 250Z"></path><path stroke-width="1" id="MJMAIN-30" d="M96 585Q152 666 249 666Q297 666 345 640T423 548Q460 465 460 320Q460 165 417 83Q397 41 362 16T301 -15T250 -22Q224 -22 198 -16T137 16T82 83Q39 165 39 320Q39 494 96 585ZM321 597Q291 629 250 629Q208 629 178 597Q153 571 145 525T137 333Q137 175 145 125T181 46Q209 16 250 16Q290 16 318 46Q347 76 354 130T362 333Q362 478 354 524T321 597Z"></path><path stroke-width="1" id="MJMAIN-33" d="M127 463Q100 463 85 480T69 524Q69 579 117 622T233 665Q268 665 277 664Q351 652 390 611T430 522Q430 470 396 421T302 350L299 348Q299 347 308 345T337 336T375 315Q457 262 457 175Q457 96 395 37T238 -22Q158 -22 100 21T42 130Q42 158 60 175T105 193Q133 193 151 175T169 130Q169 119 166 110T159 94T148 82T136 74T126 70T118 67L114 66Q165 21 238 21Q293 21 321 74Q338 107 338 175V195Q338 290 274 322Q259 328 213 329L171 330L168 332Q166 335 166 348Q166 366 174 366Q202 366 232 371Q266 376 294 413T322 525V533Q322 590 287 612Q265 626 240 626Q208 626 181 615T143 592T132 580H135Q138 579 143 578T153 573T165 566T175 555T183 540T186 520Q186 498 172 481T127 463Z"></path><path stroke-width="1" id="MJMAIN-2260" d="M166 -215T159 -215T147 -212T141 -204T139 -197Q139 -190 144 -183L306 133H70Q56 140 56 153Q56 168 72 173H327L406 327H72Q56 332 56 347Q56 360 70 367H426Q597 702 602 707Q605 716 618 716Q625 716 630 712T636 703T638 696Q638 692 471 367H707Q722 359 722 347Q722 336 708 328L451 327L371 173H708Q722 163 722 153Q722 140 707 133H351Q175 -210 170 -212Q166 -215 159 -215Z"></path><path stroke-width="1" id="MJMATHI-79" d="M21 287Q21 301 36 335T84 406T158 442Q199 442 224 419T250 355Q248 336 247 334Q247 331 231 288T198 191T182 105Q182 62 196 45T238 27Q261 27 281 38T312 61T339 94Q339 95 344 114T358 173T377 247Q415 397 419 404Q432 431 462 431Q475 431 483 424T494 412T496 403Q496 390 447 193T391 -23Q363 -106 294 -155T156 -205Q111 -205 77 -183T43 -117Q43 -95 50 -80T69 -58T89 -48T106 -45Q150 -45 150 -87Q150 -107 138 -122T115 -142T102 -147L99 -148Q101 -153 118 -160T152 -167H160Q177 -167 186 -165Q219 -156 247 -127T290 -65T313 -9T321 21L315 17Q309 13 296 6T270 -6Q250 -11 231 -11Q185 -11 150 11T104 82Q103 89 103 113Q103 170 138 262T173 379Q173 380 173 381Q173 390 173 393T169 400T158 404H154Q131 404 112 385T82 344T65 302T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-67" d="M311 43Q296 30 267 15T206 0Q143 0 105 45T66 160Q66 265 143 353T314 442Q361 442 401 394L404 398Q406 401 409 404T418 412T431 419T447 422Q461 422 470 413T480 394Q480 379 423 152T363 -80Q345 -134 286 -169T151 -205Q10 -205 10 -137Q10 -111 28 -91T74 -71Q89 -71 102 -80T116 -111Q116 -121 114 -130T107 -144T99 -154T92 -162L90 -164H91Q101 -167 151 -167Q189 -167 211 -155Q234 -144 254 -122T282 -75Q288 -56 298 -13Q311 35 311 43ZM384 328L380 339Q377 350 375 354T369 368T359 382T346 393T328 402T306 405Q262 405 221 352Q191 313 171 233T151 117Q151 38 213 38Q269 38 323 108L331 118L384 328Z"></path><path stroke-width="1" id="MJMATHI-50" d="M287 628Q287 635 230 637Q206 637 199 638T192 648Q192 649 194 659Q200 679 203 681T397 683Q587 682 600 680Q664 669 707 631T751 530Q751 453 685 389Q616 321 507 303Q500 302 402 301H307L277 182Q247 66 247 59Q247 55 248 54T255 50T272 48T305 46H336Q342 37 342 35Q342 19 335 5Q330 0 319 0Q316 0 282 1T182 2Q120 2 87 2T51 1Q33 1 33 11Q33 13 36 25Q40 41 44 43T67 46Q94 46 127 49Q141 52 146 61Q149 65 218 339T287 628ZM645 554Q645 567 643 575T634 597T609 619T560 635Q553 636 480 637Q463 637 445 637T416 636T404 636Q391 635 386 627Q384 621 367 550T332 412T314 344Q314 342 395 342H407H430Q542 342 590 392Q617 419 631 471T645 554Z"></path><path stroke-width="1" id="MJMATHI-59" d="M66 637Q54 637 49 637T39 638T32 641T30 647T33 664T42 682Q44 683 56 683Q104 680 165 680Q288 680 306 683H316Q322 677 322 674T320 656Q316 643 310 637H298Q242 637 242 624Q242 619 292 477T343 333L346 336Q350 340 358 349T379 373T411 410T454 461Q546 568 561 587T577 618Q577 634 545 637Q528 637 528 647Q528 649 530 661Q533 676 535 679T549 683Q551 683 578 682T657 680Q684 680 713 681T746 682Q763 682 763 673Q763 669 760 657T755 643Q753 637 734 637Q662 632 617 587Q608 578 477 424L348 273L322 169Q295 62 295 57Q295 46 363 46Q379 46 384 45T390 35Q390 33 388 23Q384 6 382 4T366 1Q361 1 324 1T232 2Q170 2 138 2T102 1Q84 1 84 9Q84 14 87 24Q88 27 89 30T90 35T91 39T93 42T96 44T101 45T107 45T116 46T129 46Q168 47 180 50T198 63Q201 68 227 171L252 274L129 623Q128 624 127 625T125 627T122 629T118 631T113 633T105 634T96 635T83 636T66 637Z"></path><path stroke-width="1" id="MJMAIN-2202" d="M202 508Q179 508 169 520T158 547Q158 557 164 577T185 624T230 675T301 710L333 715H345Q378 715 384 714Q447 703 489 661T549 568T566 457Q566 362 519 240T402 53Q321 -22 223 -22Q123 -22 73 56Q42 102 42 148V159Q42 276 129 370T322 465Q383 465 414 434T455 367L458 378Q478 461 478 515Q478 603 437 639T344 676Q266 676 223 612Q264 606 264 572Q264 547 246 528T202 508ZM430 306Q430 372 401 400T333 428Q270 428 222 382Q197 354 183 323T150 221Q132 149 132 116Q132 21 232 21Q244 21 250 22Q327 35 374 112Q389 137 409 196T430 306Z"></path><path stroke-width="1" id="MJMAIN-393" d="M128 619Q121 626 117 628T101 631T58 634H25V680H554V676Q556 670 568 560T582 444V440H542V444Q542 445 538 478T523 545T492 598Q454 634 349 634H334Q264 634 249 633T233 621Q232 618 232 339L233 61Q240 54 245 52T270 48T333 46H360V0H348Q324 3 182 3Q51 3 36 0H25V46H58Q100 47 109 49T128 61V619Z"></path><path stroke-width="1" id="MJMATHI-58" d="M42 0H40Q26 0 26 11Q26 15 29 27Q33 41 36 43T55 46Q141 49 190 98Q200 108 306 224T411 342Q302 620 297 625Q288 636 234 637H206Q200 643 200 645T202 664Q206 677 212 683H226Q260 681 347 681Q380 681 408 681T453 682T473 682Q490 682 490 671Q490 670 488 658Q484 643 481 640T465 637Q434 634 411 620L488 426L541 485Q646 598 646 610Q646 628 622 635Q617 635 609 637Q594 637 594 648Q594 650 596 664Q600 677 606 683H618Q619 683 643 683T697 681T738 680Q828 680 837 683H845Q852 676 852 672Q850 647 840 637H824Q790 636 763 628T722 611T698 593L687 584Q687 585 592 480L505 384Q505 383 536 304T601 142T638 56Q648 47 699 46Q734 46 734 37Q734 35 732 23Q728 7 725 4T711 1Q708 1 678 1T589 2Q528 2 496 2T461 1Q444 1 444 10Q444 11 446 25Q448 35 450 39T455 44T464 46T480 47T506 54Q523 62 523 64Q522 64 476 181L429 299Q241 95 236 84Q232 76 232 72Q232 53 261 47Q262 47 267 47T273 46Q276 46 277 46T280 45T283 42T284 35Q284 26 282 19Q279 6 276 4T261 1Q258 1 243 1T201 2T142 2Q64 2 42 0Z"></path><path stroke-width="1" id="MJMAIN-5B" d="M118 -250V750H255V710H158V-210H255V-250H118Z"></path><path stroke-width="1" id="MJMAIN-5D" d="M22 710V750H159V-250H22V-210H119V710H22Z"></path><path stroke-width="1" id="MJMATHI-77" d="M580 385Q580 406 599 424T641 443Q659 443 674 425T690 368Q690 339 671 253Q656 197 644 161T609 80T554 12T482 -11Q438 -11 404 5T355 48Q354 47 352 44Q311 -11 252 -11Q226 -11 202 -5T155 14T118 53T104 116Q104 170 138 262T173 379Q173 380 173 381Q173 390 173 393T169 400T158 404H154Q131 404 112 385T82 344T65 302T57 280Q55 278 41 278H27Q21 284 21 287Q21 293 29 315T52 366T96 418T161 441Q204 441 227 416T250 358Q250 340 217 250T184 111Q184 65 205 46T258 26Q301 26 334 87L339 96V119Q339 122 339 128T340 136T341 143T342 152T345 165T348 182T354 206T362 238T373 281Q402 395 406 404Q419 431 449 431Q468 431 475 421T483 402Q483 389 454 274T422 142Q420 131 420 107V100Q420 85 423 71T442 42T487 26Q558 26 600 148Q609 171 620 213T632 273Q632 306 619 325T593 357T580 385Z"></path><path stroke-width="1" id="MJMATHI-45" d="M492 213Q472 213 472 226Q472 230 477 250T482 285Q482 316 461 323T364 330H312Q311 328 277 192T243 52Q243 48 254 48T334 46Q428 46 458 48T518 61Q567 77 599 117T670 248Q680 270 683 272Q690 274 698 274Q718 274 718 261Q613 7 608 2Q605 0 322 0H133Q31 0 31 11Q31 13 34 25Q38 41 42 43T65 46Q92 46 125 49Q139 52 144 61Q146 66 215 342T285 622Q285 629 281 629Q273 632 228 634H197Q191 640 191 642T193 659Q197 676 203 680H757Q764 676 764 669Q764 664 751 557T737 447Q735 440 717 440H705Q698 445 698 453L701 476Q704 500 704 528Q704 558 697 578T678 609T643 625T596 632T532 634H485Q397 633 392 631Q388 629 386 622Q385 619 355 499T324 377Q347 376 372 376H398Q464 376 489 391T534 472Q538 488 540 490T557 493Q562 493 565 493T570 492T572 491T574 487T577 483L544 351Q511 218 508 216Q505 213 492 213Z"></path><path stroke-width="1" id="MJSZ2-222B" d="M114 -798Q132 -824 165 -824H167Q195 -824 223 -764T275 -600T320 -391T362 -164Q365 -143 367 -133Q439 292 523 655T645 1127Q651 1145 655 1157T672 1201T699 1257T733 1306T777 1346T828 1360Q884 1360 912 1325T944 1245Q944 1220 932 1205T909 1186T887 1183Q866 1183 849 1198T832 1239Q832 1287 885 1296L882 1300Q879 1303 874 1307T866 1313Q851 1323 833 1323Q819 1323 807 1311T775 1255T736 1139T689 936T633 628Q574 293 510 -5T410 -437T355 -629Q278 -862 165 -862Q125 -862 92 -831T55 -746Q55 -711 74 -698T112 -685Q133 -685 150 -700T167 -741Q167 -789 114 -798Z"></path><path stroke-width="1" id="MJMATHI-64" d="M366 683Q367 683 438 688T511 694Q523 694 523 686Q523 679 450 384T375 83T374 68Q374 26 402 26Q411 27 422 35Q443 55 463 131Q469 151 473 152Q475 153 483 153H487H491Q506 153 506 145Q506 140 503 129Q490 79 473 48T445 8T417 -8Q409 -10 393 -10Q359 -10 336 5T306 36L300 51Q299 52 296 50Q294 48 292 46Q233 -10 172 -10Q117 -10 75 30T33 157Q33 205 53 255T101 341Q148 398 195 420T280 442Q336 442 364 400Q369 394 369 396Q370 400 396 505T424 616Q424 629 417 632T378 637H357Q351 643 351 645T353 664Q358 683 366 683ZM352 326Q329 405 277 405Q242 405 210 374T160 293Q131 214 119 129Q119 126 119 118T118 106Q118 61 136 44T179 26Q233 26 290 98L298 109L352 326Z"></path><path stroke-width="1" id="MJMATHI-56" d="M52 648Q52 670 65 683H76Q118 680 181 680Q299 680 320 683H330Q336 677 336 674T334 656Q329 641 325 637H304Q282 635 274 635Q245 630 242 620Q242 618 271 369T301 118L374 235Q447 352 520 471T595 594Q599 601 599 609Q599 633 555 637Q537 637 537 648Q537 649 539 661Q542 675 545 679T558 683Q560 683 570 683T604 682T668 681Q737 681 755 683H762Q769 676 769 672Q769 655 760 640Q757 637 743 637Q730 636 719 635T698 630T682 623T670 615T660 608T652 599T645 592L452 282Q272 -9 266 -16Q263 -18 259 -21L241 -22H234Q216 -22 216 -15Q213 -9 177 305Q139 623 138 626Q133 637 76 637H59Q52 642 52 648Z"></path><path stroke-width="1" id="MJMAIN-2265" d="M83 616Q83 624 89 630T99 636Q107 636 253 568T543 431T687 361Q694 356 694 346T687 331Q685 329 395 192L107 56H101Q83 58 83 76Q83 77 83 79Q82 86 98 95Q117 105 248 167Q326 204 378 228L626 346L360 472Q291 505 200 548Q112 589 98 597T83 616ZM84 -118Q84 -108 99 -98H678Q694 -104 694 -118Q694 -130 679 -138H98Q84 -131 84 -118Z"></path><path stroke-width="1" id="MJMAIN-35" d="M164 157Q164 133 148 117T109 101H102Q148 22 224 22Q294 22 326 82Q345 115 345 210Q345 313 318 349Q292 382 260 382H254Q176 382 136 314Q132 307 129 306T114 304Q97 304 95 310Q93 314 93 485V614Q93 664 98 664Q100 666 102 666Q103 666 123 658T178 642T253 634Q324 634 389 662Q397 666 402 666Q410 666 410 648V635Q328 538 205 538Q174 538 149 544L139 546V374Q158 388 169 396T205 412T256 420Q337 420 393 355T449 201Q449 109 385 44T229 -22Q148 -22 99 32T50 154Q50 178 61 192T84 210T107 214Q132 214 148 197T164 157Z"></path><path stroke-width="1" id="MJMAIN-34" d="M462 0Q444 3 333 3Q217 3 199 0H190V46H221Q241 46 248 46T265 48T279 53T286 61Q287 63 287 115V165H28V211L179 442Q332 674 334 675Q336 677 355 677H373L379 671V211H471V165H379V114Q379 73 379 66T385 54Q393 47 442 46H471V0H462ZM293 211V545L74 212L183 211H293Z"></path><path stroke-width="1" id="MJMATHI-73" d="M131 289Q131 321 147 354T203 415T300 442Q362 442 390 415T419 355Q419 323 402 308T364 292Q351 292 340 300T328 326Q328 342 337 354T354 372T367 378Q368 378 368 379Q368 382 361 388T336 399T297 405Q249 405 227 379T204 326Q204 301 223 291T278 274T330 259Q396 230 396 163Q396 135 385 107T352 51T289 7T195 -10Q118 -10 86 19T53 87Q53 126 74 143T118 160Q133 160 146 151T160 120Q160 94 142 76T111 58Q109 57 108 57T107 55Q108 52 115 47T146 34T201 27Q237 27 263 38T301 66T318 97T323 122Q323 150 302 164T254 181T195 196T148 231Q131 256 131 289Z"></path><path stroke-width="1" id="MJMATHI-4C" d="M228 637Q194 637 192 641Q191 643 191 649Q191 673 202 682Q204 683 217 683Q271 680 344 680Q485 680 506 683H518Q524 677 524 674T522 656Q517 641 513 637H475Q406 636 394 628Q387 624 380 600T313 336Q297 271 279 198T252 88L243 52Q243 48 252 48T311 46H328Q360 46 379 47T428 54T478 72T522 106T564 161Q580 191 594 228T611 270Q616 273 628 273H641Q647 264 647 262T627 203T583 83T557 9Q555 4 553 3T537 0T494 -1Q483 -1 418 -1T294 0H116Q32 0 32 10Q32 17 34 24Q39 43 44 45Q48 46 59 46H65Q92 46 125 49Q139 52 144 61Q147 65 216 339T285 628Q285 635 228 637Z"></path><path stroke-width="1" id="MJMATHI-6B" d="M121 647Q121 657 125 670T137 683Q138 683 209 688T282 694Q294 694 294 686Q294 679 244 477Q194 279 194 272Q213 282 223 291Q247 309 292 354T362 415Q402 442 438 442Q468 442 485 423T503 369Q503 344 496 327T477 302T456 291T438 288Q418 288 406 299T394 328Q394 353 410 369T442 390L458 393Q446 405 434 405H430Q398 402 367 380T294 316T228 255Q230 254 243 252T267 246T293 238T320 224T342 206T359 180T365 147Q365 130 360 106T354 66Q354 26 381 26Q429 26 459 145Q461 153 479 153H483Q499 153 499 144Q499 139 496 130Q455 -11 378 -11Q333 -11 305 15T277 90Q277 108 280 121T283 145Q283 167 269 183T234 206T200 217T182 220H180Q168 178 159 139T145 81T136 44T129 20T122 7T111 -2Q98 -11 83 -11Q66 -11 57 -1T48 16Q48 26 85 176T158 471L195 616Q196 629 188 632T149 637H144Q134 637 131 637T124 640T121 647Z"></path><path stroke-width="1" id="MJSZ1-222B" d="M113 -244Q113 -246 119 -251T139 -263T167 -269Q186 -269 199 -260Q220 -247 232 -218T251 -133T262 -15T276 155T297 367Q300 390 305 438T314 512T325 580T340 647T361 703T390 751T428 784T479 804Q481 804 488 804T501 805Q552 802 581 769T610 695Q610 669 594 657T561 645Q542 645 527 658T512 694Q512 705 516 714T526 729T538 737T548 742L552 743Q552 745 545 751T525 762T498 768Q475 768 460 756T434 716T418 652T407 559T398 444T387 300T369 133Q349 -38 337 -102T303 -207Q256 -306 169 -306Q119 -306 87 -272T55 -196Q55 -170 71 -158T104 -146Q123 -146 138 -159T153 -195Q153 -206 149 -215T139 -230T127 -238T117 -242L113 -244Z"></path><path stroke-width="1" id="MJMATHI-3B3" d="M31 249Q11 249 11 258Q11 275 26 304T66 365T129 418T206 441Q233 441 239 440Q287 429 318 386T371 255Q385 195 385 170Q385 166 386 166L398 193Q418 244 443 300T486 391T508 430Q510 431 524 431H537Q543 425 543 422Q543 418 522 378T463 251T391 71Q385 55 378 6T357 -100Q341 -165 330 -190T303 -216Q286 -216 286 -188Q286 -138 340 32L346 51L347 69Q348 79 348 100Q348 257 291 317Q251 355 196 355Q148 355 108 329T51 260Q49 251 47 251Q45 249 31 249Z"></path><path stroke-width="1" id="MJMAIN-2032" d="M79 43Q73 43 52 49T30 61Q30 68 85 293T146 528Q161 560 198 560Q218 560 240 545T262 501Q262 496 260 486Q259 479 173 263T84 45T79 43Z"></path><path stroke-width="1" id="MJMATHI-3BC" d="M58 -216Q44 -216 34 -208T23 -186Q23 -176 96 116T173 414Q186 442 219 442Q231 441 239 435T249 423T251 413Q251 401 220 279T187 142Q185 131 185 107V99Q185 26 252 26Q261 26 270 27T287 31T302 38T315 45T327 55T338 65T348 77T356 88T365 100L372 110L408 253Q444 395 448 404Q461 431 491 431Q504 431 512 424T523 412T525 402L449 84Q448 79 448 68Q448 43 455 35T476 26Q485 27 496 35Q517 55 537 131Q543 151 547 152Q549 153 557 153H561Q580 153 580 144Q580 138 575 117T555 63T523 13Q510 0 491 -8Q483 -10 467 -10Q446 -10 429 -4T402 11T385 29T376 44T374 51L368 45Q362 39 350 30T324 12T288 -4T246 -11Q199 -11 153 12L129 -85Q108 -167 104 -180T92 -202Q76 -216 58 -216Z"></path><path stroke-width="1" id="MJMATHI-3C3" d="M184 -11Q116 -11 74 34T31 147Q31 247 104 333T274 430Q275 431 414 431H552Q553 430 555 429T559 427T562 425T565 422T567 420T569 416T570 412T571 407T572 401Q572 357 507 357Q500 357 490 357T476 358H416L421 348Q439 310 439 263Q439 153 359 71T184 -11ZM361 278Q361 358 276 358Q152 358 115 184Q114 180 114 178Q106 141 106 117Q106 67 131 47T188 26Q242 26 287 73Q316 103 334 153T356 233T361 278Z"></path></defs></svg></body></html>

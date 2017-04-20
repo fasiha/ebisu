@@ -616,6 +616,7 @@ plt.savefig('figures/halflife.svg')
 plt.savefig('figures/halflife.png', dpi=150)
 plt.show()
 ```
+![figures/halflife.png](figures/halflife.png)
 
 ```py
 plt.figure()
@@ -649,6 +650,7 @@ plt.savefig('figures/forgetting-curve.svg')
 plt.savefig('figures/forgetting-curve.png', dpi=150)
 plt.show()
 ```
+![figures/forgetting-curve.png](figures/forgetting-curve.png)
 
 ## Implementation thoughts
 

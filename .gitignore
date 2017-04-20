@@ -2,3 +2,7 @@
 node_modules/
 __pycache__/
 *.pyc
+build/
+dist/
+ebisu.egg-info/
+.ipynb_checkpoints/

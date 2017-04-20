@@ -2215,18 +2215,17 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
       <span class="hljs-keyword">lambda</span> now: recallProbabilityMean(alpha, beta, t, now) - percentile, mint,
       maxt)
   <span class="hljs-comment"># `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.</span>
-  <span class="hljs-comment"># To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that:</span>
-  <span class="hljs-comment"># - `v` is the probability variance around 0.5, so `sqrt(v)` is the standard deviation</span>
-  <span class="hljs-comment"># - find the times for which `0.5 +/- sqrt(v)`. This is a kind of one-sigma confidence interval in time</span>
-  <span class="hljs-comment"># - convert these times to a 'time variance' by taking their mean-absolute-distance to `h` and squaring that.</span>
-  <span class="hljs-comment"># Open to suggestions for improving this. The second 'variance' number should not be taken seriously, but it can be used for notional plotting.</span>
+  <span class="hljs-comment"># To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that.</span>
+  <span class="hljs-comment"># This 'variance' number should not be taken seriously, but it can be used for notional plotting.</span>
   v = recallProbabilityVar(alpha, beta, t, h)
-  h2 = brentq(
-      <span class="hljs-keyword">lambda</span> now: recallProbabilityMean(alpha, beta, t, now) - (percentile - sqrt(v)),
-      mint, maxt)
-  h3 = brentq(
-      <span class="hljs-keyword">lambda</span> now: recallProbabilityMean(alpha, beta, t, now) - (percentile + sqrt(v)),
-      mint, maxt)
+
+  <span class="hljs-keyword">from</span> scipy.stats <span class="hljs-keyword">import</span> beta <span class="hljs-keyword">as</span> fbeta
+  lo, hi = fbeta.interval(<span class="hljs-number">.68</span>, *meanVarToBeta(percentile, v))
+
+  h2 = brentq(<span class="hljs-keyword">lambda</span> now: recallProbabilityMean(alpha, beta, t, now) - lo, mint,
+              maxt)
+  h3 = brentq(<span class="hljs-keyword">lambda</span> now: recallProbabilityMean(alpha, beta, t, now) - hi, mint,
+              maxt)
 
   <span class="hljs-keyword">return</span> h, ((abs(h2 - h) + abs(h3 - h)) / <span class="hljs-number">2</span>)**<span class="hljs-number">2</span>
 </code></pre>

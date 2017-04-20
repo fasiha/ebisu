@@ -4,7 +4,7 @@
 
 - [Literate document](https://fasiha.github.io/ebisu/)
 - [GitHub repo](https://github.com/fasiha/ebisu)
-- [PyPI package](https://pypi.python.org/pypi/ebisu/0.1)
+- [PyPI package](https://pypi.python.org/pypi/ebisu/)
 
 ## Introduction
 
@@ -668,4 +668,3 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 ## Acknowledgements
 
 [Modest CSS](http://markdowncss.github.io/modest/) for Markdown
-

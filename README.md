@@ -4,6 +4,7 @@
 
 - [Literate document](https://fasiha.github.io/ebisu/)
 - [GitHub repo](https://github.com/fasiha/ebisu)
+- [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb)
 - [PyPI package](https://pypi.python.org/pypi/ebisu/)
 
 ## Introduction
@@ -68,7 +69,7 @@ Therefore, there are three major parts of this document.
 
 Install the Python library with `pip3 install ebisu` (or `pip install ebisu` if you only have Python3 🤠).
 
-Coming soon: API.
+Coming soon: API docs. In the meantime, please see this [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb).
 
 ## The math
 
@@ -667,5 +668,3 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 ## Acknowledgements
 
 [Modest CSS](http://markdowncss.github.io/modest/) for Markdown
-
-

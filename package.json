@@ -7,9 +7,12 @@
   "license": "Unlicense",
   "scripts": {
     "build": "node md2code.js",
+    "html": "cmark-gfm README.md | sed 's/\\\\&amp;/\\&/g' | yarn run mjpage | tail -n+2 > index.html",
     "test": "yarn build && python3 -m \"nose\" -v"
   },
-  "dependencies": {
-    "lodash": "^4.17.4"
+  "dependencies": {},
+  "devDependencies": {
+    "lodash": "^4.17.4",
+    "mathjax-node-page": "^1.2.7"
   }
 }

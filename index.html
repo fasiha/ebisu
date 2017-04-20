@@ -1,0 +1,2532 @@
+yarn run v0.22.0
+$ "/Users/fasih/Dropbox/ebisu/node_modules/.bin/mjpage" 
+<html><head><style type="text/css">
+                            .mjpage .MJX-monospace {
+                            font-family: monospace
+                            }
+
+                            .mjpage .MJX-sans-serif {
+                            font-family: sans-serif
+                            }
+
+                            .mjpage {
+                            display: inline;
+                            font-style: normal;
+                            font-weight: normal;
+                            line-height: normal;
+                            font-size: 100%;
+                            font-size-adjust: none;
+                            text-indent: 0;
+                            text-align: left;
+                            text-transform: none;
+                            letter-spacing: normal;
+                            word-spacing: normal;
+                            word-wrap: normal;
+                            white-space: nowrap;
+                            float: none;
+                            direction: ltr;
+                            max-width: none;
+                            max-height: none;
+                            min-width: 0;
+                            min-height: 0;
+                            border: 0;
+                            padding: 0;
+                            margin: 0
+                            }
+
+                            .mjpage * {
+                            transition: none;
+                            -webkit-transition: none;
+                            -moz-transition: none;
+                            -ms-transition: none;
+                            -o-transition: none
+                            }
+
+                            .mjx-svg-href {
+                            fill: blue;
+                            stroke: blue
+                            }
+
+                            .MathJax_SVG_LineBox {
+                            display: table!important
+                            }
+
+                            .MathJax_SVG_LineBox span {
+                            display: table-cell!important;
+                            width: 10000em!important;
+                            min-width: 0;
+                            max-width: none;
+                            padding: 0;
+                            border: 0;
+                            margin: 0
+                            }
+														
+                            .mjpage__block {
+                            text-align: center;
+                            margin: 1em 0em;
+                            position: relative;
+                            display: block!important;
+                            text-indent: 0;
+                            max-width: none;
+                            max-height: none;
+                            min-width: 0;
+                            min-height: 0;
+                            width: 100%
+                            }</style></head><body><h1>Ebisu: intelligent quiz scheduling</h1>
+<h2>Introduction</h2>
+<p>Given a set of facts that a student is memorizing,</p>
+<ul>
+<li>which facts need reviewing?, and</li>
+<li>how does the student’s performance on a quiz of those facts affect the latter’s future review schedule?</li>
+</ul>
+<p>Ebisu is a public-domain library that answers these two questions for developers writing quiz apps.</p>
+<p>It aims to provide a simple API to deal with these two aspects of scheduling quizzes.</p>
+<p>Under the hood, though, it uses a simple and powerful statistical model of forgetting. It’s recommendations are backed by principled application of Bayesian statistics.</p>
+<p>Because of this, Ebisu allows you to ask, at any given moment, “what is the probability that the student has forgotten this fact?”, and it responds with a percentage. Furthermore, Ebisu gives a <em>confidence interval</em> around that percentage, giving you an estimate of how sure it is about about its recall score (kind of a “probability about my estimated probability of recall”—meta).</p>
+<p>This opens the way for quiz applications to move away from “daily review piles” caused by scheduling algorithms that expect the student to review all the facts scheduled for that day. For instance, a student might have only five minutes to study today—an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed. Apps can also provide an infinite stream of quizzes (nightmare!) for students cramming: Ebisu intelligently updates its estimate of memory even when over-reviewing.</p>
+<p>Currently, this library comes with a Python implementation, as well as detailed mathematical notes. I plan on porting the algorithm to at least:</p>
+<ul>
+<li>JavaScript, or a compiled-to-JavaScript language, for browsers, and</li>
+<li>PostgreSQL.</li>
+</ul>
+<p>This first version was built in Python because of the numerical batteries provided by Scipy, Numpy, PyMC, etc.</p>
+<h2>How it works</h2>
+<p>There are many scheduling schemes, e.g.,</p>
+<ul>
+<li><a href="https://apps.ankiweb.net/">Anki</a>, an open-source Python flashcard app (and a closed-source mobile app),</li>
+<li>the <a href="https://www.supermemo.com/help/smalg.htm">SuperMemo</a> family of algorithms (<a href="https://apps.ankiweb.net/docs/manual.html#what-algorithm">Anki’s</a> is a derivative of SM-2),</li>
+<li><a href="https://www.memrise.com">Memrise.com</a>, a closed-source webapp,</li>
+<li><a href="https://www.duolingo.com/">Duolingo</a>, which has published a <a href="http://making.duolingo.com/how-we-learn-how-you-learn">blog entry</a> and a <a href="https://github.com/duolingo/halflife-regression">conference paper/code repo</a> on their half-life regression technique,</li>
+<li>the Leitner and Pimsleur spacing schemes (also discussed in some length in Duolingo’s paper).</li>
+</ul>
+<p>Many of these are inspired by Hermann Ebbinghaus’ discovery of the <a href="https://en.wikipedia.org/w/index.php?title=Forgetting_curve&amp;oldid=766120598#History">exponential forgetting curve</a>, published in 1885, when he was thirty-five. He <a href="https://en.wikipedia.org/w/index.php?title=Hermann_Ebbinghaus&amp;oldid=773908952#Research_on_memory">memorized random</a> consonant–vowel–consonant trigrams (‘PED’, e.g.) and found, among other things, that his recall decayed exponentially with some time-constant.</p>
+<p>Anki and SuperMemo use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little <a href="https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174">field guide</a> to Anki’s, with links to the source code—but they are optimized to minimize daily review time while maximizing retention. But because each fact has simply a date of next review, these algorithms do not gracefully accommodate over- or under-reviewing. Even when used as prescribed, they can schedule many facts for review on one day but few on others. (I must note that all three of these issues—over-reviewing (cramming), under-reviewing, and lumpy reviews—have well-supported solutions in Anki: they are tweaks on the rules.)</p>
+<p>Duolingo’s half-life regression explicitly models the probability of you recalling a fact as <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.811ex" height="2.676ex" style="vertical-align: -0.338ex;" viewBox="0 -1006.6 2501.9 1152.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-1-Title">
+<title id="MathJax-SVG-1-Title">2^{-Δ/h}</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-32" x="0" y="0"></use>
+<g transform="translate(500,393)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2212" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-394" x="778" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2F" x="1612" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-68" x="2112" y="0"></use>
+</g>
+</g>
+</svg></span>, where Δ is the time since your last review and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.339ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 576.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-2-Title">
+<title id="MathJax-SVG-2-Title">h</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-68" x="0" y="0"></use>
+</g>
+</svg></span> is a <em>half-life</em>. In this model, your chances of failing a quiz after <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.339ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 576.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-3-Title">
+<title id="MathJax-SVG-3-Title">h</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-68" x="0" y="0"></use>
+</g>
+</svg></span> days is 50%, which drops to 25% after <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.501ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 1077 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-4-Title">
+<title id="MathJax-SVG-4-Title">2 h</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-32" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-68" x="500" y="0"></use>
+</g>
+</svg></span> days. They estimate this half-life by combining your past performance and fact metadata in a machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.</p>
+<p>Like Duolingo’s approach, Ebisu can provide a sorted list of facts, from most in danger of being forgotten to least, by explicitly tracking the exponential forgetting curve. However, Ebisu formulates the problem very differently—while memory is understood to decay exponentially, Ebisu posits a <em>probability distribution</em> on the half-life and uses quiz results to continually update its beliefs about the half-life in a fully Bayesian way. These updates, while a little more computationally-burdensome than Anki’s scheduler, are much lighter-weight than Duolingo’s industrial-strength approach.</p>
+<p>This gives small quiz apps the same intelligent scheduling as Duolingo’s approach—recall probabilities for each fact—but with fast incorporation of quiz results.</p>
+<blockquote>
+<p>Nerdy details in a nutshell: Ebisu posits a <a href="https://en.wikipedia.org/wiki/Beta_distribution">Beta prior</a> on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it evaluates the <a href="http://mathworld.wolfram.com/GammaFunction.html">Gamma function</a> to predict the current recall probability. A <em>quiz</em> is modeled as a Beroulli trial, whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta posterior by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the Gamma function.</p>
+</blockquote>
+<p>Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how facts are related the way Duolingo can with its sentences. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.</p>
+<h2>This document</h2>
+<p>This document is a literate program. It contains not only source code (currently only Python; JavaScript/compile-to-JavaScript and PostgreSQL versions are planned), but also an explanation of the statistics and mathematics underlying the algorithm.</p>
+<p>Therefore, there are three major parts of this document.</p>
+<ol>
+<li>A brief “too long; didn’t read” section that helps you get going with the library, with minimum of fuss.</li>
+<li>The math—if you like Beta-distributed random variables, conjugate priors, and marginalization, you’ll want to read this part. If you don’t, I’ll highlight the formulas that Ebisu actually implements.</li>
+<li>And finally, the source code itself, annotated and explained. If you want to hack on Ebisu’s code, this is the section for you.</li>
+</ol>
+<h2>TL;DR</h2>
+<p>Setup instructions go here</p>
+<h2>The math</h2>
+<p>Let’s begin with a quiz. One way or another, we’ve picked a fact to quiz the student on, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-5-Title">
+<title id="MathJax-SVG-5-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span> days (the units are arbitrary since <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-6-Title">
+<title id="MathJax-SVG-6-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span> can be any positive real number) after her last quiz on it, or since she learned it for the first time.</p>
+<p>We’ll model the results of the quiz as a <a href="https://en.wikipedia.org/wiki/Bernoulli_distribution">Bernoulli experiment</a>, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="18.326ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7890.2 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-7-Title">
+<title id="MathJax-SVG-7-Title">x_t ∼ Bernoulli(π)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="809" y="-213"></use>
+ <use xlink:href="#MJMAIN-223C" x="1205" y="0"></use>
+ <use xlink:href="#MJMATHI-42" x="2262" y="0"></use>
+ <use xlink:href="#MJMATHI-65" x="3021" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="3488" y="0"></use>
+ <use xlink:href="#MJMATHI-6E" x="3939" y="0"></use>
+ <use xlink:href="#MJMATHI-6F" x="4540" y="0"></use>
+ <use xlink:href="#MJMATHI-75" x="5025" y="0"></use>
+ <use xlink:href="#MJMATHI-6C" x="5598" y="0"></use>
+ <use xlink:href="#MJMATHI-6C" x="5896" y="0"></use>
+ <use xlink:href="#MJMATHI-69" x="6195" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="6540" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="6930" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="7500" y="0"></use>
+</g>
+</svg></span>; <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.156ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 928.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-8-Title">
+<title id="MathJax-SVG-8-Title">x_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="809" y="-213"></use>
+</g>
+</svg></span> can be either 1 (success) with probability <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-9-Title">
+<title id="MathJax-SVG-9-Title">π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</svg></span>, or 0 (fail) with probability <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="6.154ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 2649.6 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-10-Title">
+<title id="MathJax-SVG-10-Title">1-π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-31" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="722" y="0"></use>
+<g transform="translate(1723,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</g>
+</svg></span>. Let’s think about <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-11-Title">
+<title id="MathJax-SVG-11-Title">π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</svg></span> as the recall probability at time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-12-Title">
+<title id="MathJax-SVG-12-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span>—then <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.156ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 928.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-13-Title">
+<title id="MathJax-SVG-13-Title">x_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="809" y="-213"></use>
+</g>
+</svg></span> is a coin flip, with a <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-14-Title">
+<title id="MathJax-SVG-14-Title">π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</svg></span>-weighted coin.</p>
+<p>The <a href="https://en.wikipedia.org/wiki/Beta_distribution">Beta distribution</a> happens to be the <a href="https://en.wikipedia.org/wiki/Conjugate_prior">conjugate prior</a> for the Bernoulli distribution. So if our <em>a priori</em> belief about <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-15-Title">
+<title id="MathJax-SVG-15-Title">π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</svg></span> follow a Beta distribution, that is, if
+<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.465ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7519.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-16-Title">
+<title id="MathJax-SVG-16-Title">π_t ∼ Beta(α_t, β_t)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+ <use xlink:href="#MJMAIN-223C" x="1203" y="0"></use>
+ <use xlink:href="#MJMATHI-42" x="2260" y="0"></use>
+ <use xlink:href="#MJMATHI-65" x="3019" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="3486" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="3847" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="4377" y="0"></use>
+<g transform="translate(4766,0)">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="905" y="-213"></use>
+</g>
+ <use xlink:href="#MJMAIN-2C" x="5762" y="0"></use>
+<g transform="translate(6207,0)">
+ <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="801" y="-326"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="7130" y="0"></use>
+</g>
+</svg></span>
+for specific <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.314ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 996.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-17-Title">
+<title id="MathJax-SVG-17-Title">α_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="905" y="-213"></use>
+</g>
+</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.142ex" height="2.676ex" style="vertical-align: -0.838ex;" viewBox="0 -791.3 922.1 1152.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-18-Title">
+<title id="MathJax-SVG-18-Title">β_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="801" y="-326"></use>
+</g>
+</svg></span>, then observing the quiz result updates our belief about the recall probability to be:
+<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.909ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 15030.3 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-19-Title">
+<title id="MathJax-SVG-19-Title">π_t | x_t ∼ Beta(α_t + x_t, β_t + 1 - x_t).</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+ <use xlink:href="#MJMAIN-7C" x="926" y="0"></use>
+<g transform="translate(1204,0)">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="809" y="-213"></use>
+</g>
+ <use xlink:href="#MJMAIN-223C" x="2410" y="0"></use>
+ <use xlink:href="#MJMATHI-42" x="3466" y="0"></use>
+ <use xlink:href="#MJMATHI-65" x="4226" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="4692" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="5054" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="5583" y="0"></use>
+<g transform="translate(5973,0)">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="905" y="-213"></use>
+</g>
+ <use xlink:href="#MJMAIN-2B" x="7191" y="0"></use>
+<g transform="translate(8192,0)">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="809" y="-213"></use>
+</g>
+ <use xlink:href="#MJMAIN-2C" x="9120" y="0"></use>
+<g transform="translate(9565,0)">
+ <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="801" y="-326"></use>
+</g>
+ <use xlink:href="#MJMAIN-2B" x="10709" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="11710" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="12433" y="0"></use>
+<g transform="translate(13434,0)">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="809" y="-213"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="14362" y="0"></use>
+ <use xlink:href="#MJMAIN-2E" x="14751" y="0"></use>
+</g>
+</svg></span></p>
+<blockquote>
+<p><strong>Aside 1</strong> Notice that since <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.156ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 928.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-20-Title">
+<title id="MathJax-SVG-20-Title">x_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="809" y="-213"></use>
+</g>
+</svg></span> is either 1 or 0, the updated parameters <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="19.642ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 8456.7 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-21-Title">
+<title id="MathJax-SVG-21-Title">(α + x_t, β + 1 - x_t)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-28" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="389" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="1252" y="0"></use>
+<g transform="translate(2252,0)">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="809" y="-213"></use>
+</g>
+ <use xlink:href="#MJMAIN-2C" x="3181" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="3626" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="4414" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="5415" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="6138" y="0"></use>
+<g transform="translate(7139,0)">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="809" y="-213"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="8067" y="0"></use>
+</g>
+</svg></span> are <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.649ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4154.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-22-Title">
+<title id="MathJax-SVG-22-Title">(α + 1, β)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-28" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="389" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="1252" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="2252" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="2753" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="3198" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="3765" y="0"></use>
+</g>
+</svg></span> when the student correctly answered the quiz, and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.649ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4154.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-23-Title">
+<title id="MathJax-SVG-23-Title">(α, β + 1)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-28" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="389" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="1030" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1475" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="2263" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="3264" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="3765" y="0"></use>
+</g>
+</svg></span> when she answered incorrectly.</p>
+<p><strong>Aside 2</strong> Even if you’re familiar with Bayesian statistics, if you’ve never worked with priors on probabilities, the meta-ness here might confuse you. What the above means is that, before we flipped our <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-24-Title">
+<title id="MathJax-SVG-24-Title">π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</svg></span>-weighted coin (before we administered the quiz), we had a specific probability distribution representing the coin’s weighting <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-25-Title">
+<title id="MathJax-SVG-25-Title">π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</svg></span>, <em>not</em> just a scalar number. After we observed the result of the coin flip, we updated our belief about the coin’s weighting—it <em>still</em> makes total sense to talk about the probability of something happening after it happens. Said another way, since we’re being Bayesian, something actually happening doesn’t preclude us from maintaining beliefs about what <em>could</em> have happened.</p>
+</blockquote>
+<p>This is totally ordinary, bread-and-butter Bayesian statistics. However, the major complication arises when the experiment took place not at time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-26-Title">
+<title id="MathJax-SVG-26-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span> but <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.894ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 815.4 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-27-Title">
+<title id="MathJax-SVG-27-Title">t_2</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
+</g>
+</svg></span>? That is, we have a Beta prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-28-Title">
+<title id="MathJax-SVG-28-Title">π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</svg></span> (probability of  recall at time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-29-Title">
+<title id="MathJax-SVG-29-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span>) but the test is administered at some other time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.894ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 815.4 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-30-Title">
+<title id="MathJax-SVG-30-Title">t_2</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
+</g>
+</svg></span>.</p>
+<p>How can we update our beliefs about the recall probability at time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-31-Title">
+<title id="MathJax-SVG-31-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span> to another time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.894ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 815.4 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-32-Title">
+<title id="MathJax-SVG-32-Title">t_2</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
+</g>
+</svg></span>, either earlier or later than <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-33-Title">
+<title id="MathJax-SVG-33-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span>?</p>
+<p>Our old friend Ebbinghaus comes to our rescue. According to the exponentially-decaying forgetting curve, the probability of recall at time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-34-Title">
+<title id="MathJax-SVG-34-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span> is
+<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.932ex" height="3.176ex" style="vertical-align: -0.671ex;" viewBox="0 -1078.4 4706.8 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-35-Title">
+<title id="MathJax-SVG-35-Title">π_t = 2^{-t/h},</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+ <use xlink:href="#MJMAIN-3D" x="1203" y="0"></use>
+<g transform="translate(2260,0)">
+ <use xlink:href="#MJMAIN-32" x="0" y="0"></use>
+<g transform="translate(500,412)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2212" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="778" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2F" x="1140" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-68" x="1640" y="0"></use>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-2C" x="4428" y="0"></use>
+</g>
+</svg></span>
+for some notional half-life <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.339ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 576.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-36-Title">
+<title id="MathJax-SVG-36-Title">h</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-68" x="0" y="0"></use>
+</g>
+</svg></span>. Let <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="8.543ex" height="2.676ex" style="vertical-align: -0.671ex;" viewBox="0 -863.1 3678.4 1152.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-37-Title">
+<title id="MathJax-SVG-37-Title">t_2 = δ·t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
+ <use xlink:href="#MJMAIN-3D" x="1093" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="2149" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="2816" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="3316" y="0"></use>
+</g>
+</svg></span>. Then,
+<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="37.4ex" height="3.509ex" style="vertical-align: -1.005ex;" viewBox="0 -1078.4 16102.7 1510.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-38-Title">
+<title id="MathJax-SVG-38-Title">π_{t_2} = π_{δ t} = 2^{-δt/h} = (2^{-t/h})^δ = (π_t)^δ.</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+<g transform="translate(570,-150)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="0" y="0"></use>
+ <use transform="scale(0.574)" xlink:href="#MJMAIN-32" x="445" y="-243"></use>
+</g>
+ <use xlink:href="#MJMAIN-3D" x="1561" y="0"></use>
+<g transform="translate(2618,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+<g transform="translate(570,-164)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="444" y="0"></use>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-3D" x="4136" y="0"></use>
+<g transform="translate(5192,0)">
+ <use xlink:href="#MJMAIN-32" x="0" y="0"></use>
+<g transform="translate(500,412)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2212" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="778" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="1223" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2F" x="1584" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-68" x="2085" y="0"></use>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-3D" x="7952" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="9009" y="0"></use>
+<g transform="translate(9398,0)">
+ <use xlink:href="#MJMAIN-32" x="0" y="0"></use>
+<g transform="translate(500,412)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2212" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="778" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2F" x="1140" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-68" x="1640" y="0"></use>
+</g>
+</g>
+<g transform="translate(11566,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="550" y="583"></use>
+</g>
+ <use xlink:href="#MJMAIN-3D" x="12648" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="13704" y="0"></use>
+<g transform="translate(14094,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+<g transform="translate(15020,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="550" y="583"></use>
+</g>
+ <use xlink:href="#MJMAIN-2E" x="15824" y="0"></use>
+</g>
+</svg></span>
+That is, to fast-forward or rewind <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-39-Title">
+<title id="MathJax-SVG-39-Title">π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</svg></span> to time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.894ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 815.4 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-40-Title">
+<title id="MathJax-SVG-40-Title">t_2</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
+</g>
+</svg></span>, we raise it to the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="8.027ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 3456 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-41-Title">
+<title id="MathJax-SVG-41-Title">δ = t_2 / t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
+<g transform="translate(1778,0)">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
+</g>
+ <use xlink:href="#MJMAIN-2F" x="2593" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="3094" y="0"></use>
+</g>
+</svg></span> power.</p>
+<p>Unfortunately, a Beta-distributed <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-42-Title">
+<title id="MathJax-SVG-42-Title">π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</svg></span> becomes not-Beta-distributed when raised to any positive power <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-43-Title">
+<title id="MathJax-SVG-43-Title">δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+</g>
+</svg></span>.</p>
+<p>In the code snippet below, we start out with <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.659ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7603.3 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-44-Title">
+<title id="MathJax-SVG-44-Title">π_t ∼ Beta(12, 12)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+ <use xlink:href="#MJMAIN-223C" x="1203" y="0"></use>
+ <use xlink:href="#MJMATHI-42" x="2260" y="0"></use>
+ <use xlink:href="#MJMATHI-65" x="3019" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="3486" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="3847" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="4377" y="0"></use>
+<g transform="translate(4766,0)">
+ <use xlink:href="#MJMAIN-31"></use>
+ <use xlink:href="#MJMAIN-32" x="500" y="0"></use>
+</g>
+ <use xlink:href="#MJMAIN-2C" x="5767" y="0"></use>
+<g transform="translate(6212,0)">
+ <use xlink:href="#MJMAIN-31"></use>
+ <use xlink:href="#MJMAIN-32" x="500" y="0"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="7213" y="0"></use>
+</g>
+</svg></span> and show the distribution of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.287ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 984.8 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-45-Title">
+<title id="MathJax-SVG-45-Title">π_t^δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+</svg></span> for various <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-46-Title">
+<title id="MathJax-SVG-46-Title">δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+</g>
+</svg></span>. To make it concrete, imagine <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-47-Title">
+<title id="MathJax-SVG-47-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span> is seven days. The <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="12.41ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 5343.2 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-48-Title">
+<title id="MathJax-SVG-48-Title">Beta(12, 12)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-42" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-65" x="759" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="1226" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="1587" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="2117" y="0"></use>
+<g transform="translate(2506,0)">
+ <use xlink:href="#MJMAIN-31"></use>
+ <use xlink:href="#MJMAIN-32" x="500" y="0"></use>
+</g>
+ <use xlink:href="#MJMAIN-2C" x="3507" y="0"></use>
+<g transform="translate(3952,0)">
+ <use xlink:href="#MJMAIN-31"></use>
+ <use xlink:href="#MJMAIN-32" x="500" y="0"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="4953" y="0"></use>
+</g>
+</svg></span> prior on recall probability seven days after the last review is the middle histogram (<span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.293ex" height="2.343ex" style="vertical-align: -0.338ex;" viewBox="0 -863.1 2279.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-49-Title">
+<title id="MathJax-SVG-49-Title">δ = 1</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="1778" y="0"></use>
+</g>
+</svg></span>). If the student is quizzed on this fact just two days after last review (<span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="7.103ex" height="2.343ex" style="vertical-align: -0.338ex;" viewBox="0 -863.1 3058.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-50-Title">
+<title id="MathJax-SVG-50-Title">δ=0.3</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
+<g transform="translate(1778,0)">
+ <use xlink:href="#MJMAIN-30"></use>
+ <use xlink:href="#MJMAIN-2E" x="500" y="0"></use>
+ <use xlink:href="#MJMAIN-33" x="779" y="0"></use>
+</g>
+</g>
+</svg></span>), that density moves from the middle of the plot to the right, meaning a high probability of recall. However, if the student is quizzed three weeks after review, the original density moves to the left: it’s likely the student will fail the quiz.</p>
+<pre><code class="language-py">import matplotlib.pyplot as plt
+plt.style.use('ggplot')
+plt.rcParams['svg.fonttype'] = 'none'
+
+
+def generatePis(deltaT, alpha=12.0, beta=12.0):
+  import scipy.stats as stats
+  import numpy as np
+  from scipy.special import beta as fbeta
+
+  piT = stats.beta.rvs(alpha, beta, size=50 * 1000)
+  piT2 = piT**deltaT
+
+  plt.hist(piT2, bins=20, label='δ={}'.format(deltaT), alpha=0.25, normed=True)
+  # p = np.linspace(0, 1, num=1000)
+  # a, b, _, _ = stats.beta.fit(piT2, floc=0, fscale=1)
+  # plt.plot(p, stats.beta.pdf(p, a, b), ls='dotted', lw=4, alpha=0.5, color='0.5')
+  # pr = lambda a,b,d,p: p**((a-d)/d) * (1-p**(1/d))**(b-1) / d / fbeta(a,b)
+  # plt.plot(p, pr(alpha,beta,deltaT,p), ls='dashed', color='0.25', alpha=0.35)
+
+  return piT2
+
+
+generatePis(0.3)
+generatePis(1.)
+generatePis(3.)
+plt.xlabel('π (recall probability)')
+plt.ylabel('Probability(π)')
+plt.title('Histograms of π_t^δ for different δ')
+plt.legend(loc=0)
+plt.savefig('figures/pidelta.svg')
+plt.savefig('figures/pidelta.png', dpi=150)
+plt.show()
+</code></pre>
+<p><img src="figures/pidelta.png" alt="figures/pidelta.png"></p>
+<p>You’ll have to take my word for it that the histograms where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.293ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 2279.1 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-51-Title">
+<title id="MathJax-SVG-51-Title">δ≠1</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-2260" x="722" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="1778" y="0"></use>
+</g>
+</svg></span> as indeed not Beta. I initially fit a Beta distribution to them and sought to make this point visually but alas, for reasonable values of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.488ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 640.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-52-Title">
+<title id="MathJax-SVG-52-Title">α</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+</g>
+</svg></span>, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.332ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 573.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-53-Title">
+<title id="MathJax-SVG-53-Title">β</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
+</g>
+</svg></span>, and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-54-Title">
+<title id="MathJax-SVG-54-Title">δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+</g>
+</svg></span>, a histogram for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.287ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 984.8 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-55-Title">
+<title id="MathJax-SVG-55-Title">π_t^δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+</svg></span> was well-matched by a Beta distribution.</p>
+<p>So let’s derive analytically the probability density function (PDF) for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.287ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 984.8 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-56-Title">
+<title id="MathJax-SVG-56-Title">π_t^δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+</svg></span>. Recall the conventional way to obtain the density of a <a href="https://en.wikipedia.org/w/index.php?title=Random_variable&amp;oldid=771423505#Functions_of_random_variables">nonlinearly-transformed random variable</a>: let <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="6.579ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 2832.7 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-57-Title">
+<title id="MathJax-SVG-57-Title">x=π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="850" y="0"></use>
+<g transform="translate(1906,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</g>
+</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.899ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 5984.4 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-58-Title">
+<title id="MathJax-SVG-58-Title">y = g(x) = x^δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-79" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="775" y="0"></use>
+ <use xlink:href="#MJMATHI-67" x="1831" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="2312" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="2701" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="3274" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="3941" y="0"></use>
+<g transform="translate(4997,0)">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="809" y="513"></use>
+</g>
+</g>
+</svg></span> be the forward transform, so <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.45ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 5791 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-59-Title">
+<title id="MathJax-SVG-59-Title">g^{-1}(y) = x^{1/δ}</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-67" x="0" y="0"></use>
+<g transform="translate(481,362)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2212" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="778" y="0"></use>
+</g>
+ <use xlink:href="#MJMAIN-28" x="1485" y="0"></use>
+ <use xlink:href="#MJMATHI-79" x="1875" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="2372" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="3040" y="0"></use>
+<g transform="translate(4096,0)">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+<g transform="translate(572,362)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2F" x="500" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="1001" y="0"></use>
+</g>
+</g>
+</g>
+</svg></span> is its inverse. Then, with <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.33ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 572.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-60-Title">
+<title id="MathJax-SVG-60-Title">x</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+</g>
+</svg></span> being <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.564ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4548.2 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-61-Title">
+<title id="MathJax-SVG-61-Title">Beta(α,β)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-42" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-65" x="759" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="1226" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="1587" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="2117" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="2506" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="3147" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="3592" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="4158" y="0"></use>
+</g>
+</svg></span>,
+<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="31.383ex" height="6.009ex" style="vertical-align: -2.505ex;" viewBox="0 -1508.9 13512.2 2587.3" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-62-Title">
+<title id="MathJax-SVG-62-Title">P_{Y}(y) = P_{x}(g^{-1}(y)) · \frac{∂}{∂y} g^{-1}(y),</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-59" x="908" y="-213"></use>
+ <use xlink:href="#MJMAIN-28" x="1282" y="0"></use>
+ <use xlink:href="#MJMATHI-79" x="1671" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="2169" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="2836" y="0"></use>
+<g transform="translate(3892,0)">
+ <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-78" x="908" y="-213"></use>
+</g>
+ <use xlink:href="#MJMAIN-28" x="5040" y="0"></use>
+<g transform="translate(5429,0)">
+ <use xlink:href="#MJMATHI-67" x="0" y="0"></use>
+<g transform="translate(481,412)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2212" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="778" y="0"></use>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-28" x="6915" y="0"></use>
+ <use xlink:href="#MJMATHI-79" x="7305" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="7802" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="8192" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="8803" y="0"></use>
+<g transform="translate(9082,0)">
+<g transform="translate(120,0)">
+<rect stroke="none" width="1149" height="60" x="0" y="220"></rect>
+ <use xlink:href="#MJMAIN-2202" x="308" y="676"></use>
+<g transform="translate(60,-736)">
+ <use xlink:href="#MJMAIN-2202" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-79" x="531" y="0"></use>
+</g>
+</g>
+</g>
+<g transform="translate(10471,0)">
+ <use xlink:href="#MJMATHI-67" x="0" y="0"></use>
+<g transform="translate(481,412)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2212" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="778" y="0"></use>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-28" x="11957" y="0"></use>
+ <use xlink:href="#MJMATHI-79" x="12346" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="12844" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="13233" y="0"></use>
+</g>
+</svg></span>
+and this after some Wolfram Alpha and hand-manipulation becomes
+<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="44.588ex" height="3.343ex" style="vertical-align: -0.838ex;" viewBox="0 -1078.4 19197.6 1439.2" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-63-Title">
+<title id="MathJax-SVG-63-Title">P_{Y}(y) = y^{(α-δ)/δ} · (1-y^{1/δ})^{β-1} / (δ · B(α, β)),</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-59" x="908" y="-213"></use>
+ <use xlink:href="#MJMAIN-28" x="1282" y="0"></use>
+ <use xlink:href="#MJMATHI-79" x="1671" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="2169" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="2836" y="0"></use>
+<g transform="translate(3892,0)">
+ <use xlink:href="#MJMATHI-79" x="0" y="0"></use>
+<g transform="translate(499,412)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-28" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B1" x="389" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2212" x="1030" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="1808" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-29" x="2253" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2F" x="2642" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="3143" y="0"></use>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-22C5" x="7251" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="7752" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="8141" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="8864" y="0"></use>
+<g transform="translate(9865,0)">
+ <use xlink:href="#MJMATHI-79" x="0" y="0"></use>
+<g transform="translate(499,412)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2F" x="500" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="1001" y="0"></use>
+</g>
+</g>
+<g transform="translate(11486,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+<g transform="translate(389,412)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2212" x="566" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="1345" y="0"></use>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-2F" x="13281" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="13781" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="14171" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="14838" y="0"></use>
+ <use xlink:href="#MJMATHI-42" x="15338" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="16098" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="16487" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="17128" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="17573" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="18140" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="18529" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="18919" y="0"></use>
+</g>
+</svg></span>
+where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="31.584ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 13598.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-64-Title">
+<title id="MathJax-SVG-64-Title">B(α, β) = Γ(α) · Γ(β) / Γ(α + β)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-42" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="759" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="1149" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="1789" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="2234" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="2801" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="3468" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="4524" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="5150" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="5539" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="6180" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="6791" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="7292" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="7918" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="8307" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="8874" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="9263" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="9764" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="10389" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="10779" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="11641" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="12642" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="13209" y="0"></use>
+</g>
+</svg></span> is <a href="https://en.wikipedia.org/wiki/Beta_function">beta function</a>, also the normalizing denominator in the Beta density (very confusing, sorry; here <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="3.909ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 1683 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-65-Title">
+<title id="MathJax-SVG-65-Title">Γ(·)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-393" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="625" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="1015" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="1293" y="0"></use>
+</g>
+</svg></span> denotes the <a href="https://en.wikipedia.org/wiki/Gamma_function">gamma function</a>, which is a generalization of factorial).</p>
+<blockquote>
+<p>To check this, type in <code>y^((a-1)/d) * (1 - y^(1/d))^(b-1) / Beta[a,b] * D[y^(1/d), y]</code> at <a href="https://www.wolframalpha.com">Wolfram Alpha</a>.</p>
+</blockquote>
+<p>Replacing the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.98ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 852.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-66-Title">
+<title id="MathJax-SVG-66-Title">X</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-58" x="0" y="0"></use>
+</g>
+</svg></span>’s and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.773ex" height="2.009ex" style="vertical-align: -0.171ex;" viewBox="0 -791.3 763.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-67-Title">
+<title id="MathJax-SVG-67-Title">Y</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-59" x="0" y="0"></use>
+</g>
+</svg></span>’s with our usual variables, we have the probability density for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="8.368ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 3603 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-68-Title">
+<title id="MathJax-SVG-68-Title">π_{t_2} = π_t^δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+<g transform="translate(570,-150)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="0" y="0"></use>
+ <use transform="scale(0.574)" xlink:href="#MJMAIN-32" x="445" y="-243"></use>
+</g>
+ <use xlink:href="#MJMAIN-3D" x="1561" y="0"></use>
+<g transform="translate(2618,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+</g>
+</svg></span> in terms of the original density for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-69-Title">
+<title id="MathJax-SVG-69-Title">π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</svg></span>:
+<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="32.558ex" height="6.843ex" style="vertical-align: -2.671ex;" viewBox="0 -1796 14018.1 2946.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-70-Title">
+<title id="MathJax-SVG-70-Title">P(π_t^δ) = \frac{π^{(α - δ)/δ} · (1-π^{1/δ})^{β-1}}{δ · B(α, β)}.</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="751" y="0"></use>
+<g transform="translate(1141,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="2125" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="2793" y="0"></use>
+<g transform="translate(3571,0)">
+<g transform="translate(397,0)">
+<rect stroke="none" width="9650" height="60" x="0" y="220"></rect>
+<g transform="translate(60,770)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+<g transform="translate(570,362)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-28" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B1" x="389" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2212" x="1030" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="1808" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-29" x="2253" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2F" x="2642" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="3143" y="0"></use>
+</g>
+ <use xlink:href="#MJMAIN-22C5" x="3429" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="3930" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="4319" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="5042" y="0"></use>
+<g transform="translate(6043,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+<g transform="translate(570,362)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2F" x="500" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="1001" y="0"></use>
+</g>
+</g>
+<g transform="translate(7735,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+<g transform="translate(389,362)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2212" x="566" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="1345" y="0"></use>
+</g>
+</g>
+</g>
+<g transform="translate(2646,-771)">
+ <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="666" y="0"></use>
+ <use xlink:href="#MJMATHI-42" x="1167" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="1926" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="2316" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="2956" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="3402" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="3968" y="0"></use>
+</g>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-2E" x="13739" y="0"></use>
+</g>
+</svg></span>
+I tried but failed to rewrite this as a Beta distribution, and indeed, we can show numerically that this density does indeed diverge from the best-approximating Beta density.</p>
+<p>We will use the density of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.287ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 984.8 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-71-Title">
+<title id="MathJax-SVG-71-Title">π_t^δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+</svg></span> to reach our two most important goals:</p>
+<ul>
+<li>what’s the recall probability of a given fact right now?, and</li>
+<li>how do I update my estimate of that recall probability given quiz results?</li>
+</ul>
+<p>Let’s see how to get the recall probability right now. Recall that we start out with a prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="15.813ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 6808.3 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-72-Title">
+<title id="MathJax-SVG-72-Title">π_t ∼ Beta(α, β)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+ <use xlink:href="#MJMAIN-223C" x="1203" y="0"></use>
+ <use xlink:href="#MJMATHI-42" x="2260" y="0"></use>
+ <use xlink:href="#MJMATHI-65" x="3019" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="3486" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="3847" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="4377" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="4766" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="5407" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="5852" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="6418" y="0"></use>
+</g>
+</svg></span>, that is, we believe the recall probability on a quiz conducted <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-73-Title">
+<title id="MathJax-SVG-73-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span> days after the last review for a given fact is <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.564ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4548.2 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-74-Title">
+<title id="MathJax-SVG-74-Title">Beta(α, β)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-42" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-65" x="759" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="1226" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="1587" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="2117" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="2506" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="3147" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="3592" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="4158" y="0"></use>
+</g>
+</svg></span>-distributed. This prior is parameterized by three positive real numbers: <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="7.005ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 3015.8 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-75-Title">
+<title id="MathJax-SVG-75-Title">[α, β, t]</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-5B" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="278" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="919" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1364" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="1930" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="2375" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="2737" y="0"></use>
+</g>
+</svg></span>. Let <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-76-Title">
+<title id="MathJax-SVG-76-Title">δ = t_{now} / t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
+<g transform="translate(1778,0)">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+<g transform="translate(361,-150)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6F" x="600" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-2F" x="3514" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="4015" y="0"></use>
+</g>
+</svg></span>, where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.032ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 1736.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-77-Title">
+<title id="MathJax-SVG-77-Title">t_{now}</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+<g transform="translate(361,-150)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6F" x="600" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
+</g>
+</g>
+</svg></span> is the time currently elapsed since the last review. The expected recall probability right now is
+<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.889ex" height="12.843ex" style="vertical-align: -5.838ex;" viewBox="0 -3015.9 15021.7 5529.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-78-Title">
+<title id="MathJax-SVG-78-Title">\begin{align}
+E[π_t^δ] &amp;= \int_0^1 P(π_t^δ) · π \, dπ \\
+&amp;= \frac{Γ(α + β)}{Γ(α)} · \frac{Γ(α + δ)}{Γ(α + β + δ)}.
+\end{align}</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+<g transform="translate(167,0)">
+<g transform="translate(-11,0)">
+<g transform="translate(0,1347)">
+ <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
+<g transform="translate(1043,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="2027" y="0"></use>
+</g>
+</g>
+<g transform="translate(2295,0)">
+<g transform="translate(0,1347)">
+ <use xlink:href="#MJMAIN-3D" x="277" y="0"></use>
+<g transform="translate(1334,0)">
+ <use xlink:href="#MJSZ2-222B" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="1500" y="1540"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="787" y="-1270"></use>
+</g>
+ <use xlink:href="#MJMATHI-50" x="3015" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="3767" y="0"></use>
+<g transform="translate(4156,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="5141" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="5753" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="6253" y="0"></use>
+ <use xlink:href="#MJMATHI-64" x="6990" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="7514" y="0"></use>
+</g>
+<g transform="translate(0,-1388)">
+ <use xlink:href="#MJMAIN-3D" x="277" y="0"></use>
+<g transform="translate(1056,0)">
+<g transform="translate(397,0)">
+<rect stroke="none" width="3954" height="60" x="0" y="220"></rect>
+<g transform="translate(60,770)">
+ <use xlink:href="#MJMAIN-393" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="625" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="1015" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="1877" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="2878" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="3444" y="0"></use>
+</g>
+<g transform="translate(954,-771)">
+ <use xlink:href="#MJMAIN-393" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="625" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="1015" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="1655" y="0"></use>
+</g>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-22C5" x="5750" y="0"></use>
+<g transform="translate(6029,0)">
+<g transform="translate(342,0)">
+<rect stroke="none" width="5621" height="60" x="0" y="220"></rect>
+<g transform="translate(954,770)">
+ <use xlink:href="#MJMAIN-393" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="625" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="1015" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="1877" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="2878" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="3322" y="0"></use>
+</g>
+<g transform="translate(60,-771)">
+ <use xlink:href="#MJMAIN-393" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="625" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="1015" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="1877" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="2878" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="3667" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="4667" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="5112" y="0"></use>
+</g>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-2E" x="12113" y="0"></use>
+</g>
+</g>
+</g>
+</g>
+</svg></span></p>
+<blockquote>
+<p>Mathematica code to verify on Wolfram Alpha: <code>Integrate[p^((a - d)/d) * (1 - p^(1/d))^(b - 1) / (d * Gamma[a]*Gamma[b]/Gamma[a+b]) * p, {p, 0, 1}]</code>.</p>
+</blockquote>
+<p>It’s also useful to know how much uncertainty is in our belief about <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.287ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 984.8 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-79-Title">
+<title id="MathJax-SVG-79-Title">π_t^δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+</svg></span>. We can evaluate the variance of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.287ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 984.8 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-80-Title">
+<title id="MathJax-SVG-80-Title">π_t^δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+</svg></span>:
+<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="38.237ex" height="9.676ex" style="vertical-align: -4.003ex; margin-bottom: -0.335ex;" viewBox="0 -2298.3 16463 4166" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-81-Title">
+<title id="MathJax-SVG-81-Title">\begin{align}
+Var[π_t^δ] &amp;= \int_0^1 P(π_t^δ) · (π - E[π_t^δ])^2 \, dπ \\
+&amp;= E[π_t^{2 δ}] - (E[π_t^δ])^2.
+\end{align}</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+<g transform="translate(167,0)">
+<g transform="translate(-11,0)">
+<g transform="translate(0,662)">
+ <use xlink:href="#MJMATHI-56" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="769" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="1299" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="1750" y="0"></use>
+<g transform="translate(2029,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="3013" y="0"></use>
+</g>
+</g>
+<g transform="translate(3281,0)">
+<g transform="translate(0,662)">
+ <use xlink:href="#MJMAIN-3D" x="277" y="0"></use>
+<g transform="translate(1334,0)">
+ <use xlink:href="#MJSZ2-222B" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="1500" y="1540"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="787" y="-1270"></use>
+</g>
+ <use xlink:href="#MJMATHI-50" x="3015" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="3767" y="0"></use>
+<g transform="translate(4156,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="5141" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="5753" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="6253" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="6643" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="7436" y="0"></use>
+ <use xlink:href="#MJMATHI-45" x="8436" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="9201" y="0"></use>
+<g transform="translate(9479,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="10464" y="0"></use>
+<g transform="translate(10743,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="583"></use>
+</g>
+ <use xlink:href="#MJMATHI-64" x="11753" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="12276" y="0"></use>
+</g>
+<g transform="translate(0,-1437)">
+ <use xlink:href="#MJMAIN-3D" x="277" y="0"></use>
+ <use xlink:href="#MJMATHI-45" x="1334" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="2098" y="0"></use>
+<g transform="translate(2377,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+<g transform="translate(570,352)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="500" y="0"></use>
+</g>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="3715" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="4216" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="5217" y="0"></use>
+ <use xlink:href="#MJMATHI-45" x="5606" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="6371" y="0"></use>
+<g transform="translate(6649,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="7634" y="0"></use>
+<g transform="translate(7913,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="583"></use>
+</g>
+ <use xlink:href="#MJMAIN-2E" x="8756" y="0"></use>
+</g>
+</g>
+</g>
+</g>
+</svg></span></p>
+<p>That first value <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="6.179ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 2660.2 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-82-Title">
+<title id="MathJax-SVG-82-Title">E[π_t^{2 δ}]</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
+<g transform="translate(1043,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+<g transform="translate(570,352)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="500" y="0"></use>
+</g>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="2381" y="0"></use>
+</g>
+</svg></span> means evaluate the expected recall probability for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.211ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 952 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-83-Title">
+<title id="MathJax-SVG-83-Title">2 δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-32" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="500" y="0"></use>
+</g>
+</svg></span>, that is, at another <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.032ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 1736.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-84-Title">
+<title id="MathJax-SVG-84-Title">t_{now}</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+<g transform="translate(361,-150)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6F" x="600" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
+</g>
+</g>
+</svg></span> days in the future. It might be just coincidence but the fact that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.211ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 952 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-85-Title">
+<title id="MathJax-SVG-85-Title">2 δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-32" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="500" y="0"></use>
+</g>
+</svg></span> shows up in this way surprised me.</p>
+<blockquote>
+<p>Verifying this in Mathematica/Wolfram Alpha is a bit more involved. First,
+<code>Assuming[a&gt;0 &amp;&amp; b&gt;0 &amp;&amp; t&gt;0, {Integrate[p^((a - d)/d) * (1 - p^(1/d))^(b - 1) / (d * Gamma[a]*Gamma[b]/Gamma[a+b]) * (p-m)^2, {p, 0, 1}]}]</code> gives the result in terms of mean <code>m</code> = <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.357ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 2306.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-86-Title">
+<title id="MathJax-SVG-86-Title">E[π_t^δ]</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
+<g transform="translate(1043,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="2027" y="0"></use>
+</g>
+</svg></span>. Then plug in that value for <code>m</code> and simplify by hand.</p>
+</blockquote>
+<p>So far we have found three analytical expressions. Suffice it to say that I tested both the derivations as well as my implementations of them in the code thoroughly to confirm that they matched the answers given by quadrature integration as well as Monte Carlo analysis. Code to do that is provided below, and when I present it, I will show how the above formulae are corroborated.</p>
+<p>A quiz app can implement at least the expectation <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.357ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 2306.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-87-Title">
+<title id="MathJax-SVG-87-Title">E[π_t^δ]</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
+<g transform="translate(1043,0)">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="2027" y="0"></use>
+</g>
+</svg></span> above to identify the facts most at risk of being forgotten.</p>
+<p><strong>Important aside</strong> Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="7.005ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 3015.8 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-88-Title">
+<title id="MathJax-SVG-88-Title">[α, β, t]</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-5B" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="278" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="919" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1364" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="1930" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="2375" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="2737" y="0"></use>
+</g>
+</svg></span> initially, for example when the student has first learned a fact. I propose setting <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-89-Title">
+<title id="MathJax-SVG-89-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span> equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-90-Title">
+<title id="MathJax-SVG-90-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span> to four hours or a day, respectively. Then, set <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.163ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 4375.6 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-91-Title">
+<title id="MathJax-SVG-91-Title">α = β ≥ 2</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1974" y="0"></use>
+ <use xlink:href="#MJMAIN-2265" x="2818" y="0"></use>
+ <use xlink:href="#MJMAIN-32" x="3875" y="0"></use>
+</g>
+</svg></span>: the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-92-Title">
+<title id="MathJax-SVG-92-Title">α = β</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1974" y="0"></use>
+</g>
+</svg></span> part will center the Beta distribution for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-93-Title">
+<title id="MathJax-SVG-93-Title">π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</svg></span> at 0.5, and then the actual value will constrain the variability of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.151ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 926.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-94-Title">
+<title id="MathJax-SVG-94-Title">π_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-213"></use>
+</g>
+</svg></span>. Specifically, the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.564ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4548.2 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-95-Title">
+<title id="MathJax-SVG-95-Title">Beta(α, β)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-42" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-65" x="759" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="1226" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="1587" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="2117" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="2506" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="3147" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="3592" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="4158" y="0"></use>
+</g>
+</svg></span> distribution has</p>
+<ul>
+<li>mean <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.103ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4349.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-96-Title">
+<title id="MathJax-SVG-96-Title">α / (α + β)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="640" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="1141" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="1530" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="2393" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="3393" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="3960" y="0"></use>
+</g>
+</svg></span> or <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.972ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 1279.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-97-Title">
+<title id="MathJax-SVG-97-Title">0.5</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-30"></use>
+ <use xlink:href="#MJMAIN-2E" x="500" y="0"></use>
+ <use xlink:href="#MJMAIN-35" x="779" y="0"></use>
+</g>
+</svg></span> if <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-98-Title">
+<title id="MathJax-SVG-98-Title">α = β</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1974" y="0"></use>
+</g>
+</svg></span>, and</li>
+<li>variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="26.771ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 11526.2 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-99-Title">
+<title id="MathJax-SVG-99-Title">α · β / (α + β)^ 2 / (α + β + 1)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="862" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1363" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="1929" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="2430" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="2819" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="3682" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="4683" y="0"></use>
+<g transform="translate(5249,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="513"></use>
+</g>
+ <use xlink:href="#MJMAIN-2F" x="6093" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="6593" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="6983" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="7846" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="8846" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="9635" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="10636" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="11136" y="0"></use>
+</g>
+</svg></span> which simplifies to <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.759ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 5923.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-100-Title">
+<title id="MathJax-SVG-100-Title">1/(4 (2 α + 1))</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-31" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="500" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="1001" y="0"></use>
+ <use xlink:href="#MJMAIN-34" x="1390" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="1891" y="0"></use>
+ <use xlink:href="#MJMAIN-32" x="2280" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="2781" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="3643" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="4644" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="5144" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="5534" y="0"></use>
+</g>
+</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-101-Title">
+<title id="MathJax-SVG-101-Title">α = β</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1974" y="0"></use>
+</g>
+</svg></span>.
+<ul>
+<li>(Recall the traditional explanation of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.488ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 640.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-102-Title">
+<title id="MathJax-SVG-102-Title">α</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+</g>
+</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.332ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 573.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-103-Title">
+<title id="MathJax-SVG-103-Title">β</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
+</g>
+</svg></span> are the number of successes and failures, respectively, that have been observed by flipping a weighted coin—or in our application, the number of successful versus unsuccessful quiz results for a sequence of quizzes on the same fact <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-104-Title">
+<title id="MathJax-SVG-104-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span> days apart.)</li>
+</ul>
+</li>
+</ul>
+<p>A higher value for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-105-Title">
+<title id="MathJax-SVG-105-Title">α = β</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1974" y="0"></use>
+</g>
+</svg></span> encodes <em>higher</em> confidence in the expected half-life <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-106-Title">
+<title id="MathJax-SVG-106-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span>, which in turn makes the model (which we’ll detail below) <em>less</em> sensitive to quiz results. In our experiments below, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="11.325ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 4876.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-107-Title">
+<title id="MathJax-SVG-107-Title">α = β = 12</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1974" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="2818" y="0"></use>
+<g transform="translate(3875,0)">
+ <use xlink:href="#MJMAIN-31"></use>
+ <use xlink:href="#MJMAIN-32" x="500" y="0"></use>
+</g>
+</g>
+</svg></span> is our least sensitive model, while <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.163ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 4375.6 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-108-Title">
+<title id="MathJax-SVG-108-Title">α = β = 3</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1974" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="2818" y="0"></use>
+ <use xlink:href="#MJMAIN-33" x="3875" y="0"></use>
+</g>
+</svg></span> is our most sensitive model. In the absence of strong feelings, a quiz app author can pick a number between these.</p>
+<p>Now, let us turn to the final piece of the math, how to update our Beta prior on a fact’s recall probability when a quiz result arrives.</p>
+<p>One option could be this: since we have analytical expressions for the mean and variance of the prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.287ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 984.8 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-109-Title">
+<title id="MathJax-SVG-109-Title">π_t^δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="806" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="806" y="-395"></use>
+</g>
+</svg></span>, convert these to the <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">closest Beta distribution</a> and straightforwardly update with the Bernoulli likelihood (straightforward because of conjugacy). However, it is better to delay the Beta fit till we have the posterior, and do the likelihood update analytically. Lucky for us, this is tractable and we will see code later that demonstrates the  boost in accuracy with respect to a computationally-expensive Monte Carlo simulation.</p>
+<p>By application of Bayes rule, the posterior is
+<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="44.783ex" height="7.343ex" style="vertical-align: -3.505ex;" viewBox="0 -1652.5 19281.7 3161.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-110-Title">
+<title id="MathJax-SVG-110-Title">Posterior(π|x) = \frac{Prior(π) · Lik(x|π)}{\int_0^1 Prior(π) · Lik(x|π) \, dπ},</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-6F" x="751" y="0"></use>
+ <use xlink:href="#MJMATHI-73" x="1237" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="1706" y="0"></use>
+ <use xlink:href="#MJMATHI-65" x="2068" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="2534" y="0"></use>
+ <use xlink:href="#MJMATHI-69" x="2986" y="0"></use>
+ <use xlink:href="#MJMATHI-6F" x="3331" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="3817" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="4268" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="4658" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="5228" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="5507" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="6079" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="6746" y="0"></use>
+<g transform="translate(7525,0)">
+<g transform="translate(397,0)">
+<rect stroke="none" width="10960" height="60" x="0" y="220"></rect>
+<g transform="translate(1326,770)">
+ <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="751" y="0"></use>
+ <use xlink:href="#MJMATHI-69" x="1203" y="0"></use>
+ <use xlink:href="#MJMATHI-6F" x="1548" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="2034" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="2485" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="2875" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="3445" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="4057" y="0"></use>
+ <use xlink:href="#MJMATHI-4C" x="4557" y="0"></use>
+ <use xlink:href="#MJMATHI-69" x="5239" y="0"></use>
+ <use xlink:href="#MJMATHI-6B" x="5584" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="6106" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="6495" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="7068" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="7346" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="7917" y="0"></use>
+</g>
+<g transform="translate(60,-1025)">
+ <use xlink:href="#MJSZ1-222B" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="921" y="754"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="668" y="-484"></use>
+ <use xlink:href="#MJMATHI-50" x="1272" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="2024" y="0"></use>
+ <use xlink:href="#MJMATHI-69" x="2475" y="0"></use>
+ <use xlink:href="#MJMATHI-6F" x="2821" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="3306" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="3758" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="4147" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="4718" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="5329" y="0"></use>
+ <use xlink:href="#MJMATHI-4C" x="5830" y="0"></use>
+ <use xlink:href="#MJMATHI-69" x="6511" y="0"></use>
+ <use xlink:href="#MJMATHI-6B" x="6857" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="7378" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="7768" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="8340" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="8619" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="9189" y="0"></use>
+ <use xlink:href="#MJMATHI-64" x="9746" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="10269" y="0"></use>
+</g>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-2C" x="19003" y="0"></use>
+</g>
+</svg></span>
+where “posterior” and “prior” are the Beta densities, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="3.597ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 1548.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-111-Title">
+<title id="MathJax-SVG-111-Title">Lik</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-4C" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-69" x="681" y="0"></use>
+ <use xlink:href="#MJMATHI-6B" x="1027" y="0"></use>
+</g>
+</svg></span> is the Bernoulli likelihood, and the denominator is the marginal probability of the observation <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.33ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 572.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-112-Title">
+<title id="MathJax-SVG-112-Title">x</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+</g>
+</svg></span>. <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.138ex" height="2.843ex" style="vertical-align: -0.838ex; margin-right: -0.007ex;" viewBox="0 -863.1 5656.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-113-Title">
+<title id="MathJax-SVG-113-Title">Lik(x|π) = π</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-4C" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-69" x="681" y="0"></use>
+ <use xlink:href="#MJMATHI-6B" x="1027" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="1548" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="1938" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="2510" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="2789" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="3359" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="4026" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="5083" y="0"></use>
+</g>
+</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-114-Title">
+<title id="MathJax-SVG-114-Title">x=1</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="850" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="1906" y="0"></use>
+</g>
+</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.335ex" height="2.343ex" style="vertical-align: -0.505ex; margin-right: -0.007ex;" viewBox="0 -791.3 2296.9 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-115-Title">
+<title id="MathJax-SVG-115-Title">1-π</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-31" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="722" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="1723" y="0"></use>
+</g>
+</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-116-Title">
+<title id="MathJax-SVG-116-Title">x=0</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="850" y="0"></use>
+ <use xlink:href="#MJMAIN-30" x="1906" y="0"></use>
+</g>
+</svg></span>. (Here we’re dropping the time-subscripts since all recall probabilities <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.332ex" height="1.676ex" style="vertical-align: -0.338ex; margin-right: -0.007ex;" viewBox="0 -576.1 573.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-117-Title">
+<title id="MathJax-SVG-117-Title">π</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C0" x="0" y="0"></use>
+</g>
+</svg></span> and quiz results <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.33ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 572.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-118-Title">
+<title id="MathJax-SVG-118-Title">x</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+</g>
+</svg></span> are at the same <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="8.56ex" height="2.676ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -863.1 3685.4 1152.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-119-Title">
+<title id="MathJax-SVG-119-Title">t_2 = t · δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
+ <use xlink:href="#MJMAIN-3D" x="1093" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="2149" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="2733" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="3233" y="0"></use>
+</g>
+</svg></span>.)</p>
+<p>Next we compute the mean and variance of this posterior, because that’s how we’ll fit it to a Beta distribution to function as our subsequent prior. We’ll break this down into the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-120-Title">
+<title id="MathJax-SVG-120-Title">x=1</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="850" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="1906" y="0"></use>
+</g>
+</svg></span> (success) and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-121-Title">
+<title id="MathJax-SVG-121-Title">x=0</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="850" y="0"></use>
+ <use xlink:href="#MJMAIN-30" x="1906" y="0"></use>
+</g>
+</svg></span> (failure) cases. In the following, let <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.232ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 14738.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-122-Title">
+<title id="MathJax-SVG-122-Title">γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="733" y="-357"></use>
+ <use xlink:href="#MJMAIN-3D" x="1320" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="2377" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="3002" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="3392" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="4254" y="0"></use>
+ <use xlink:href="#MJMATHI-6E" x="5255" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="6078" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="6579" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="7023" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="7413" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="7913" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="8539" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="8928" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="9791" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="10792" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="11580" y="0"></use>
+ <use xlink:href="#MJMATHI-6E" x="12581" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="13404" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="13904" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="14349" y="0"></use>
+</g>
+</svg></span>; this exposes numerical symmetries that an implementation can take advantage of.</p>
+<p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="52.278ex" height="6.176ex" style="vertical-align: -2.338ex;" viewBox="0 -1652.5 22508.7 2659.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-123-Title">
+<title id="MathJax-SVG-123-Title">E[π | x=1] = \int_0^1 π · Posterior(π|x=1) \, dπ = γ_2 / γ_1.</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="1043" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="1613" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="1892" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="2742" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="3798" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="4299" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="4855" y="0"></use>
+<g transform="translate(5911,0)">
+ <use xlink:href="#MJSZ2-222B" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="1500" y="1540"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="787" y="-1270"></use>
+</g>
+ <use xlink:href="#MJMATHI-3C0" x="7593" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="8385" y="0"></use>
+ <use xlink:href="#MJMATHI-50" x="8886" y="0"></use>
+ <use xlink:href="#MJMATHI-6F" x="9638" y="0"></use>
+ <use xlink:href="#MJMATHI-73" x="10123" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="10593" y="0"></use>
+ <use xlink:href="#MJMATHI-65" x="10954" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="11421" y="0"></use>
+ <use xlink:href="#MJMATHI-69" x="11872" y="0"></use>
+ <use xlink:href="#MJMATHI-6F" x="12218" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="12703" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="13155" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="13544" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="14115" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="14393" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="15243" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="16300" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="16800" y="0"></use>
+ <use xlink:href="#MJMATHI-64" x="17356" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="17880" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="18728" y="0"></use>
+<g transform="translate(19784,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2F" x="20757" y="0"></use>
+<g transform="translate(21257,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2E" x="22230" y="0"></use>
+</g>
+</svg></span></p>
+<p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="61.844ex" height="9.509ex" style="vertical-align: -3.981ex; margin-bottom: -0.19ex;" viewBox="0 -2298.3 26627.1 4094.3" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-124-Title">
+<title id="MathJax-SVG-124-Title">\begin{align}
+Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \\
+&amp;= γ_3 / γ_1 - (E[π|x=1])^2.
+\end{align}</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+<g transform="translate(167,0)">
+<g transform="translate(-11,0)">
+<g transform="translate(0,653)">
+ <use xlink:href="#MJMATHI-56" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="769" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="1299" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="1750" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="2029" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="2599" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="2878" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="3728" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="4784" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="5285" y="0"></use>
+</g>
+</g>
+<g transform="translate(5553,0)">
+<g transform="translate(0,653)">
+ <use xlink:href="#MJMAIN-3D" x="277" y="0"></use>
+<g transform="translate(1334,0)">
+ <use xlink:href="#MJSZ2-222B" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="1500" y="1540"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="787" y="-1270"></use>
+</g>
+ <use xlink:href="#MJMAIN-28" x="2848" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="3238" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="4031" y="0"></use>
+ <use xlink:href="#MJMATHI-45" x="5031" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="5796" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="6074" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="6645" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="6923" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="7774" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="8830" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="9330" y="0"></use>
+<g transform="translate(9609,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="583"></use>
+</g>
+ <use xlink:href="#MJMAIN-22C5" x="10675" y="0"></use>
+ <use xlink:href="#MJMATHI-50" x="11175" y="0"></use>
+ <use xlink:href="#MJMATHI-6F" x="11927" y="0"></use>
+ <use xlink:href="#MJMATHI-73" x="12412" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="12882" y="0"></use>
+ <use xlink:href="#MJMATHI-65" x="13243" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="13710" y="0"></use>
+ <use xlink:href="#MJMATHI-69" x="14161" y="0"></use>
+ <use xlink:href="#MJMATHI-6F" x="14507" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="14992" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="15444" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="15833" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="16404" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="16682" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="17533" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="18589" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="19089" y="0"></use>
+ <use xlink:href="#MJMATHI-64" x="19645" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="20169" y="0"></use>
+</g>
+<g transform="translate(0,-1446)">
+ <use xlink:href="#MJMAIN-3D" x="277" y="0"></use>
+<g transform="translate(1334,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-33" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2F" x="2306" y="0"></use>
+<g transform="translate(2806,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2212" x="4001" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="5002" y="0"></use>
+ <use xlink:href="#MJMATHI-45" x="5391" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="6156" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="6434" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="7005" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="7283" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="8134" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="9190" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="9690" y="0"></use>
+<g transform="translate(9969,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="583"></use>
+</g>
+ <use xlink:href="#MJMAIN-2E" x="10812" y="0"></use>
+</g>
+</g>
+</g>
+</g>
+</svg></span></p>
+<p>The posterior mean and variance when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-125-Title">
+<title id="MathJax-SVG-125-Title">x=0</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="850" y="0"></use>
+ <use xlink:href="#MJMAIN-30" x="1906" y="0"></use>
+</g>
+</svg></span> (failed quiz) are:</p>
+<p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="22.571ex" height="5.843ex" style="vertical-align: -2.505ex;" viewBox="0 -1437.2 9717.9 2515.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-126-Title">
+<title id="MathJax-SVG-126-Title">E[π | x=0] = \frac{γ_2 - γ_1}{γ_1 - γ_0}.</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="1043" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="1613" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="1892" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="2742" y="0"></use>
+ <use xlink:href="#MJMAIN-30" x="3798" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="4299" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="4855" y="0"></use>
+<g transform="translate(5633,0)">
+<g transform="translate(397,0)">
+<rect stroke="none" width="3287" height="60" x="0" y="220"></rect>
+<g transform="translate(60,772)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
+ <use xlink:href="#MJMAIN-2212" x="1194" y="0"></use>
+<g transform="translate(2195,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+</g>
+<g transform="translate(60,-686)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+ <use xlink:href="#MJMAIN-2212" x="1194" y="0"></use>
+<g transform="translate(2195,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="733" y="-357"></use>
+</g>
+</g>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-2E" x="9439" y="0"></use>
+</g>
+</svg></span></p>
+<p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="53.392ex" height="6.676ex" style="vertical-align: -2.671ex;" viewBox="0 -1724.2 22988.1 2874.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-127-Title">
+<title id="MathJax-SVG-127-Title">Var[π | x=0] = \frac{γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2}{(γ_1 - γ_0)^2}.</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-56" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="769" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="1299" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="1750" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="2029" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="2599" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="2878" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="3728" y="0"></use>
+ <use xlink:href="#MJMAIN-30" x="4784" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="5285" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="5841" y="0"></use>
+<g transform="translate(6619,0)">
+<g transform="translate(397,0)">
+<rect stroke="none" width="15571" height="60" x="0" y="220"></rect>
+<g transform="translate(60,827)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-33" x="733" y="-357"></use>
+ <use xlink:href="#MJMAIN-28" x="972" y="0"></use>
+<g transform="translate(1361,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2212" x="2556" y="0"></use>
+<g transform="translate(3557,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="4529" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="5141" y="0"></use>
+<g transform="translate(6142,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-28" x="7114" y="0"></use>
+<g transform="translate(7504,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2B" x="8698" y="0"></use>
+<g transform="translate(9699,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2212" x="10893" y="0"></use>
+<g transform="translate(11894,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="12867" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="13478" y="0"></use>
+<g transform="translate(14479,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="488"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-435"></use>
+</g>
+</g>
+<g transform="translate(5585,-780)">
+ <use xlink:href="#MJMAIN-28" x="0" y="0"></use>
+<g transform="translate(389,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2212" x="1584" y="0"></use>
+<g transform="translate(2584,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="733" y="-357"></use>
+</g>
+<g transform="translate(3557,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="408"></use>
+</g>
+</g>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-2E" x="22709" y="0"></use>
+</g>
+</svg></span></p>
+<blockquote>
+<p>The Mathematica expressions used in deriving these are given in the source code below. Unlike the first few analytical results above, these required considerable hand-simplification, and we will double-check them against both Monte Carlo simulation and quadrature integration below.</p>
+</blockquote>
+<p>With the mean and variance of the posterior in hand, it is straightforward to find a well-approximating Beta distribution using the <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">method of moments</a>:</p>
+<ul>
+<li>a new <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="24.644ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 10610.7 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-128-Title">
+<title id="MathJax-SVG-128-Title">α' = μ (μ (1-μ) / σ^2 - 1)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2032" x="905" y="513"></use>
+ <use xlink:href="#MJMAIN-3D" x="1213" y="0"></use>
+ <use xlink:href="#MJMATHI-3BC" x="2269" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="2872" y="0"></use>
+ <use xlink:href="#MJMATHI-3BC" x="3262" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="3865" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="4255" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="4978" y="0"></use>
+ <use xlink:href="#MJMATHI-3BC" x="5978" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="6582" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="6971" y="0"></use>
+<g transform="translate(7472,0)">
+ <use xlink:href="#MJMATHI-3C3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="808" y="513"></use>
+</g>
+ <use xlink:href="#MJMAIN-2212" x="8719" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="9720" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="10221" y="0"></use>
+</g>
+</svg></span> and</li>
+<li><span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="30.284ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 13039.1 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-129-Title">
+<title id="MathJax-SVG-129-Title">β' = (1-μ) (μ (1-μ) / σ^2 - 1)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2032" x="801" y="612"></use>
+ <use xlink:href="#MJMAIN-3D" x="1139" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="2195" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="2584" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="3307" y="0"></use>
+ <use xlink:href="#MJMATHI-3BC" x="4308" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="4911" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="5301" y="0"></use>
+ <use xlink:href="#MJMATHI-3BC" x="5690" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="6294" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="6683" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="7406" y="0"></use>
+ <use xlink:href="#MJMATHI-3BC" x="8407" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="9010" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="9400" y="0"></use>
+<g transform="translate(9900,0)">
+ <use xlink:href="#MJMATHI-3C3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="808" y="513"></use>
+</g>
+ <use xlink:href="#MJMAIN-2212" x="11148" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="12149" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="12649" y="0"></use>
+</g>
+</svg></span>,
+<ul>
+<li>for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.871ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4680.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-130-Title">
+<title id="MathJax-SVG-130-Title">μ = E[π|x]</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3BC" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="881" y="0"></use>
+ <use xlink:href="#MJMATHI-45" x="1937" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="2702" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="2980" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="3551" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="3829" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="4402" y="0"></use>
+</g>
+</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="14.141ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 6088.5 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-131-Title">
+<title id="MathJax-SVG-131-Title">σ^2 = Var[π|x]</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3C3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="808" y="513"></use>
+ <use xlink:href="#MJMAIN-3D" x="1303" y="0"></use>
+ <use xlink:href="#MJMATHI-56" x="2359" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="3128" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="3658" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="4109" y="0"></use>
+ <use xlink:href="#MJMATHI-3C0" x="4388" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="4958" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="5237" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="5809" y="0"></use>
+</g>
+</svg></span>.</li>
+</ul>
+</li>
+</ul>
+<p>The updated posterior becomes the new prior, parameterized by this <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.428ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 4059.4 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-132-Title">
+<title id="MathJax-SVG-132-Title">[α', β', t_2]</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-5B" x="0" y="0"></use>
+<g transform="translate(278,0)">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2032" x="905" y="513"></use>
+</g>
+ <use xlink:href="#MJMAIN-2C" x="1213" y="0"></use>
+<g transform="translate(1658,0)">
+ <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2032" x="801" y="612"></use>
+</g>
+ <use xlink:href="#MJMAIN-2C" x="2520" y="0"></use>
+<g transform="translate(2965,0)">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="3780" y="0"></use>
+</g>
+</svg></span>, where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.894ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 815.4 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-133-Title">
+<title id="MathJax-SVG-133-Title">t_2</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
+</g>
+</svg></span> is the time elapsed between this fact’s last quiz and the one just used in the update.</p>
+<p>We are done. That’s all the math.</p>
+<h2>Source code</h2>
+<h3>Core library</h3>
+<pre><code class="language-py"># export ebisu/__init__.py #
+from .ebisu import *
+from . import alternate
+</code></pre>
+<pre><code class="language-py"># export ebisu/ebisu.py #
+def recallProbabilityMean(alpha, beta, t, tnow):
+  # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`
+  from scipy.special import gammaln
+  from numpy import exp
+  dt = tnow / t
+  return exp(
+      gammaln(alpha + dt) - gammaln(alpha + beta + dt) - (
+          gammaln(alpha) - gammaln(alpha + beta)))
+
+
+def recallProbabilityVar(alpha, beta, t, tnow):
+  from scipy.special import gamma
+  # `Assuming[a&gt;0 &amp;&amp; b&gt;0 &amp;&amp; t&gt;0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``
+  # And then plug in mean for `m` &amp; simplify to get:
+  dt = tnow / t
+  same0 = gamma(alpha) / gamma(alpha + beta)
+  same1 = gamma(alpha + dt) / gamma(alpha + beta + dt)
+  same2 = gamma(alpha + 2 * dt) / gamma(alpha + beta + 2 * dt)
+  md = same1 / same0
+  md2 = same2 / same0
+  return md2 - md**2
+
+
+def posteriorAnalytic(alpha, beta, t, result, tnow):
+  from scipy.special import gammaln, gamma
+  from math import exp
+  dt = tnow / t
+  if result == 1:
+    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
+    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`
+    # variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
+    # Simplify all three to get the following:
+    same = gammaln(alpha + beta + dt) - gammaln(alpha + dt)
+    mu = exp(gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt) + same)
+    var = exp(same + gammaln(alpha + 3 * dt) -
+              gammaln(alpha + beta + 3 * dt)) - mu**2
+  else:
+    # Mathematica code is same as above, but replace one `p` with `(1-p)`
+    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
+    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
+    # var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
+    # Then simplify and combine
+    same0 = gamma(alpha) / gamma(alpha + beta)
+    same1 = gamma(alpha + dt) / gamma(alpha + beta + dt)
+    same2 = gamma(alpha + 2 * dt) / gamma(alpha + beta + 2 * dt)
+    same3 = gamma(alpha + 3 * dt) / gamma(alpha + beta + 3 * dt)
+    mu = (same1 - same2) / (same0 - same1)
+    var = (same3 * (same1 - same0) + same2 *
+           (same0 + same1 - same2) - same1**2) / (same1 - same0)**2
+  newAlpha, newBeta = meanVarToBeta(mu, var)
+  return newAlpha, newBeta, tnow
+
+
+def meanVarToBeta(mean, var):
+  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters
+  tmp = mean * (1 - mean) / var - 1
+  alpha = mean * tmp
+  beta = (1 - mean) * tmp
+  return alpha, beta
+
+
+def priorToHalflife(alpha, beta, t, percentile=0.5, maxt=100, mint=1e-3):
+  from math import sqrt
+  from scipy.optimize import brentq
+  h = brentq(
+      lambda now: recallProbabilityMean(alpha, beta, t, now) - percentile, mint,
+      maxt)
+  # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.
+  # To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that:
+  # - `v` is the probability variance around 0.5, so `sqrt(v)` is the standard deviation
+  # - find the times for which `0.5 +/- sqrt(v)`. This is a kind of one-sigma confidence interval in time
+  # - convert these times to a 'time variance' by taking their mean-absolute-distance to `h` and squaring that.
+  # Open to suggestions for improving this. The second 'variance' number should not be taken seriously, but it can be used for notional plotting.
+  v = recallProbabilityVar(alpha, beta, t, h)
+  h2 = brentq(
+      lambda now: recallProbabilityMean(alpha, beta, t, now) - (percentile - sqrt(v)),
+      mint, maxt)
+  h3 = brentq(
+      lambda now: recallProbabilityMean(alpha, beta, t, now) - (percentile + sqrt(v)),
+      mint, maxt)
+
+  return h, ((abs(h2 - h) + abs(h3 - h)) / 2)**2
+</code></pre>
+<h3>Alternate ways of evaluating the same results as above</h3>
+<pre><code class="language-py"># export ebisu/alternate.py #
+from .ebisu import meanVarToBeta
+</code></pre>
+<pre><code class="language-py"># export ebisu/alternate.py #
+import numpy as np
+
+
+def recallProbabilityMode(alpha, beta, t, tnow):
+  """Returns the mode of the immediate (pseudo-Beta) prior"""
+  # [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`
+  dt = tnow / t
+  pr = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1)
+
+  # See [peak]. The actual mode is `modeBase ** dt`, but since `modeBase` might be negative or otherwise invalid, check it.
+  modeBase = (alpha - dt) / (alpha + beta - dt - 1)
+  if modeBase &gt;= 0 and modeBase &lt;= 1:
+    # Still need to confirm this is not a minimum (anti-mode). Do this with a coarse check of other points likely to be the mode.
+    mode = modeBase**dt
+    modePr = pr(mode)
+
+    eps = 1e-3
+    others = [
+        eps, mode - eps if mode &gt; eps else mode / 2, mode + eps
+        if mode &lt; 1 - eps else (1 + mode) / 2, 1 - eps
+    ]
+    otherPr = map(pr, others)
+    if max(otherPr) &lt;= modePr:
+      return mode
+  # If anti-mode detected, that means one of the edges is the mode, likely caused by a very large or very small `dt`. Just use `dt` to guess which extreme it was pushed to. If `dt` == 1.0, and we get to this point, likely we have malformed alpha/beta (i.e., &lt;1)
+  return 0.5 if dt == 1. else (0. if dt &gt; 1 else 1.)
+
+
+def recallProbabilityMedian(alpha, beta, t, tnow, percentile=0.5):
+  """"""
+  # [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
+  from scipy.optimize import brentq
+  from scipy.special import beta as fbeta
+  from scipy.special import hyp2f1
+
+  dt = tnow / t
+
+  # See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.
+  # N.B. I prefer to try to find the mode (above) because it will be much faster than this.
+  cdfPercentile = lambda p: (p**(alpha/dt) *
+                             hyp2f1(alpha, 1 - beta, 1 + alpha, p**(1/dt)) /
+                             alpha /
+                             fbeta(alpha,beta)) - percentile
+  return brentq(cdfPercentile, 0, 1)
+
+
+def recallProbabilityMonteCarlo(alpha, beta, t, tnow, N=1000000):
+  import scipy.stats as stats
+  tPrior = stats.beta.rvs(alpha, beta, size=N)
+  tnowPrior = tPrior**(tnow / t)
+  freqs, bins = np.histogram(tnowPrior, 'auto')
+  bincenters = bins[:-1] + np.diff(bins) / 2
+  return dict(
+      mean=np.mean(tnowPrior),
+      median=np.median(tnowPrior),
+      mode=bincenters[freqs.argmax()],
+      var=np.var(tnowPrior))
+
+
+# So we have several ways of evaluating the posterior mean/var:
+# - Monte Carlo
+# - Quadrature integration
+# - Analytic expression, with several hyp2f1
+# - Simplified analytic expression with fewer hyp2f1 (recurrence relations)
+
+
+def posteriorQuad(alpha,
+                  beta,
+                  t,
+                  result,
+                  tnow,
+                  analyticMarginal=True,
+                  maxiter=100):
+  """Update a time-dependent Beta distribution with a new data sample"""
+  from scipy.integrate import quad
+
+  dt = tnow / t
+
+  if result == 1:
+    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1) * p
+  else:
+    # difference from above: -------------------------------------------^vvvv
+    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1) * (1 - p)
+
+  if analyticMarginal:
+    from scipy.special import beta as fbeta
+    if result == 1:
+      marginal = dt * fbeta(alpha + dt, beta)
+    else:
+      marginal = dt * (fbeta(alpha, beta) - fbeta(alpha + dt, beta))
+  else:
+    marginalEst = quad(marginalInt, 0, 1)
+    if marginalEst[0] &lt; marginalEst[1] * 10.:
+      raise OverflowError(
+          'Marginal integral error too high: value={}, error={}'.format(
+              marginalEst[0], marginalEst[1]))
+    marginal = marginalEst[0]
+
+  muInt = lambda p: marginalInt(p) * p
+  muEst = quad(muInt, 0, 1)
+  if muEst[0] &lt; muEst[1] * 10.:
+    raise OverflowError('Mean integral error too high: value={}, error={}'.
+                        format(muEst[0], muEst[1]))
+  mu = muEst[0] / marginal
+
+  varInt = lambda p: marginalInt(p) * (p - mu)**2
+  varEst = quad(varInt, 0, 1)
+  if varEst[0] &lt; varEst[1] * 10.:
+    raise OverflowError('Variance integral error too high: value={}, error={}'.
+                        format(varEst[0], varEst[1]))
+  var = varEst[0] / marginal
+
+  newAlpha, newBeta = meanVarToBeta(mu, var)
+  return newAlpha, newBeta, tnow
+
+
+def posteriorMonteCarlo(alpha, beta, t, result, tnow, N=10000):
+  """Update a time-dependent Beta distribution with a new data sample"""
+  # [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&amp;oldid=769806318#Properties_of_the_Bernoulli_Distribution, third (last) equation
+  # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&amp;oldid=770608018#Mathematical_definition
+  # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&amp;oldid=770608018#Weighted_sample_variance
+  import scipy.stats as stats
+
+  tPrior = stats.beta.rvs(alpha, beta, size=N)
+
+  # To see where this comes from, read the rest of this document!
+  tnowPrior = tPrior**(tnow / t)
+
+  # This is the Bernoulli likelihood [bernoulliLikelihood]
+  weights = (tnowPrior)**result * ((1 - tnowPrior)**(1 - result))
+
+  # See [weightedMean]
+  weightedMean = np.sum(weights * tnowPrior) / np.sum(weights)
+  # See [weightedVar]
+  weightedVar = np.sum(weights *
+                       (tnowPrior - weightedMean)**2) / np.sum(weights)
+
+  newAlpha, newBeta = meanVarToBeta(weightedMean, weightedVar)
+
+  return newAlpha, newBeta, tnow
+</code></pre>
+<h3>Test code</h3>
+<pre><code class="language-py">def betafitBeforeLikelihood(a, b, t1, x, t2):
+  a2, b2 = meanVarToBeta(
+      recallProbabilityMean(a, b, t1, t2), recallProbabilityVar(a, b, t1, t2))
+  return a2 + x, b2 + 1 - x, t2
+
+
+betafitBeforeLikelihood(3.3, 4.4, 1., 1., 2.)
+posteriorAnalytic(3.3, 4.4, 1., 1., 2.)
+</code></pre>
+<pre><code class="language-py"># export ebisu/tests/test_ebisu.py
+from unittest import TestCase
+from ebisu import *
+from ebisu.alternate import *
+</code></pre>
+<pre><code class="language-py"># export ebisu/tests/test_ebisu.py
+import unittest
+
+
+def relerr(dirt, gold):
+  return abs(dirt - gold) / abs(gold)
+
+
+def maxrelerr(dirts, golds):
+  return max(map(relerr, dirts, golds))
+
+
+def klDivBeta(a, b, a2, b2):
+  """Kullback-Leibler divergence between two Beta distributions in nats"""
+  # Via http://bariskurt.com/kullback-leibler-divergence-between-two-dirichlet-and-beta-distributions/
+  from scipy.special import gammaln, psi
+  import numpy as np
+  left = np.array([a, b])
+  right = np.array([a2, b2])
+  return gammaln(sum(left)) - gammaln(sum(right)) - sum(gammaln(left)) + sum(
+      gammaln(right)) + np.dot(left - right, psi(left) - psi(sum(left)))
+
+
+class TestEbisu(unittest.TestCase):
+
+  def test_kl(self):
+    # See https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Quantities_of_information_.28entropy.29 for these numbers
+    self.assertAlmostEqual(klDivBeta(1., 1., 3., 3.), 0.598803, places=5)
+    self.assertAlmostEqual(klDivBeta(3., 3., 1., 1.), 0.267864, places=5)
+
+  def test_prior(self):
+
+    def inner(a, b, t0):
+      for t in map(lambda dt: dt * t0, [0.1, .99, 1., 1.01, 5.5]):
+        mc = recallProbabilityMonteCarlo(a, b, t0, t, N=100 * 1000)
+        mean = recallProbabilityMean(a, b, t0, t)
+        var = recallProbabilityVar(a, b, t0, t)
+        self.assertLess(relerr(mean, mc['mean']), 3e-2)
+
+    inner(3.3, 4.4, 5.5)
+    inner(3.3, 4.4, 15.5)
+    inner(3.3, 4.4, .5)
+    inner(34.4, 34.4, 5.5)
+    inner(34.4, 34.4, 15.5)
+    inner(34.4, 34.4, .5)
+
+  def test_posterior(self):
+
+    def inner(a, b, t0):
+      kl = lambda v, w: ((klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])) / 2.)
+      for t in map(lambda dt: dt * t0, [0.1, 1., 5.5]):
+        for x in [0., 1.]:
+          msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
+          mc = posteriorMonteCarlo(a, b, t0, x, t, N=1 * 1000 * 1000)
+          an = posteriorAnalytic(a, b, t0, x, t)
+          self.assertLess(kl(an, mc), 1e-4, msg=msg)
+
+          try:
+            quad1 = posteriorQuad(a, b, t0, x, t, analyticMarginal=True)
+          except OverflowError:
+            quad1 = None
+          if quad1 is not None:
+            self.assertLess(kl(quad1, mc), 1e-4, msg=msg)
+
+          try:
+            quad2 = posteriorQuad(a, b, t0, x, t, analyticMarginal=False)
+          except OverflowError:
+            quad2 = None
+          if quad2 is not None:
+            self.assertLess(kl(quad2, mc), 1e-4, msg=msg)
+
+    inner(3.3, 4.4, 5.5)
+    inner(3.3, 4.4, 15.5)
+    inner(3.3, 4.4, .5)
+    inner(34.4, 34.4, 5.5)
+    inner(34.4, 34.4, 15.5)
+    inner(34.4, 34.4, .5)
+
+
+if __name__ == '__main__':
+  unittest.TextTestRunner().run(
+      unittest.TestLoader().loadTestsFromModule(TestEbisu()))
+</code></pre>
+<h3>Demo code</h3>
+<pre><code class="language-py">import scipy.stats as stats
+import matplotlib.pyplot as plt
+
+plt.style.use('ggplot')
+plt.rcParams['svg.fonttype'] = 'none'
+
+betaa = 4. / 3
+betab = 4. / 3
+
+betaa = 12.
+betab = 12.
+
+t0 = 7.
+
+v2s = lambda var: np.sqrt(var) / 10
+
+ts = np.arange(1, 31.)
+
+plt.close('all')
+plt.figure()
+ax = plt.subplot(111)
+plt.axhline(y=t0, linewidth=1, color='0.5')
+[plt.errorbar(ts,
+          np.array(list(map(lambda t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t))[0],
+                            ts))),
+          v2s(np.array(list(map(lambda t: priorToHalflife(*posteriorAnalytic(a, a, t0, xobs, t))[1],
+                            ts)))),
+          fmt='x-' if xobs == 1 else 'o-',
+          color='C{}'.format(aidx),
+          label='a=b={}, {}'.format(a, 'pass' if xobs==1 else 'fail'))
+ for (aidx, a) in enumerate([3, 6, 12])
+ for xobs in [1, 0]]
+plt.grid(True)
+plt.legend(loc=0)
+plt.title('New interval, for old interval={} days'.format(t0))
+plt.xlabel('Time test taken (days)')
+plt.ylabel('New interval (days)')
+plt.savefig('figures/halflife.svg')
+plt.savefig('figures/halflife.png', dpi=150)
+plt.show()
+</code></pre>
+<pre><code class="language-py">plt.figure()
+modelA = posteriorAnalytic(3., 3., 7., 1, 15.)
+modelB = posteriorAnalytic(12., 12., 7., 1, 15.)
+hlA = priorToHalflife(*modelA)
+hlB = priorToHalflife(*modelB)
+plt.errorbar(
+    ts,
+    recallProbabilityMean(*modelA, ts),
+    v2s(recallProbabilityVar(*modelA, ts)),
+    fmt='.-',
+    label='Model A',
+    color='C0')
+plt.plot(ts, 2**(-ts / hlA[0]), '--', label='approx A', color='C0')
+plt.errorbar(
+    ts,
+    recallProbabilityMean(*modelB, ts),
+    v2s(recallProbabilityVar(*modelB, ts)),
+    fmt='.-',
+    label='Model B',
+    color='C1')
+plt.plot(ts, 2**(-ts / hlB[0]), '--', label='approx B', color='C1')
+plt.legend(loc=0)
+plt.ylim([0, 1])
+plt.grid(True)
+plt.xlabel('Time (days)')
+plt.ylabel('Recall probability')
+plt.title('Predicted forgetting curves (A: a=b=3, B: a=b=12)')
+plt.savefig('figures/forgetting-curve.svg')
+plt.savefig('figures/forgetting-curve.png', dpi=150)
+plt.show()
+</code></pre>
+<h2>Implementation thoughts</h2>
+<p>Lua, Erlang, Elixir, Red, F#, OCaml, Reason, PureScript, JS, TypeScript, Rust, …</p>
+<p>Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …</p>
+<svg style="display: none;"><defs id="MathJax_SVG_glyphs"><path stroke-width="1" id="MJMAIN-32" d="M109 429Q82 429 66 447T50 491Q50 562 103 614T235 666Q326 666 387 610T449 465Q449 422 429 383T381 315T301 241Q265 210 201 149L142 93L218 92Q375 92 385 97Q392 99 409 186V189H449V186Q448 183 436 95T421 3V0H50V19V31Q50 38 56 46T86 81Q115 113 136 137Q145 147 170 174T204 211T233 244T261 278T284 308T305 340T320 369T333 401T340 431T343 464Q343 527 309 573T212 619Q179 619 154 602T119 569T109 550Q109 549 114 549Q132 549 151 535T170 489Q170 464 154 447T109 429Z"></path><path stroke-width="1" id="MJMAIN-2212" d="M84 237T84 250T98 270H679Q694 262 694 250T679 230H98Q84 237 84 250Z"></path><path stroke-width="1" id="MJMAIN-394" d="M51 0Q46 4 46 7Q46 9 215 357T388 709Q391 716 416 716Q439 716 444 709Q447 705 616 357T786 7Q786 4 781 0H51ZM507 344L384 596L137 92L383 91H630Q630 93 507 344Z"></path><path stroke-width="1" id="MJMAIN-2F" d="M423 750Q432 750 438 744T444 730Q444 725 271 248T92 -240Q85 -250 75 -250Q68 -250 62 -245T56 -231Q56 -221 230 257T407 740Q411 750 423 750Z"></path><path stroke-width="1" id="MJMATHI-68" d="M137 683Q138 683 209 688T282 694Q294 694 294 685Q294 674 258 534Q220 386 220 383Q220 381 227 388Q288 442 357 442Q411 442 444 415T478 336Q478 285 440 178T402 50Q403 36 407 31T422 26Q450 26 474 56T513 138Q516 149 519 151T535 153Q555 153 555 145Q555 144 551 130Q535 71 500 33Q466 -10 419 -10H414Q367 -10 346 17T325 74Q325 90 361 192T398 345Q398 404 354 404H349Q266 404 205 306L198 293L164 158Q132 28 127 16Q114 -11 83 -11Q69 -11 59 -2T48 16Q48 30 121 320L195 616Q195 629 188 632T149 637H128Q122 643 122 645T124 664Q129 683 137 683Z"></path><path stroke-width="1" id="MJMATHI-74" d="M26 385Q19 392 19 395Q19 399 22 411T27 425Q29 430 36 430T87 431H140L159 511Q162 522 166 540T173 566T179 586T187 603T197 615T211 624T229 626Q247 625 254 615T261 596Q261 589 252 549T232 470L222 433Q222 431 272 431H323Q330 424 330 420Q330 398 317 385H210L174 240Q135 80 135 68Q135 26 162 26Q197 26 230 60T283 144Q285 150 288 151T303 153H307Q322 153 322 145Q322 142 319 133Q314 117 301 95T267 48T216 6T155 -11Q125 -11 98 4T59 56Q57 64 57 83V101L92 241Q127 382 128 383Q128 385 77 385H26Z"></path><path stroke-width="1" id="MJMATHI-78" d="M52 289Q59 331 106 386T222 442Q257 442 286 424T329 379Q371 442 430 442Q467 442 494 420T522 361Q522 332 508 314T481 292T458 288Q439 288 427 299T415 328Q415 374 465 391Q454 404 425 404Q412 404 406 402Q368 386 350 336Q290 115 290 78Q290 50 306 38T341 26Q378 26 414 59T463 140Q466 150 469 151T485 153H489Q504 153 504 145Q504 144 502 134Q486 77 440 33T333 -11Q263 -11 227 52Q186 -10 133 -10H127Q78 -10 57 16T35 71Q35 103 54 123T99 143Q142 143 142 101Q142 81 130 66T107 46T94 41L91 40Q91 39 97 36T113 29T132 26Q168 26 194 71Q203 87 217 139T245 247T261 313Q266 340 266 352Q266 380 251 392T217 404Q177 404 142 372T93 290Q91 281 88 280T72 278H58Q52 284 52 289Z"></path><path stroke-width="1" id="MJMAIN-223C" d="M55 166Q55 241 101 304T222 367Q260 367 296 349T362 304T421 252T484 208T554 189Q616 189 655 236T694 338Q694 350 698 358T708 367Q722 367 722 334Q722 260 677 197T562 134H554Q517 134 481 152T414 196T355 248T292 293T223 311Q179 311 145 286Q109 257 96 218T80 156T69 133Q55 133 55 166Z"></path><path stroke-width="1" id="MJMATHI-42" d="M231 637Q204 637 199 638T194 649Q194 676 205 682Q206 683 335 683Q594 683 608 681Q671 671 713 636T756 544Q756 480 698 429T565 360L555 357Q619 348 660 311T702 219Q702 146 630 78T453 1Q446 0 242 0Q42 0 39 2Q35 5 35 10Q35 17 37 24Q42 43 47 45Q51 46 62 46H68Q95 46 128 49Q142 52 147 61Q150 65 219 339T288 628Q288 635 231 637ZM649 544Q649 574 634 600T585 634Q578 636 493 637Q473 637 451 637T416 636H403Q388 635 384 626Q382 622 352 506Q352 503 351 500L320 374H401Q482 374 494 376Q554 386 601 434T649 544ZM595 229Q595 273 572 302T512 336Q506 337 429 337Q311 337 310 336Q310 334 293 263T258 122L240 52Q240 48 252 48T333 46Q422 46 429 47Q491 54 543 105T595 229Z"></path><path stroke-width="1" id="MJMATHI-65" d="M39 168Q39 225 58 272T107 350T174 402T244 433T307 442H310Q355 442 388 420T421 355Q421 265 310 237Q261 224 176 223Q139 223 138 221Q138 219 132 186T125 128Q125 81 146 54T209 26T302 45T394 111Q403 121 406 121Q410 121 419 112T429 98T420 82T390 55T344 24T281 -1T205 -11Q126 -11 83 42T39 168ZM373 353Q367 405 305 405Q272 405 244 391T199 357T170 316T154 280T149 261Q149 260 169 260Q282 260 327 284T373 353Z"></path><path stroke-width="1" id="MJMATHI-72" d="M21 287Q22 290 23 295T28 317T38 348T53 381T73 411T99 433T132 442Q161 442 183 430T214 408T225 388Q227 382 228 382T236 389Q284 441 347 441H350Q398 441 422 400Q430 381 430 363Q430 333 417 315T391 292T366 288Q346 288 334 299T322 328Q322 376 378 392Q356 405 342 405Q286 405 239 331Q229 315 224 298T190 165Q156 25 151 16Q138 -11 108 -11Q95 -11 87 -5T76 7T74 17Q74 30 114 189T154 366Q154 405 128 405Q107 405 92 377T68 316T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-6E" d="M21 287Q22 293 24 303T36 341T56 388T89 425T135 442Q171 442 195 424T225 390T231 369Q231 367 232 367L243 378Q304 442 382 442Q436 442 469 415T503 336T465 179T427 52Q427 26 444 26Q450 26 453 27Q482 32 505 65T540 145Q542 153 560 153Q580 153 580 145Q580 144 576 130Q568 101 554 73T508 17T439 -10Q392 -10 371 17T350 73Q350 92 386 193T423 345Q423 404 379 404H374Q288 404 229 303L222 291L189 157Q156 26 151 16Q138 -11 108 -11Q95 -11 87 -5T76 7T74 17Q74 30 112 180T152 343Q153 348 153 366Q153 405 129 405Q91 405 66 305Q60 285 60 284Q58 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-6F" d="M201 -11Q126 -11 80 38T34 156Q34 221 64 279T146 380Q222 441 301 441Q333 441 341 440Q354 437 367 433T402 417T438 387T464 338T476 268Q476 161 390 75T201 -11ZM121 120Q121 70 147 48T206 26Q250 26 289 58T351 142Q360 163 374 216T388 308Q388 352 370 375Q346 405 306 405Q243 405 195 347Q158 303 140 230T121 120Z"></path><path stroke-width="1" id="MJMATHI-75" d="M21 287Q21 295 30 318T55 370T99 420T158 442Q204 442 227 417T250 358Q250 340 216 246T182 105Q182 62 196 45T238 27T291 44T328 78L339 95Q341 99 377 247Q407 367 413 387T427 416Q444 431 463 431Q480 431 488 421T496 402L420 84Q419 79 419 68Q419 43 426 35T447 26Q469 29 482 57T512 145Q514 153 532 153Q551 153 551 144Q550 139 549 130T540 98T523 55T498 17T462 -8Q454 -10 438 -10Q372 -10 347 46Q345 45 336 36T318 21T296 6T267 -6T233 -11Q189 -11 155 7Q103 38 103 113Q103 170 138 262T173 379Q173 380 173 381Q173 390 173 393T169 400T158 404H154Q131 404 112 385T82 344T65 302T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-6C" d="M117 59Q117 26 142 26Q179 26 205 131Q211 151 215 152Q217 153 225 153H229Q238 153 241 153T246 151T248 144Q247 138 245 128T234 90T214 43T183 6T137 -11Q101 -11 70 11T38 85Q38 97 39 102L104 360Q167 615 167 623Q167 626 166 628T162 632T157 634T149 635T141 636T132 637T122 637Q112 637 109 637T101 638T95 641T94 647Q94 649 96 661Q101 680 107 682T179 688Q194 689 213 690T243 693T254 694Q266 694 266 686Q266 675 193 386T118 83Q118 81 118 75T117 65V59Z"></path><path stroke-width="1" id="MJMATHI-69" d="M184 600Q184 624 203 642T247 661Q265 661 277 649T290 619Q290 596 270 577T226 557Q211 557 198 567T184 600ZM21 287Q21 295 30 318T54 369T98 420T158 442Q197 442 223 419T250 357Q250 340 236 301T196 196T154 83Q149 61 149 51Q149 26 166 26Q175 26 185 29T208 43T235 78T260 137Q263 149 265 151T282 153Q302 153 302 143Q302 135 293 112T268 61T223 11T161 -11Q129 -11 102 10T74 74Q74 91 79 106T122 220Q160 321 166 341T173 380Q173 404 156 404H154Q124 404 99 371T61 287Q60 286 59 284T58 281T56 279T53 278T49 278T41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMAIN-28" d="M94 250Q94 319 104 381T127 488T164 576T202 643T244 695T277 729T302 750H315H319Q333 750 333 741Q333 738 316 720T275 667T226 581T184 443T167 250T184 58T225 -81T274 -167T316 -220T333 -241Q333 -250 318 -250H315H302L274 -226Q180 -141 137 -14T94 250Z"></path><path stroke-width="1" id="MJMATHI-3C0" d="M132 -11Q98 -11 98 22V33L111 61Q186 219 220 334L228 358H196Q158 358 142 355T103 336Q92 329 81 318T62 297T53 285Q51 284 38 284Q19 284 19 294Q19 300 38 329T93 391T164 429Q171 431 389 431Q549 431 553 430Q573 423 573 402Q573 371 541 360Q535 358 472 358H408L405 341Q393 269 393 222Q393 170 402 129T421 65T431 37Q431 20 417 5T381 -10Q370 -10 363 -7T347 17T331 77Q330 86 330 121Q330 170 339 226T357 318T367 358H269L268 354Q268 351 249 275T206 114T175 17Q164 -11 132 -11Z"></path><path stroke-width="1" id="MJMAIN-29" d="M60 749L64 750Q69 750 74 750H86L114 726Q208 641 251 514T294 250Q294 182 284 119T261 12T224 -76T186 -143T145 -194T113 -227T90 -246Q87 -249 86 -250H74Q66 -250 63 -250T58 -247T55 -238Q56 -237 66 -225Q221 -64 221 250T66 725Q56 737 55 738Q55 746 60 749Z"></path><path stroke-width="1" id="MJMAIN-31" d="M213 578L200 573Q186 568 160 563T102 556H83V602H102Q149 604 189 617T245 641T273 663Q275 666 285 666Q294 666 302 660V361L303 61Q310 54 315 52T339 48T401 46H427V0H416Q395 3 257 3Q121 3 100 0H88V46H114Q136 46 152 46T177 47T193 50T201 52T207 57T213 61V578Z"></path><path stroke-width="1" id="MJMATHI-61" d="M33 157Q33 258 109 349T280 441Q331 441 370 392Q386 422 416 422Q429 422 439 414T449 394Q449 381 412 234T374 68Q374 43 381 35T402 26Q411 27 422 35Q443 55 463 131Q469 151 473 152Q475 153 483 153H487Q506 153 506 144Q506 138 501 117T481 63T449 13Q436 0 417 -8Q409 -10 393 -10Q359 -10 336 5T306 36L300 51Q299 52 296 50Q294 48 292 46Q233 -10 172 -10Q117 -10 75 30T33 157ZM351 328Q351 334 346 350T323 385T277 405Q242 405 210 374T160 293Q131 214 119 129Q119 126 119 118T118 106Q118 61 136 44T179 26Q217 26 254 59T298 110Q300 114 325 217T351 328Z"></path><path stroke-width="1" id="MJMATHI-3B1" d="M34 156Q34 270 120 356T309 442Q379 442 421 402T478 304Q484 275 485 237V208Q534 282 560 374Q564 388 566 390T582 393Q603 393 603 385Q603 376 594 346T558 261T497 161L486 147L487 123Q489 67 495 47T514 26Q528 28 540 37T557 60Q559 67 562 68T577 70Q597 70 597 62Q597 56 591 43Q579 19 556 5T512 -10H505Q438 -10 414 62L411 69L400 61Q390 53 370 41T325 18T267 -2T203 -11Q124 -11 79 39T34 156ZM208 26Q257 26 306 47T379 90L403 112Q401 255 396 290Q382 405 304 405Q235 405 183 332Q156 292 139 224T121 120Q121 71 146 49T208 26Z"></path><path stroke-width="1" id="MJMAIN-2C" d="M78 35T78 60T94 103T137 121Q165 121 187 96T210 8Q210 -27 201 -60T180 -117T154 -158T130 -185T117 -194Q113 -194 104 -185T95 -172Q95 -168 106 -156T131 -126T157 -76T173 -3V9L172 8Q170 7 167 6T161 3T152 1T140 0Q113 0 96 17Z"></path><path stroke-width="1" id="MJMATHI-3B2" d="M29 -194Q23 -188 23 -186Q23 -183 102 134T186 465Q208 533 243 584T309 658Q365 705 429 705H431Q493 705 533 667T573 570Q573 465 469 396L482 383Q533 332 533 252Q533 139 448 65T257 -10Q227 -10 203 -2T165 17T143 40T131 59T126 65L62 -188Q60 -194 42 -194H29ZM353 431Q392 431 427 419L432 422Q436 426 439 429T449 439T461 453T472 471T484 495T493 524T501 560Q503 569 503 593Q503 611 502 616Q487 667 426 667Q384 667 347 643T286 582T247 514T224 455Q219 439 186 308T152 168Q151 163 151 147Q151 99 173 68Q204 26 260 26Q302 26 349 51T425 137Q441 171 449 214T457 279Q457 337 422 372Q380 358 347 358H337Q258 358 258 389Q258 396 261 403Q275 431 353 431Z"></path><path stroke-width="1" id="MJMAIN-7C" d="M139 -249H137Q125 -249 119 -235V251L120 737Q130 750 139 750Q152 750 159 735V-235Q151 -249 141 -249H139Z"></path><path stroke-width="1" id="MJMAIN-2B" d="M56 237T56 250T70 270H369V420L370 570Q380 583 389 583Q402 583 409 568V270H707Q722 262 722 250T707 230H409V-68Q401 -82 391 -82H389H387Q375 -82 369 -68V230H70Q56 237 56 250Z"></path><path stroke-width="1" id="MJMAIN-2E" d="M78 60Q78 84 95 102T138 120Q162 120 180 104T199 61Q199 36 182 18T139 0T96 17T78 60Z"></path><path stroke-width="1" id="MJMAIN-3D" d="M56 347Q56 360 70 367H707Q722 359 722 347Q722 336 708 328L390 327H72Q56 332 56 347ZM56 153Q56 168 72 173H708Q722 163 722 153Q722 140 707 133H70Q56 140 56 153Z"></path><path stroke-width="1" id="MJMATHI-3B4" d="M195 609Q195 656 227 686T302 717Q319 716 351 709T407 697T433 690Q451 682 451 662Q451 644 438 628T403 612Q382 612 348 641T288 671T249 657T235 628Q235 584 334 463Q401 379 401 292Q401 169 340 80T205 -10H198Q127 -10 83 36T36 153Q36 286 151 382Q191 413 252 434Q252 435 245 449T230 481T214 521T201 566T195 609ZM112 130Q112 83 136 55T204 27Q233 27 256 51T291 111T309 178T316 232Q316 267 309 298T295 344T269 400L259 396Q215 381 183 342T137 256T118 179T112 130Z"></path><path stroke-width="1" id="MJMAIN-22C5" d="M78 250Q78 274 95 292T138 310Q162 310 180 294T199 251Q199 226 182 208T139 190T96 207T78 250Z"></path><path stroke-width="1" id="MJMAIN-30" d="M96 585Q152 666 249 666Q297 666 345 640T423 548Q460 465 460 320Q460 165 417 83Q397 41 362 16T301 -15T250 -22Q224 -22 198 -16T137 16T82 83Q39 165 39 320Q39 494 96 585ZM321 597Q291 629 250 629Q208 629 178 597Q153 571 145 525T137 333Q137 175 145 125T181 46Q209 16 250 16Q290 16 318 46Q347 76 354 130T362 333Q362 478 354 524T321 597Z"></path><path stroke-width="1" id="MJMAIN-33" d="M127 463Q100 463 85 480T69 524Q69 579 117 622T233 665Q268 665 277 664Q351 652 390 611T430 522Q430 470 396 421T302 350L299 348Q299 347 308 345T337 336T375 315Q457 262 457 175Q457 96 395 37T238 -22Q158 -22 100 21T42 130Q42 158 60 175T105 193Q133 193 151 175T169 130Q169 119 166 110T159 94T148 82T136 74T126 70T118 67L114 66Q165 21 238 21Q293 21 321 74Q338 107 338 175V195Q338 290 274 322Q259 328 213 329L171 330L168 332Q166 335 166 348Q166 366 174 366Q202 366 232 371Q266 376 294 413T322 525V533Q322 590 287 612Q265 626 240 626Q208 626 181 615T143 592T132 580H135Q138 579 143 578T153 573T165 566T175 555T183 540T186 520Q186 498 172 481T127 463Z"></path><path stroke-width="1" id="MJMAIN-2260" d="M166 -215T159 -215T147 -212T141 -204T139 -197Q139 -190 144 -183L306 133H70Q56 140 56 153Q56 168 72 173H327L406 327H72Q56 332 56 347Q56 360 70 367H426Q597 702 602 707Q605 716 618 716Q625 716 630 712T636 703T638 696Q638 692 471 367H707Q722 359 722 347Q722 336 708 328L451 327L371 173H708Q722 163 722 153Q722 140 707 133H351Q175 -210 170 -212Q166 -215 159 -215Z"></path><path stroke-width="1" id="MJMATHI-79" d="M21 287Q21 301 36 335T84 406T158 442Q199 442 224 419T250 355Q248 336 247 334Q247 331 231 288T198 191T182 105Q182 62 196 45T238 27Q261 27 281 38T312 61T339 94Q339 95 344 114T358 173T377 247Q415 397 419 404Q432 431 462 431Q475 431 483 424T494 412T496 403Q496 390 447 193T391 -23Q363 -106 294 -155T156 -205Q111 -205 77 -183T43 -117Q43 -95 50 -80T69 -58T89 -48T106 -45Q150 -45 150 -87Q150 -107 138 -122T115 -142T102 -147L99 -148Q101 -153 118 -160T152 -167H160Q177 -167 186 -165Q219 -156 247 -127T290 -65T313 -9T321 21L315 17Q309 13 296 6T270 -6Q250 -11 231 -11Q185 -11 150 11T104 82Q103 89 103 113Q103 170 138 262T173 379Q173 380 173 381Q173 390 173 393T169 400T158 404H154Q131 404 112 385T82 344T65 302T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-67" d="M311 43Q296 30 267 15T206 0Q143 0 105 45T66 160Q66 265 143 353T314 442Q361 442 401 394L404 398Q406 401 409 404T418 412T431 419T447 422Q461 422 470 413T480 394Q480 379 423 152T363 -80Q345 -134 286 -169T151 -205Q10 -205 10 -137Q10 -111 28 -91T74 -71Q89 -71 102 -80T116 -111Q116 -121 114 -130T107 -144T99 -154T92 -162L90 -164H91Q101 -167 151 -167Q189 -167 211 -155Q234 -144 254 -122T282 -75Q288 -56 298 -13Q311 35 311 43ZM384 328L380 339Q377 350 375 354T369 368T359 382T346 393T328 402T306 405Q262 405 221 352Q191 313 171 233T151 117Q151 38 213 38Q269 38 323 108L331 118L384 328Z"></path><path stroke-width="1" id="MJMATHI-50" d="M287 628Q287 635 230 637Q206 637 199 638T192 648Q192 649 194 659Q200 679 203 681T397 683Q587 682 600 680Q664 669 707 631T751 530Q751 453 685 389Q616 321 507 303Q500 302 402 301H307L277 182Q247 66 247 59Q247 55 248 54T255 50T272 48T305 46H336Q342 37 342 35Q342 19 335 5Q330 0 319 0Q316 0 282 1T182 2Q120 2 87 2T51 1Q33 1 33 11Q33 13 36 25Q40 41 44 43T67 46Q94 46 127 49Q141 52 146 61Q149 65 218 339T287 628ZM645 554Q645 567 643 575T634 597T609 619T560 635Q553 636 480 637Q463 637 445 637T416 636T404 636Q391 635 386 627Q384 621 367 550T332 412T314 344Q314 342 395 342H407H430Q542 342 590 392Q617 419 631 471T645 554Z"></path><path stroke-width="1" id="MJMATHI-59" d="M66 637Q54 637 49 637T39 638T32 641T30 647T33 664T42 682Q44 683 56 683Q104 680 165 680Q288 680 306 683H316Q322 677 322 674T320 656Q316 643 310 637H298Q242 637 242 624Q242 619 292 477T343 333L346 336Q350 340 358 349T379 373T411 410T454 461Q546 568 561 587T577 618Q577 634 545 637Q528 637 528 647Q528 649 530 661Q533 676 535 679T549 683Q551 683 578 682T657 680Q684 680 713 681T746 682Q763 682 763 673Q763 669 760 657T755 643Q753 637 734 637Q662 632 617 587Q608 578 477 424L348 273L322 169Q295 62 295 57Q295 46 363 46Q379 46 384 45T390 35Q390 33 388 23Q384 6 382 4T366 1Q361 1 324 1T232 2Q170 2 138 2T102 1Q84 1 84 9Q84 14 87 24Q88 27 89 30T90 35T91 39T93 42T96 44T101 45T107 45T116 46T129 46Q168 47 180 50T198 63Q201 68 227 171L252 274L129 623Q128 624 127 625T125 627T122 629T118 631T113 633T105 634T96 635T83 636T66 637Z"></path><path stroke-width="1" id="MJMAIN-2202" d="M202 508Q179 508 169 520T158 547Q158 557 164 577T185 624T230 675T301 710L333 715H345Q378 715 384 714Q447 703 489 661T549 568T566 457Q566 362 519 240T402 53Q321 -22 223 -22Q123 -22 73 56Q42 102 42 148V159Q42 276 129 370T322 465Q383 465 414 434T455 367L458 378Q478 461 478 515Q478 603 437 639T344 676Q266 676 223 612Q264 606 264 572Q264 547 246 528T202 508ZM430 306Q430 372 401 400T333 428Q270 428 222 382Q197 354 183 323T150 221Q132 149 132 116Q132 21 232 21Q244 21 250 22Q327 35 374 112Q389 137 409 196T430 306Z"></path><path stroke-width="1" id="MJMAIN-393" d="M128 619Q121 626 117 628T101 631T58 634H25V680H554V676Q556 670 568 560T582 444V440H542V444Q542 445 538 478T523 545T492 598Q454 634 349 634H334Q264 634 249 633T233 621Q232 618 232 339L233 61Q240 54 245 52T270 48T333 46H360V0H348Q324 3 182 3Q51 3 36 0H25V46H58Q100 47 109 49T128 61V619Z"></path><path stroke-width="1" id="MJMATHI-58" d="M42 0H40Q26 0 26 11Q26 15 29 27Q33 41 36 43T55 46Q141 49 190 98Q200 108 306 224T411 342Q302 620 297 625Q288 636 234 637H206Q200 643 200 645T202 664Q206 677 212 683H226Q260 681 347 681Q380 681 408 681T453 682T473 682Q490 682 490 671Q490 670 488 658Q484 643 481 640T465 637Q434 634 411 620L488 426L541 485Q646 598 646 610Q646 628 622 635Q617 635 609 637Q594 637 594 648Q594 650 596 664Q600 677 606 683H618Q619 683 643 683T697 681T738 680Q828 680 837 683H845Q852 676 852 672Q850 647 840 637H824Q790 636 763 628T722 611T698 593L687 584Q687 585 592 480L505 384Q505 383 536 304T601 142T638 56Q648 47 699 46Q734 46 734 37Q734 35 732 23Q728 7 725 4T711 1Q708 1 678 1T589 2Q528 2 496 2T461 1Q444 1 444 10Q444 11 446 25Q448 35 450 39T455 44T464 46T480 47T506 54Q523 62 523 64Q522 64 476 181L429 299Q241 95 236 84Q232 76 232 72Q232 53 261 47Q262 47 267 47T273 46Q276 46 277 46T280 45T283 42T284 35Q284 26 282 19Q279 6 276 4T261 1Q258 1 243 1T201 2T142 2Q64 2 42 0Z"></path><path stroke-width="1" id="MJMAIN-5B" d="M118 -250V750H255V710H158V-210H255V-250H118Z"></path><path stroke-width="1" id="MJMAIN-5D" d="M22 710V750H159V-250H22V-210H119V710H22Z"></path><path stroke-width="1" id="MJMATHI-77" d="M580 385Q580 406 599 424T641 443Q659 443 674 425T690 368Q690 339 671 253Q656 197 644 161T609 80T554 12T482 -11Q438 -11 404 5T355 48Q354 47 352 44Q311 -11 252 -11Q226 -11 202 -5T155 14T118 53T104 116Q104 170 138 262T173 379Q173 380 173 381Q173 390 173 393T169 400T158 404H154Q131 404 112 385T82 344T65 302T57 280Q55 278 41 278H27Q21 284 21 287Q21 293 29 315T52 366T96 418T161 441Q204 441 227 416T250 358Q250 340 217 250T184 111Q184 65 205 46T258 26Q301 26 334 87L339 96V119Q339 122 339 128T340 136T341 143T342 152T345 165T348 182T354 206T362 238T373 281Q402 395 406 404Q419 431 449 431Q468 431 475 421T483 402Q483 389 454 274T422 142Q420 131 420 107V100Q420 85 423 71T442 42T487 26Q558 26 600 148Q609 171 620 213T632 273Q632 306 619 325T593 357T580 385Z"></path><path stroke-width="1" id="MJMATHI-45" d="M492 213Q472 213 472 226Q472 230 477 250T482 285Q482 316 461 323T364 330H312Q311 328 277 192T243 52Q243 48 254 48T334 46Q428 46 458 48T518 61Q567 77 599 117T670 248Q680 270 683 272Q690 274 698 274Q718 274 718 261Q613 7 608 2Q605 0 322 0H133Q31 0 31 11Q31 13 34 25Q38 41 42 43T65 46Q92 46 125 49Q139 52 144 61Q146 66 215 342T285 622Q285 629 281 629Q273 632 228 634H197Q191 640 191 642T193 659Q197 676 203 680H757Q764 676 764 669Q764 664 751 557T737 447Q735 440 717 440H705Q698 445 698 453L701 476Q704 500 704 528Q704 558 697 578T678 609T643 625T596 632T532 634H485Q397 633 392 631Q388 629 386 622Q385 619 355 499T324 377Q347 376 372 376H398Q464 376 489 391T534 472Q538 488 540 490T557 493Q562 493 565 493T570 492T572 491T574 487T577 483L544 351Q511 218 508 216Q505 213 492 213Z"></path><path stroke-width="1" id="MJSZ2-222B" d="M114 -798Q132 -824 165 -824H167Q195 -824 223 -764T275 -600T320 -391T362 -164Q365 -143 367 -133Q439 292 523 655T645 1127Q651 1145 655 1157T672 1201T699 1257T733 1306T777 1346T828 1360Q884 1360 912 1325T944 1245Q944 1220 932 1205T909 1186T887 1183Q866 1183 849 1198T832 1239Q832 1287 885 1296L882 1300Q879 1303 874 1307T866 1313Q851 1323 833 1323Q819 1323 807 1311T775 1255T736 1139T689 936T633 628Q574 293 510 -5T410 -437T355 -629Q278 -862 165 -862Q125 -862 92 -831T55 -746Q55 -711 74 -698T112 -685Q133 -685 150 -700T167 -741Q167 -789 114 -798Z"></path><path stroke-width="1" id="MJMATHI-64" d="M366 683Q367 683 438 688T511 694Q523 694 523 686Q523 679 450 384T375 83T374 68Q374 26 402 26Q411 27 422 35Q443 55 463 131Q469 151 473 152Q475 153 483 153H487H491Q506 153 506 145Q506 140 503 129Q490 79 473 48T445 8T417 -8Q409 -10 393 -10Q359 -10 336 5T306 36L300 51Q299 52 296 50Q294 48 292 46Q233 -10 172 -10Q117 -10 75 30T33 157Q33 205 53 255T101 341Q148 398 195 420T280 442Q336 442 364 400Q369 394 369 396Q370 400 396 505T424 616Q424 629 417 632T378 637H357Q351 643 351 645T353 664Q358 683 366 683ZM352 326Q329 405 277 405Q242 405 210 374T160 293Q131 214 119 129Q119 126 119 118T118 106Q118 61 136 44T179 26Q233 26 290 98L298 109L352 326Z"></path><path stroke-width="1" id="MJMATHI-56" d="M52 648Q52 670 65 683H76Q118 680 181 680Q299 680 320 683H330Q336 677 336 674T334 656Q329 641 325 637H304Q282 635 274 635Q245 630 242 620Q242 618 271 369T301 118L374 235Q447 352 520 471T595 594Q599 601 599 609Q599 633 555 637Q537 637 537 648Q537 649 539 661Q542 675 545 679T558 683Q560 683 570 683T604 682T668 681Q737 681 755 683H762Q769 676 769 672Q769 655 760 640Q757 637 743 637Q730 636 719 635T698 630T682 623T670 615T660 608T652 599T645 592L452 282Q272 -9 266 -16Q263 -18 259 -21L241 -22H234Q216 -22 216 -15Q213 -9 177 305Q139 623 138 626Q133 637 76 637H59Q52 642 52 648Z"></path><path stroke-width="1" id="MJMAIN-2265" d="M83 616Q83 624 89 630T99 636Q107 636 253 568T543 431T687 361Q694 356 694 346T687 331Q685 329 395 192L107 56H101Q83 58 83 76Q83 77 83 79Q82 86 98 95Q117 105 248 167Q326 204 378 228L626 346L360 472Q291 505 200 548Q112 589 98 597T83 616ZM84 -118Q84 -108 99 -98H678Q694 -104 694 -118Q694 -130 679 -138H98Q84 -131 84 -118Z"></path><path stroke-width="1" id="MJMAIN-35" d="M164 157Q164 133 148 117T109 101H102Q148 22 224 22Q294 22 326 82Q345 115 345 210Q345 313 318 349Q292 382 260 382H254Q176 382 136 314Q132 307 129 306T114 304Q97 304 95 310Q93 314 93 485V614Q93 664 98 664Q100 666 102 666Q103 666 123 658T178 642T253 634Q324 634 389 662Q397 666 402 666Q410 666 410 648V635Q328 538 205 538Q174 538 149 544L139 546V374Q158 388 169 396T205 412T256 420Q337 420 393 355T449 201Q449 109 385 44T229 -22Q148 -22 99 32T50 154Q50 178 61 192T84 210T107 214Q132 214 148 197T164 157Z"></path><path stroke-width="1" id="MJMAIN-34" d="M462 0Q444 3 333 3Q217 3 199 0H190V46H221Q241 46 248 46T265 48T279 53T286 61Q287 63 287 115V165H28V211L179 442Q332 674 334 675Q336 677 355 677H373L379 671V211H471V165H379V114Q379 73 379 66T385 54Q393 47 442 46H471V0H462ZM293 211V545L74 212L183 211H293Z"></path><path stroke-width="1" id="MJMATHI-73" d="M131 289Q131 321 147 354T203 415T300 442Q362 442 390 415T419 355Q419 323 402 308T364 292Q351 292 340 300T328 326Q328 342 337 354T354 372T367 378Q368 378 368 379Q368 382 361 388T336 399T297 405Q249 405 227 379T204 326Q204 301 223 291T278 274T330 259Q396 230 396 163Q396 135 385 107T352 51T289 7T195 -10Q118 -10 86 19T53 87Q53 126 74 143T118 160Q133 160 146 151T160 120Q160 94 142 76T111 58Q109 57 108 57T107 55Q108 52 115 47T146 34T201 27Q237 27 263 38T301 66T318 97T323 122Q323 150 302 164T254 181T195 196T148 231Q131 256 131 289Z"></path><path stroke-width="1" id="MJMATHI-4C" d="M228 637Q194 637 192 641Q191 643 191 649Q191 673 202 682Q204 683 217 683Q271 680 344 680Q485 680 506 683H518Q524 677 524 674T522 656Q517 641 513 637H475Q406 636 394 628Q387 624 380 600T313 336Q297 271 279 198T252 88L243 52Q243 48 252 48T311 46H328Q360 46 379 47T428 54T478 72T522 106T564 161Q580 191 594 228T611 270Q616 273 628 273H641Q647 264 647 262T627 203T583 83T557 9Q555 4 553 3T537 0T494 -1Q483 -1 418 -1T294 0H116Q32 0 32 10Q32 17 34 24Q39 43 44 45Q48 46 59 46H65Q92 46 125 49Q139 52 144 61Q147 65 216 339T285 628Q285 635 228 637Z"></path><path stroke-width="1" id="MJMATHI-6B" d="M121 647Q121 657 125 670T137 683Q138 683 209 688T282 694Q294 694 294 686Q294 679 244 477Q194 279 194 272Q213 282 223 291Q247 309 292 354T362 415Q402 442 438 442Q468 442 485 423T503 369Q503 344 496 327T477 302T456 291T438 288Q418 288 406 299T394 328Q394 353 410 369T442 390L458 393Q446 405 434 405H430Q398 402 367 380T294 316T228 255Q230 254 243 252T267 246T293 238T320 224T342 206T359 180T365 147Q365 130 360 106T354 66Q354 26 381 26Q429 26 459 145Q461 153 479 153H483Q499 153 499 144Q499 139 496 130Q455 -11 378 -11Q333 -11 305 15T277 90Q277 108 280 121T283 145Q283 167 269 183T234 206T200 217T182 220H180Q168 178 159 139T145 81T136 44T129 20T122 7T111 -2Q98 -11 83 -11Q66 -11 57 -1T48 16Q48 26 85 176T158 471L195 616Q196 629 188 632T149 637H144Q134 637 131 637T124 640T121 647Z"></path><path stroke-width="1" id="MJSZ1-222B" d="M113 -244Q113 -246 119 -251T139 -263T167 -269Q186 -269 199 -260Q220 -247 232 -218T251 -133T262 -15T276 155T297 367Q300 390 305 438T314 512T325 580T340 647T361 703T390 751T428 784T479 804Q481 804 488 804T501 805Q552 802 581 769T610 695Q610 669 594 657T561 645Q542 645 527 658T512 694Q512 705 516 714T526 729T538 737T548 742L552 743Q552 745 545 751T525 762T498 768Q475 768 460 756T434 716T418 652T407 559T398 444T387 300T369 133Q349 -38 337 -102T303 -207Q256 -306 169 -306Q119 -306 87 -272T55 -196Q55 -170 71 -158T104 -146Q123 -146 138 -159T153 -195Q153 -206 149 -215T139 -230T127 -238T117 -242L113 -244Z"></path><path stroke-width="1" id="MJMATHI-3B3" d="M31 249Q11 249 11 258Q11 275 26 304T66 365T129 418T206 441Q233 441 239 440Q287 429 318 386T371 255Q385 195 385 170Q385 166 386 166L398 193Q418 244 443 300T486 391T508 430Q510 431 524 431H537Q543 425 543 422Q543 418 522 378T463 251T391 71Q385 55 378 6T357 -100Q341 -165 330 -190T303 -216Q286 -216 286 -188Q286 -138 340 32L346 51L347 69Q348 79 348 100Q348 257 291 317Q251 355 196 355Q148 355 108 329T51 260Q49 251 47 251Q45 249 31 249Z"></path><path stroke-width="1" id="MJMAIN-2032" d="M79 43Q73 43 52 49T30 61Q30 68 85 293T146 528Q161 560 198 560Q218 560 240 545T262 501Q262 496 260 486Q259 479 173 263T84 45T79 43Z"></path><path stroke-width="1" id="MJMATHI-3BC" d="M58 -216Q44 -216 34 -208T23 -186Q23 -176 96 116T173 414Q186 442 219 442Q231 441 239 435T249 423T251 413Q251 401 220 279T187 142Q185 131 185 107V99Q185 26 252 26Q261 26 270 27T287 31T302 38T315 45T327 55T338 65T348 77T356 88T365 100L372 110L408 253Q444 395 448 404Q461 431 491 431Q504 431 512 424T523 412T525 402L449 84Q448 79 448 68Q448 43 455 35T476 26Q485 27 496 35Q517 55 537 131Q543 151 547 152Q549 153 557 153H561Q580 153 580 144Q580 138 575 117T555 63T523 13Q510 0 491 -8Q483 -10 467 -10Q446 -10 429 -4T402 11T385 29T376 44T374 51L368 45Q362 39 350 30T324 12T288 -4T246 -11Q199 -11 153 12L129 -85Q108 -167 104 -180T92 -202Q76 -216 58 -216Z"></path><path stroke-width="1" id="MJMATHI-3C3" d="M184 -11Q116 -11 74 34T31 147Q31 247 104 333T274 430Q275 431 414 431H552Q553 430 555 429T559 427T562 425T565 422T567 420T569 416T570 412T571 407T572 401Q572 357 507 357Q500 357 490 357T476 358H416L421 348Q439 310 439 263Q439 153 359 71T184 -11ZM361 278Q361 358 276 358Q152 358 115 184Q114 180 114 178Q106 141 106 117Q106 67 131 47T188 26Q242 26 287 73Q316 103 334 153T356 233T361 278Z"></path></defs></svg></body></html>Done in 2.66s.

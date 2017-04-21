@@ -2085,7 +2085,7 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
 </g>
 </g>
 </g>
-</svg></span> has lost precision to the ones place, that is, <code>np.spacing(gamma(19)) == 1.0</code>). In this regime, which we regularly encounter, particularly when over- and under-reviewing, addition and subtraction are risky. Ebisu takes care to factor these expressions to allow the use of log-gamma, <a href="https://docs.scipy.org/doc/numpy/reference/generated/numpy.expm1.html"><code>expm1</code></a>, and <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html"><code>logsumexp</code></a> and minimize loss of precision.</p>
+</svg></span> has lost precision to the ones place, that is, <code>np.spacing(gamma(19)) == 1.0</code>). In this regime, which we regularly encounter particularly when over- and under-reviewing, addition and subtraction are risky. Ebisu takes care to factor these expressions to allow the use of log-gamma, <a href="https://docs.scipy.org/doc/numpy/reference/generated/numpy.expm1.html"><code>expm1</code></a>, and <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html"><code>logsumexp</code></a>, in order to minimize loss of precision.</p>
 </blockquote>
 <p>With the mean and variance of the posterior in hand, it is straightforward to find a well-approximating Beta distribution using the <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">method of moments</a>:</p>
 <ul>

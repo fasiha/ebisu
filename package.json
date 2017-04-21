@@ -7,7 +7,7 @@
   "license": "Unlicense",
   "scripts": {
     "build": "node md2code.js",
-    "html": "cp header.html index.html && pandoc -f markdown_github -t html5 README.md | sed 's/\\\\&amp;/\\&/g' >> index.html && node_modules/.bin/mjpage < index.html > tmp && mv tmp index.html",
+    "html": "cp header.html index.html && pandoc --no-highlight -f markdown_github -t html5 README.md | sed 's/\\\\&amp;/\\&/g' >> index.html && node_modules/.bin/mjpage < index.html | grep -v HLJS_CLIENTSIDE > tmp && mv tmp index.html",
     "test": "yarn build && python3 -m \"nose\" -v",
     "pypi": "python setup.py sdist bdist_wheel && python3 setup.py sdist bdist_wheel && twine upload dist/* --skip-existing"
   },

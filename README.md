@@ -82,32 +82,32 @@ Similarly, if the student fails the quiz after a whole month of not reviewing it
 
 Let’s begin with a quiz. One way or another, we’ve picked a fact to quiz the student on, \\(t\\) days (the units are arbitrary since \\(t\\) can be any positive real number) after her last quiz on it, or since she learned it for the first time.
 
-We’ll model the results of the quiz as a [Bernoulli experiment](https://en.wikipedia.org/wiki/Bernoulli_distribution), \\(x_t ∼ Bernoulli(π)\\); \\(x_t\\) can be either 1 (success) with probability \\(π_t\\), or 0 (fail) with probability \\(1-π_t\\). Let’s think about \\(π_t\\) as the recall probability at time \\(t\\)—then \\(x_t\\) is a coin flip, with a \\(π_t\\)-weighted coin.
+We’ll model the results of the quiz as a [Bernoulli experiment](https://en.wikipedia.org/wiki/Bernoulli_distribution), \\(x_t ∼ Bernoulli(p)\\); \\(x_t\\) can be either 1 (success) with probability \\(p_t\\), or 0 (fail) with probability \\(1-p_t\\). Let’s think about \\(p_t\\) as the recall probability at time \\(t\\)—then \\(x_t\\) is a coin flip, with a \\(p_t\\)-weighted coin.
 
-The [Beta distribution](https://en.wikipedia.org/wiki/Beta_distribution) happens to be the [conjugate prior](https://en.wikipedia.org/wiki/Conjugate_prior) for the Bernoulli distribution. So if our *a priori* belief about \\(π_t\\) follow a Beta distribution, that is, if
-\\[π_t ∼ Beta(α_t, β_t)\\]
+The [Beta distribution](https://en.wikipedia.org/wiki/Beta_distribution) happens to be the [conjugate prior](https://en.wikipedia.org/wiki/Conjugate_prior) for the Bernoulli distribution. So if our *a priori* belief about \\(p_t\\) follow a Beta distribution, that is, if
+\\[p_t ∼ Beta(α_t, β_t)\\]
 for specific \\(α_t\\) and \\(β_t\\), then observing the quiz result updates our belief about the recall probability to be:
-\\[π_t | x_t ∼ Beta(α_t + x_t, β_t + 1 - x_t).\\]
+\\[p_t | x_t ∼ Beta(α_t + x_t, β_t + 1 - x_t).\\]
 
 > **Aside 1** Notice that since \\(x_t\\) is either 1 or 0, the updated parameters \\((α + x_t, β + 1 - x_t)\\) are \\((α + 1, β)\\) when the student correctly answered the quiz, and \\((α, β + 1)\\) when she answered incorrectly.
 >
-> **Aside 2** Even if you’re familiar with Bayesian statistics, if you’ve never worked with priors on probabilities, the meta-ness here might confuse you. What the above means is that, before we flipped our \\(π_t\\)-weighted coin (before we administered the quiz), we had a specific probability distribution representing the coin’s weighting \\(π_t\\), *not* just a scalar number. After we observed the result of the coin flip, we updated our belief about the coin’s weighting—it *still* makes total sense to talk about the probability of something happening after it happens. Said another way, since we’re being Bayesian, something actually happening doesn’t preclude us from maintaining beliefs about what *could* have happened.
+> **Aside 2** Even if you’re familiar with Bayesian statistics, if you’ve never worked with priors on probabilities, the meta-ness here might confuse you. What the above means is that, before we flipped our \\(p_t\\)-weighted coin (before we administered the quiz), we had a specific probability distribution representing the coin’s weighting \\(p_t\\), *not* just a scalar number. After we observed the result of the coin flip, we updated our belief about the coin’s weighting—it *still* makes total sense to talk about the probability of something happening after it happens. Said another way, since we’re being Bayesian, something actually happening doesn’t preclude us from maintaining beliefs about what *could* have happened.
 
-This is totally ordinary, bread-and-butter Bayesian statistics. However, the major complication arises when the experiment took place not at time \\(t\\) but \\(t_2\\)? That is, we have a Beta prior on \\(π_t\\) (probability of  recall at time \\(t\\)) but the test is administered at some other time \\(t_2\\).
+This is totally ordinary, bread-and-butter Bayesian statistics. However, the major complication arises when the experiment took place not at time \\(t\\) but \\(t_2\\)? That is, we have a Beta prior on \\(p_t\\) (probability of  recall at time \\(t\\)) but the test is administered at some other time \\(t_2\\).
 
 How can we update our beliefs about the recall probability at time \\(t\\) to another time \\(t_2\\), either earlier or later than \\(t\\)?
 
 ### Moving Beta distributions through time
 
 Our old friend Ebbinghaus comes to our rescue. According to the exponentially-decaying forgetting curve, the probability of recall at time \\(t\\) is
-\\[π_t = 2^{-t/h},\\]
+\\[p_t = 2^{-t/h},\\]
 for some notional half-life \\(h\\). Let \\(t_2 = δ·t\\). Then,
-\\[π_{t_2} = π_{δ t} = 2^{-δt/h} = (2^{-t/h})^δ = (π_t)^δ.\\]
-That is, to fast-forward or rewind \\(π_t\\) to time \\(t_2\\), we raise it to the \\(δ = t_2 / t\\) power.
+\\[p_{t_2} = p_{δ t} = 2^{-δt/h} = (2^{-t/h})^δ = (p_t)^δ.\\]
+That is, to fast-forward or rewind \\(p_t\\) to time \\(t_2\\), we raise it to the \\(δ = t_2 / t\\) power.
 
-Unfortunately, a Beta-distributed \\(π_t\\) becomes not-Beta-distributed when raised to any positive power \\(δ\\).
+Unfortunately, a Beta-distributed \\(p_t\\) becomes not-Beta-distributed when raised to any positive power \\(δ\\).
 
-In the code snippet below, we start out with \\(π_t ∼ Beta(12, 12)\\) and show the distribution of \\(π_t^δ\\) for various \\(δ\\). To make it concrete, imagine \\(t\\) is seven days. The \\(Beta(12, 12)\\) prior on recall probability seven days after the last review is the middle histogram (\\(δ = 1\\)). If the student is quizzed on this fact just two days after last review (\\(δ=0.3\\)), that density moves from the middle of the plot to the right, meaning a high probability of recall. However, if the student is quizzed three weeks after review, the original density moves to the left: it’s likely the student will fail the quiz.
+In the code snippet below, we start out with \\(p_t ∼ Beta(12, 12)\\) and show the distribution of \\(p_t^δ\\) for various \\(δ\\). To make it concrete, imagine \\(t\\) is seven days. The \\(Beta(12, 12)\\) prior on recall probability seven days after the last review is the middle histogram (\\(δ = 1\\)). If the student is quizzed on this fact just two days after last review (\\(δ=0.3\\)), that density moves from the middle of the plot to the right, meaning a high probability of recall. However, if the student is quizzed three weeks after review, the original density moves to the left: it’s likely the student will fail the quiz.
 ```py
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
@@ -135,9 +135,9 @@ def generatePis(deltaT, alpha=12.0, beta=12.0):
 generatePis(0.3)
 generatePis(1.)
 generatePis(3.)
-plt.xlabel('π (recall probability)')
-plt.ylabel('Probability(π)')
-plt.title('Histograms of π_t^δ for different δ')
+plt.xlabel('p (recall probability)')
+plt.ylabel('Probability(p)')
+plt.title('Histograms of p_t^δ for different δ')
 plt.legend(loc=0)
 plt.savefig('figures/pidelta.svg')
 plt.savefig('figures/pidelta.png', dpi=150)
@@ -145,9 +145,9 @@ plt.show()
 ```
 ![figures/pidelta.png](figures/pidelta.png)
 
-You’ll have to take my word for it that the histograms where \\(δ≠1\\) as indeed not Beta. I initially fit a Beta distribution to them and sought to make this point visually but alas, for reasonable values of \\(α\\), \\(β\\), and \\(δ\\), a histogram for \\(π_t^δ\\) was well-matched by a Beta distribution.
+You’ll have to take my word for it that the histograms where \\(δ≠1\\) as indeed not Beta. I initially fit a Beta distribution to them and sought to make this point visually but alas, for reasonable values of \\(α\\), \\(β\\), and \\(δ\\), a histogram for \\(p_t^δ\\) was well-matched by a Beta distribution.
 
-So let’s derive analytically the probability density function (PDF) for \\(π_t^δ\\). Recall the conventional way to obtain the density of a [nonlinearly-transformed random variable](https://en.wikipedia.org/w/index.php?title=Random_variable&oldid=771423505#Functions_of_random_variables): let \\(x=π_t\\) and \\(y = g(x) = x^δ\\) be the forward transform, so \\(g^{-1}(y) = x^{1/δ}\\) is its inverse. Then, with \\(x\\) being \\(Beta(α,β)\\),
+So let’s derive analytically the probability density function (PDF) for \\(p_t^δ\\). Recall the conventional way to obtain the density of a [nonlinearly-transformed random variable](https://en.wikipedia.org/w/index.php?title=Random_variable&oldid=771423505#Functions_of_random_variables): let \\(x=p_t\\) and \\(y = g(x) = x^δ\\) be the forward transform, so \\(g^{-1}(y) = x^{1/δ}\\) is its inverse. Then, with \\(x\\) being \\(Beta(α,β)\\),
 \\[P_{Y}(y) = P_{x}(g^{-1}(y)) · \frac{∂}{∂y} g^{-1}(y),\\]
 and this after some Wolfram Alpha and hand-manipulation becomes
 \\[P_{Y}(y) = y^{(α-δ)/δ} · (1-y^{1/δ})^{β-1} / (δ · B(α, β)),\\]
@@ -155,41 +155,41 @@ where \\(B(α, β) = Γ(α) · Γ(β) / Γ(α + β)\\) is [beta function](https:
 
 > To check this, type in `y^((a-1)/d) * (1 - y^(1/d))^(b-1) / Beta[a,b] * D[y^(1/d), y]` at [Wolfram Alpha](https://www.wolframalpha.com).
 
-Replacing the \\(X\\)’s and \\(Y\\)’s with our usual variables, we have the probability density for \\(π_{t_2} = π_t^δ\\) in terms of the original density for \\(π_t\\):
-\\[P(π_t^δ) = \frac{π^{(α - δ)/δ} · (1-π^{1/δ})^{β-1}}{δ · B(α, β)}.\\]
+Replacing the \\(X\\)’s and \\(Y\\)’s with our usual variables, we have the probability density for \\(p_{t_2} = p_t^δ\\) in terms of the original density for \\(p_t\\):
+\\[P(p_t^δ) = \frac{p^{(α - δ)/δ} · (1-p^{1/δ})^{β-1}}{δ · B(α, β)}.\\]
 I tried but failed to rewrite this as a Beta distribution, and indeed, we can show numerically that this density does indeed diverge from the best-approximating Beta density.
 
-We will use the density of \\(π_t^δ\\) to reach our two most important goals:
+We will use the density of \\(p_t^δ\\) to reach our two most important goals:
 - what’s the recall probability of a given fact right now?, and
 - how do I update my estimate of that recall probability given quiz results?
 
 ### Mean and variance of the recall probability right now
 
-Let’s see how to get the recall probability right now. Recall that we start out with a prior on \\(π_t ∼ Beta(α, β)\\), that is, we believe the recall probability on a quiz conducted \\(t\\) days after the last review for a given fact is \\(Beta(α, β)\\)-distributed. This prior is parameterized by three positive real numbers: \\([α, β, t]\\). Let \\(δ = t_{now} / t\\), where \\(t_{now}\\) is the time currently elapsed since the last review. The expected recall probability right now is
+Let’s see how to get the recall probability right now. Recall that we start out with a prior on \\(p_t ∼ Beta(α, β)\\), that is, we believe the recall probability on a quiz conducted \\(t\\) days after the last review for a given fact is \\(Beta(α, β)\\)-distributed. This prior is parameterized by three positive real numbers: \\([α, β, t]\\). Let \\(δ = t_{now} / t\\), where \\(t_{now}\\) is the time currently elapsed since the last review. The expected recall probability right now is
 \begin{align}
-E[π_t^δ] \\&= \int_0^1 P(π_t^δ) · π \\, dπ \\\\
+E[p_t^δ] \\&= \int_0^1 P(p_t^δ) · p \\, dp \\\\
          \\&= \frac{Γ(α + β)}{Γ(α)} · \frac{Γ(α + δ)}{Γ(α + β + δ)}.
 \end{align}
 
 > Mathematica code to verify on Wolfram Alpha: `Integrate[p^((a - d)/d) * (1 - p^(1/d))^(b - 1) / (d * Gamma[a]*Gamma[b]/Gamma[a+b]) * p, {p, 0, 1}]`.
 
-It’s also useful to know how much uncertainty is in our belief about \\(π_t^δ\\). We can evaluate the variance of \\(π_t^δ\\):
+It’s also useful to know how much uncertainty is in our belief about \\(p_t^δ\\). We can evaluate the variance of \\(p_t^δ\\):
 \\[\begin{align}
-Var[π_t^δ] \\&= \int_0^1 P(π_t^δ) · (π - E[π_t^δ])^2 \\, dπ \\\\
-           \\&= E[π_t^{2 δ}] - (E[π_t^δ])^2.
+Var[p_t^δ] \\&= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \\, dp \\\\
+           \\&= E[p_t^{2 δ}] - (E[p_t^δ])^2.
 \end{align}\\]
 
-That first value \\(E[π_t^{2 δ}]\\) means evaluate the expected recall probability for \\(2 δ\\), that is, at another \\(t_{now}\\) days in the future. It might be just coincidence but the fact that \\(2 δ\\) shows up in this way surprised me.
+That first value \\(E[p_t^{2 δ}]\\) means evaluate the expected recall probability for \\(2 δ\\), that is, at another \\(t_{now}\\) days in the future. It might be just coincidence but the fact that \\(2 δ\\) shows up in this way surprised me.
 
 > Verifying this in Mathematica/Wolfram Alpha is a bit more involved. First,
-> `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - d)/d) * (1 - p^(1/d))^(b - 1) / (d * Gamma[a]*Gamma[b]/Gamma[a+b]) * (p-m)^2, {p, 0, 1}]}]` gives the result in terms of mean `m` = \\(E[π_t^δ]\\). Then plug in that value for `m` and simplify by hand.
+> `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - d)/d) * (1 - p^(1/d))^(b - 1) / (d * Gamma[a]*Gamma[b]/Gamma[a+b]) * (p-m)^2, {p, 0, 1}]}]` gives the result in terms of mean `m` = \\(E[p_t^δ]\\). Then plug in that value for `m` and simplify by hand.
 
 So far we have found three analytical expressions. Suffice it to say that I tested both the derivations as well as my implementations of them in the code thoroughly to confirm that they matched the answers given by quadrature integration as well as Monte Carlo analysis. Code to do that is provided below, and when I present it, I will show how the above formulae are corroborated.
 
-A quiz app can implement at least the expectation \\(E[π_t^δ]\\) above to identify the facts most at risk of being forgotten.
+A quiz app can implement at least the expectation \\(E[p_t^δ]\\) above to identify the facts most at risk of being forgotten.
 
 ### Initial choice for \\(α\\), \\(β\\), and \\(t\\)
-Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple \\([α, β, t]\\) initially, for example when the student has first learned a fact. I propose setting \\(t\\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \\(t\\) to four hours or a day, respectively. Then, set \\(α = β ≥ 2\\): the \\(α = β\\) part will center the Beta distribution for \\(π_t\\) at 0.5, and then the actual value will constrain the variability of \\(π_t\\). Specifically, the \\(Beta(α, β)\\) distribution has
+Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple \\([α, β, t]\\) initially, for example when the student has first learned a fact. I propose setting \\(t\\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \\(t\\) to four hours or a day, respectively. Then, set \\(α = β ≥ 2\\): the \\(α = β\\) part will center the Beta distribution for \\(p_t\\) at 0.5, and then the actual value will constrain the variability of \\(p_t\\). Specifically, the \\(Beta(α, β)\\) distribution has
 - mean \\(α / (α + β)\\) or \\(0.5\\) if \\(α = β\\), and
 - variance \\(α · β / (α + β)^ 2 / (α + β + 1)\\) which simplifies to \\(1/(4 (2 α + 1))\\) when \\(α = β\\).
     - (Recall the traditional explanation of \\(α\\) and \\(β\\) are the number of successes and failures, respectively, that have been observed by flipping a weighted coin—or in our application, the number of successful versus unsuccessful quiz results for a sequence of quizzes on the same fact \\(t\\) days apart.)
@@ -200,35 +200,35 @@ Now, let us turn to the final piece of the math, how to update our Beta prior on
 
 ### Updating the posterior with quiz results
 
-One option could be this: since we have analytical expressions for the mean and variance of the prior on \\(π_t^δ\\), convert these to the [closest Beta distribution](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) and straightforwardly update with the Bernoulli likelihood (straightforward because of conjugacy). However, it is better to delay the Beta fit till we have the posterior, and do the likelihood update analytically. Lucky for us, this is tractable and we will see code later that demonstrates the  boost in accuracy with respect to a computationally-expensive Monte Carlo simulation.
+One option could be this: since we have analytical expressions for the mean and variance of the prior on \\(p_t^δ\\), convert these to the [closest Beta distribution](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) and straightforwardly update with the Bernoulli likelihood (straightforward because of conjugacy). However, it is better to delay the Beta fit till we have the posterior, and do the likelihood update analytically. Lucky for us, this is tractable and we will see code later that demonstrates the  boost in accuracy with respect to a computationally-expensive Monte Carlo simulation.
 
 By application of Bayes rule, the posterior is
-\\[Posterior(π|x) = \frac{Prior(π) · Lik(x|π)}{\int_0^1 Prior(π) · Lik(x|π) \\, dπ},\\]
-where “posterior” and “prior” are the Beta densities, \\(Lik\\) is the Bernoulli likelihood, and the denominator is the marginal probability of the observation \\(x\\). \\(Lik(x|π) = π\\) when \\(x=1\\) and \\(1-π\\) when \\(x=0\\). (Here we’re dropping the time-subscripts since all recall probabilities \\(π\\) and quiz results \\(x\\) are at the same \\(t_2 = t · δ\\).)
+\\[Posterior(p|x) = \frac{Prior(p) · Lik(x|p)}{\int_0^1 Prior(p) · Lik(x|p) \\, dp},\\]
+where “posterior” and “prior” are the Beta densities, \\(Lik\\) is the Bernoulli likelihood, and the denominator is the marginal probability of the observation \\(x\\). \\(Lik(x|p) = p\\) when \\(x=1\\) and \\(1-p\\) when \\(x=0\\). (Here we’re dropping the time-subscripts since all recall probabilities \\(p\\) and quiz results \\(x\\) are at the same \\(t_2 = t · δ\\).)
 
 Next we compute the mean and variance of this posterior, because that’s how we’ll fit it to a Beta distribution to function as our subsequent prior. We’ll break this down into the \\(x=1\\) (success) and \\(x=0\\) (failure) cases. In the following, let \\(γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)\\); this exposes numerical symmetries that an implementation can take advantage of.
 
-\\[E[π | x=1] = \int_0^1 π · Posterior(π|x=1) \\, dπ = γ_2 / γ_1.\\]
+\\[E[p | x=1] = \int_0^1 p · Posterior(p|x=1) \\, dp = γ_2 / γ_1.\\]
 
 \\[\begin{align}
-Var[π | x=1] \\&= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \\, dπ \\\\
-             \\&= γ_3 / γ_1 - (E[π|x=1])^2.
+Var[p | x=1] \\&= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \\, dp \\\\
+             \\&= γ_3 / γ_1 - (E[p|x=1])^2.
 \end{align}\\]
 
 The posterior mean and variance when \\(x=0\\) (failed quiz) are:
 
-\\[E[π | x=0] = \frac{γ_2 - γ_1}{γ_1 - γ_0}.\\]
+\\[E[p | x=0] = \frac{γ_2 - γ_1}{γ_1 - γ_0}.\\]
 
-\\[Var[π | x=0] = \frac{γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2}{(γ_1 - γ_0)^2}.\\]
+\\[Var[p | x=0] = \frac{γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2}{(γ_1 - γ_0)^2}.\\]
 
 > **Note 1** The Mathematica expressions used in deriving these are given in the source code below. Unlike the first few analytical results above, these required considerable hand-simplification, and we will double-check them against both Monte Carlo simulation and quadrature integration below.
 >
-> **Note 2** Something I haven’t commented on at all this whole while but that I must address with this expression for \\(Var[π | x=0]\\). The gamma function is the generalization of factorial—it’s a rapidly-growing function. With double-precision floats, \\(Γ(19) ≈ 6·10^{15}\\) has lost precision to the ones place, that is, `np.spacing(gamma(19)) == 1.0`). In this regime, which we regularly encounter particularly when over- and under-reviewing, addition and subtraction are risky. Ebisu takes care to factor these expressions to allow the use of log-gamma, [`expm1`](https://docs.scipy.org/doc/numpy/reference/generated/numpy.expm1.html), and [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html), in order to minimize loss of precision.
+> **Note 2** Something I haven’t commented on at all this whole while but that I must address with this expression for \\(Var[p | x=0]\\). The gamma function is the generalization of factorial—it’s a rapidly-growing function. With double-precision floats, \\(Γ(19) ≈ 6·10^{15}\\) has lost precision to the ones place, that is, `np.spacing(gamma(19)) == 1.0`). In this regime, which we regularly encounter particularly when over- and under-reviewing, addition and subtraction are risky. Ebisu takes care to factor these expressions to allow the use of log-gamma, [`expm1`](https://docs.scipy.org/doc/numpy/reference/generated/numpy.expm1.html), and [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html), in order to minimize loss of precision.
 
 With the mean and variance of the posterior in hand, it is straightforward to find a well-approximating Beta distribution using the [method of moments](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters):
 - a new \\(α' = μ (μ (1-μ) / σ^2 - 1)\\) and
 - \\(β' = (1-μ) (μ (1-μ) / σ^2 - 1)\\),
-    - for \\(μ = E[π|x]\\) and \\(σ^2 = Var[π|x]\\).
+    - for \\(μ = E[p|x]\\) and \\(σ^2 = Var[p|x]\\).
 
 The updated posterior becomes the new prior, parameterized by this \\([α', β', t_2]\\), where \\(t_2\\) is the time elapsed between this fact’s last quiz and the one just used in the update.
 
@@ -719,3 +719,4 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 Many thanks to Drew Benedetti for reviewing this manuscript.
 
 I use [Modest CSS](http://markdowncss.github.io/modest/).
+

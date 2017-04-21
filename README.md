@@ -188,7 +188,7 @@ So far we have found three analytical expressions. Suffice it to say that I test
 
 A quiz app can implement at least the expectation \\(E[π_t^δ]\\) above to identify the facts most at risk of being forgotten.
 
-### Initial choice for $α$, $β$, and $t$
+### Initial choice for \\(α\\), \\(β\\), and \\(t\\)
 Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple \\([α, β, t]\\) initially, for example when the student has first learned a fact. I propose setting \\(t\\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \\(t\\) to four hours or a day, respectively. Then, set \\(α = β ≥ 2\\): the \\(α = β\\) part will center the Beta distribution for \\(π_t\\) at 0.5, and then the actual value will constrain the variability of \\(π_t\\). Specifically, the \\(Beta(α, β)\\) distribution has
 - mean \\(α / (α + β)\\) or \\(0.5\\) if \\(α = β\\), and
 - variance \\(α · β / (α + β)^ 2 / (α + β + 1)\\) which simplifies to \\(1/(4 (2 α + 1))\\) when \\(α = β\\).
@@ -223,7 +223,7 @@ The posterior mean and variance when \\(x=0\\) (failed quiz) are:
 
 > **Note 1** The Mathematica expressions used in deriving these are given in the source code below. Unlike the first few analytical results above, these required considerable hand-simplification, and we will double-check them against both Monte Carlo simulation and quadrature integration below.
 >
-> **Note 2** Something I haven’t commented on at all this whole while but that I must address with this expression for \\(Var[π | x=0]\\). The gamma function is the generalization of factorial—it’s a rapidly-growing function. With double-precision floats, $Γ(19) ≈ 6·10^{15}$ has lost precision to the ones place, that is, `np.spacing(gamma(19)) == 1.0`). In this regime, which we regularly encounter, particularly when over- and under-reviewing, addition and subtraction are risky. Ebisu takes care to factor these expressions to allow the use of log-gamma, [`expm1`](https://docs.scipy.org/doc/numpy/reference/generated/numpy.expm1.html), and [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html) and minimize loss of precision.
+> **Note 2** Something I haven’t commented on at all this whole while but that I must address with this expression for \\(Var[π | x=0]\\). The gamma function is the generalization of factorial—it’s a rapidly-growing function. With double-precision floats, \\(Γ(19) ≈ 6·10^{15}\\) has lost precision to the ones place, that is, `np.spacing(gamma(19)) == 1.0`). In this regime, which we regularly encounter, particularly when over- and under-reviewing, addition and subtraction are risky. Ebisu takes care to factor these expressions to allow the use of log-gamma, [`expm1`](https://docs.scipy.org/doc/numpy/reference/generated/numpy.expm1.html), and [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html) and minimize loss of precision.
 
 With the mean and variance of the posterior in hand, it is straightforward to find a well-approximating Beta distribution using the [method of moments](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters):
 - a new \\(α' = μ (μ (1-μ) / σ^2 - 1)\\) and

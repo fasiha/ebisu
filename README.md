@@ -32,7 +32,7 @@ Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other sch
 
 Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. if you like Beta-distributed random variables, conjugate priors, and marginalization, this is for you. If not, you’ll find the formulas to implement `predictRecall` and `updateRecall`.
 
-> Nerdy details in a nutshell: Ebisu posits a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it requires only a few [Gamma function](http://mathworld.wolfram.com/GammaFunction.html) evaluations to predict the current recall probability. A *quiz* is modeled as a Beroulli trial, whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta distribution by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the Gamma function.
+> Nerdy details in a nutshell: Ebisu posits a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it requires only a few [gamma function](http://mathworld.wolfram.com/GammaFunction.html) evaluations to predict the current recall probability. A *quiz* is modeled as a Bernoulli trial, whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta distribution by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the gamma function.
 
 Finally, the [Source Code](#source-code) section presents the literate source of the library.
 
@@ -58,7 +58,7 @@ Many of these are inspired by Hermann Ebbinghaus’ discovery of the [exponentia
 
 Anki and SuperMemo use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little [field guide](https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174) to Anki’s, with links to the source code—but they are optimized to minimize daily review time while maximizing retention. But because each fact has simply a date of next review, these algorithms do not gracefully accommodate over- or under-reviewing. Even when used as prescribed, they can schedule many facts for review on one day but few on others. (I must note that all three of these issues—over-reviewing (cramming), under-reviewing, and lumpy reviews—have well-supported solutions in Anki: they are tweaks on the rules.)
 
-Duolingo’s half-life regression explicitly models the probability of you recalling a fact as \\(2^{-Δ/h}\\), where Δ is the time since your last review and \\(h\\) is a *half-life*. In this model, your chances of failing a quiz after \\(h\\) days is 50%, which drops to 25% after \\(2 h\\) days. They estimate this half-life by combining your past performance and fact metadata in a large-scale machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.
+Duolingo’s half-life regression explicitly models the probability of you recalling a fact as \\(2^{-Δ/h}\\), where Δ is the time since your last review and \\(h\\) is a *half-life*. In this model, your chances of passing a quiz after \\(h\\) days is 50%, which drops to 25% after \\(2 h\\) days. They estimate this half-life by combining your past performance and fact metadata in a large-scale machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.
 
 The Mozer group’s algorithms also fit a hierarchical Bayesian model that links quiz performance to memory, taking into account inter-fact and inter-student variability, but the training step is again computationally-intensive.
 
@@ -78,6 +78,8 @@ Similarly, if the student fails the quiz after a whole month of not reviewing it
 
 ## The math
 
+### Bernoulli quizzes
+
 Let’s begin with a quiz. One way or another, we’ve picked a fact to quiz the student on, \\(t\\) days (the units are arbitrary since \\(t\\) can be any positive real number) after her last quiz on it, or since she learned it for the first time.
 
 We’ll model the results of the quiz as a [Bernoulli experiment](https://en.wikipedia.org/wiki/Bernoulli_distribution), \\(x_t ∼ Bernoulli(π)\\); \\(x_t\\) can be either 1 (success) with probability \\(π_t\\), or 0 (fail) with probability \\(1-π_t\\). Let’s think about \\(π_t\\) as the recall probability at time \\(t\\)—then \\(x_t\\) is a coin flip, with a \\(π_t\\)-weighted coin.
@@ -94,6 +96,8 @@ for specific \\(α_t\\) and \\(β_t\\), then observing the quiz result updates o
 This is totally ordinary, bread-and-butter Bayesian statistics. However, the major complication arises when the experiment took place not at time \\(t\\) but \\(t_2\\)? That is, we have a Beta prior on \\(π_t\\) (probability of  recall at time \\(t\\)) but the test is administered at some other time \\(t_2\\).
 
 How can we update our beliefs about the recall probability at time \\(t\\) to another time \\(t_2\\), either earlier or later than \\(t\\)?
+
+### Moving Beta distributions through time
 
 Our old friend Ebbinghaus comes to our rescue. According to the exponentially-decaying forgetting curve, the probability of recall at time \\(t\\) is
 \\[π_t = 2^{-t/h},\\]
@@ -159,6 +163,8 @@ We will use the density of \\(π_t^δ\\) to reach our two most important goals:
 - what’s the recall probability of a given fact right now?, and
 - how do I update my estimate of that recall probability given quiz results?
 
+### Mean and variance of the recall probability right now
+
 Let’s see how to get the recall probability right now. Recall that we start out with a prior on \\(π_t ∼ Beta(α, β)\\), that is, we believe the recall probability on a quiz conducted \\(t\\) days after the last review for a given fact is \\(Beta(α, β)\\)-distributed. This prior is parameterized by three positive real numbers: \\([α, β, t]\\). Let \\(δ = t_{now} / t\\), where \\(t_{now}\\) is the time currently elapsed since the last review. The expected recall probability right now is
 \begin{align}
 E[π_t^δ] \\&= \int_0^1 P(π_t^δ) · π \\, dπ \\\\
@@ -182,7 +188,8 @@ So far we have found three analytical expressions. Suffice it to say that I test
 
 A quiz app can implement at least the expectation \\(E[π_t^δ]\\) above to identify the facts most at risk of being forgotten.
 
-**Important aside** Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple \\([α, β, t]\\) initially, for example when the student has first learned a fact. I propose setting \\(t\\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \\(t\\) to four hours or a day, respectively. Then, set \\(α = β ≥ 2\\): the \\(α = β\\) part will center the Beta distribution for \\(π_t\\) at 0.5, and then the actual value will constrain the variability of \\(π_t\\). Specifically, the \\(Beta(α, β)\\) distribution has
+### Initial choice for $α$, $β$, and $t$
+Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple \\([α, β, t]\\) initially, for example when the student has first learned a fact. I propose setting \\(t\\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \\(t\\) to four hours or a day, respectively. Then, set \\(α = β ≥ 2\\): the \\(α = β\\) part will center the Beta distribution for \\(π_t\\) at 0.5, and then the actual value will constrain the variability of \\(π_t\\). Specifically, the \\(Beta(α, β)\\) distribution has
 - mean \\(α / (α + β)\\) or \\(0.5\\) if \\(α = β\\), and
 - variance \\(α · β / (α + β)^ 2 / (α + β + 1)\\) which simplifies to \\(1/(4 (2 α + 1))\\) when \\(α = β\\).
     - (Recall the traditional explanation of \\(α\\) and \\(β\\) are the number of successes and failures, respectively, that have been observed by flipping a weighted coin—or in our application, the number of successful versus unsuccessful quiz results for a sequence of quizzes on the same fact \\(t\\) days apart.)
@@ -190,6 +197,8 @@ A quiz app can implement at least the expectation \\(E[π_t^δ]\\) above to iden
 A higher value for \\(α = β\\) encodes *higher* confidence in the expected half-life \\(t\\), which in turn makes the model (which we’ll detail below) *less* sensitive to quiz results. In our experiments below, \\(α = β = 12\\) is our least sensitive model, while \\(α = β = 3\\) is our most sensitive model. In the absence of strong feelings, a quiz app author can pick a number between these.
 
 Now, let us turn to the final piece of the math, how to update our Beta prior on a fact’s recall probability when a quiz result arrives.
+
+### Updating the posterior with quiz results
 
 One option could be this: since we have analytical expressions for the mean and variance of the prior on \\(π_t^δ\\), convert these to the [closest Beta distribution](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) and straightforwardly update with the Bernoulli likelihood (straightforward because of conjugacy). However, it is better to delay the Beta fit till we have the posterior, and do the likelihood update analytically. Lucky for us, this is tractable and we will see code later that demonstrates the  boost in accuracy with respect to a computationally-expensive Monte Carlo simulation.
 
@@ -212,7 +221,9 @@ The posterior mean and variance when \\(x=0\\) (failed quiz) are:
 
 \\[Var[π | x=0] = \frac{γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2}{(γ_1 - γ_0)^2}.\\]
 
-> The Mathematica expressions used in deriving these are given in the source code below. Unlike the first few analytical results above, these required considerable hand-simplification, and we will double-check them against both Monte Carlo simulation and quadrature integration below.
+> **Note 1** The Mathematica expressions used in deriving these are given in the source code below. Unlike the first few analytical results above, these required considerable hand-simplification, and we will double-check them against both Monte Carlo simulation and quadrature integration below.
+>
+> **Note 2** Something I haven’t commented on at all this whole while but that I must address with this expression for \\(Var[π | x=0]\\). The gamma function is the generalization of factorial—it’s a rapidly-growing function. With double-precision floats, $Γ(19) ≈ 6·10^{15}$ has lost precision to the ones place, that is, `np.spacing(gamma(19)) == 1.0`). In this regime, which we regularly encounter, particularly when over- and under-reviewing, addition and subtraction are risky. Ebisu takes care to factor these expressions to allow the use of log-gamma, [`expm1`](https://docs.scipy.org/doc/numpy/reference/generated/numpy.expm1.html), and [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html) and minimize loss of precision.
 
 With the mean and variance of the posterior in hand, it is straightforward to find a well-approximating Beta distribution using the [method of moments](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters):
 - a new \\(α' = μ (μ (1-μ) / σ^2 - 1)\\) and
@@ -705,4 +716,6 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 
 ## Acknowledgements
 
-[Modest CSS](http://markdowncss.github.io/modest/) for Markdown
+Many thanks to Drew Benedetti for reviewing this manuscript.
+
+I use [Modest CSS](http://markdowncss.github.io/modest/).

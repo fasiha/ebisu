@@ -49,14 +49,15 @@ class TestEbisu(unittest.TestCase):
 
   def test_posterior(self):
 
-    def inner(a, b, t0):
+    def inner(a, b, t0, dts):
       kl = lambda v, w: ((klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])) / 2.)
-      for t in map(lambda dt: dt * t0, [0.1, 1., 5.5]):
+      for t in map(lambda dt: dt * t0, dts):
         for x in [0., 1.]:
           msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
           mc = updateRecallMonteCarlo(a, b, t0, x, t, N=1 * 1000 * 1000)
           an = updateRecall(a, b, t0, x, t)
-          self.assertLess(kl(an, mc), 1e-4, msg=msg)
+          self.assertLess(
+              kl(an, mc), 1e-4, msg=msg + ' an={}, mc={}'.format(an, mc))
 
           try:
             quad1 = updateRecallQuad(a, b, t0, x, t, analyticMarginal=True)
@@ -72,12 +73,8 @@ class TestEbisu(unittest.TestCase):
           if quad2 is not None:
             self.assertLess(kl(quad2, mc), 1e-4, msg=msg)
 
-    inner(3.3, 4.4, 5.5)
-    inner(3.3, 4.4, 15.5)
-    inner(3.3, 4.4, .5)
-    inner(34.4, 34.4, 5.5)
-    inner(34.4, 34.4, 15.5)
-    inner(34.4, 34.4, .5)
+    inner(3.3, 4.4, 1., [0.1, 1., 5.5, 12.12])
+    inner(341.4, 3.4, 1., [0.1, 1., 5.5, 50.])
 
 
 if __name__ == '__main__':

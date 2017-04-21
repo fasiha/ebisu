@@ -280,13 +280,32 @@ def updateRecall(alpha, beta, t, result, tnow):
     # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
     # var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
     # Then simplify and combine
-    same0 = gamma(alpha) / gamma(alpha + beta)
-    same1 = gamma(alpha + dt) / gamma(alpha + beta + dt)
-    same2 = gamma(alpha + 2 * dt) / gamma(alpha + beta + 2 * dt)
-    same3 = gamma(alpha + 3 * dt) / gamma(alpha + beta + 3 * dt)
-    mu = (same1 - same2) / (same0 - same1)
-    var = (same3 * (same1 - same0) + same2 *
-           (same0 + same1 - same2) - same1**2) / (same1 - same0)**2
+
+    # Caveat TODO: if alpha+beta > 1e-14 and alpha+beta+3*dt < 17, we could just evaluate `gamma` directly, rather than gammaln+expm1+logsumexp. Is it worth it?
+
+    from scipy.misc import logsumexp
+    from numpy import expm1
+
+    s = [
+        gammaln(alpha + n * dt) - gammaln(alpha + beta + n * dt)
+        for n in range(4)
+    ]
+
+    mu = expm1(s[2] - s[1]) / -expm1(s[0] - s[1])
+
+    def lse(a, b):
+      return list(logsumexp(a, b=b, return_sign=True))
+
+    n1 = lse([s[1], s[0]], [1, -1])
+    n1[0] += s[3]
+    n2 = lse([s[0], s[1], s[2]], [1, 1, -1])
+    n2[0] += s[2]
+    n3 = [s[1] * 2, 1.]
+    d = lse([s[1], s[0]], [1, -1])
+    d[0] *= 2
+    n = lse([n1[0], n2[0], n3[0]], [n1[1], n2[1], -n3[1]])
+    var = exp(n[0] - d[0])
+
   newAlpha, newBeta = meanVarToBeta(mu, var)
   return newAlpha, newBeta, tnow
 
@@ -537,14 +556,15 @@ class TestEbisu(unittest.TestCase):
 
   def test_posterior(self):
 
-    def inner(a, b, t0):
+    def inner(a, b, t0, dts):
       kl = lambda v, w: ((klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])) / 2.)
-      for t in map(lambda dt: dt * t0, [0.1, 1., 5.5]):
+      for t in map(lambda dt: dt * t0, dts):
         for x in [0., 1.]:
           msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
           mc = updateRecallMonteCarlo(a, b, t0, x, t, N=1 * 1000 * 1000)
           an = updateRecall(a, b, t0, x, t)
-          self.assertLess(kl(an, mc), 1e-4, msg=msg)
+          self.assertLess(
+              kl(an, mc), 1e-4, msg=msg + ' an={}, mc={}'.format(an, mc))
 
           try:
             quad1 = updateRecallQuad(a, b, t0, x, t, analyticMarginal=True)
@@ -560,12 +580,8 @@ class TestEbisu(unittest.TestCase):
           if quad2 is not None:
             self.assertLess(kl(quad2, mc), 1e-4, msg=msg)
 
-    inner(3.3, 4.4, 5.5)
-    inner(3.3, 4.4, 15.5)
-    inner(3.3, 4.4, .5)
-    inner(34.4, 34.4, 5.5)
-    inner(34.4, 34.4, 15.5)
-    inner(34.4, 34.4, .5)
+    inner(3.3, 4.4, 1., [0.1, 1., 5.5, 12.12])
+    inner(341.4, 3.4, 1., [0.1, 1., 5.5, 50.])
 
 
 if __name__ == '__main__':
@@ -576,6 +592,7 @@ if __name__ == '__main__':
 ### Demo code
 
 ```py
+np.spacing(1e14)
 import scipy.stats as stats
 import numpy as np
 import matplotlib.pyplot as plt
@@ -689,4 +706,3 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 ## Acknowledgements
 
 [Modest CSS](http://markdowncss.github.io/modest/) for Markdown
-

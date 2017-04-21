@@ -2193,13 +2193,32 @@ Var[π | x=1] &amp;= \int_0^1 (π - E[π | x=1])^2 · Posterior(π|x=1) \, dπ \
     <span class="co"><span class="hljs-comment"># mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`</span></span>
     <span class="co"><span class="hljs-comment"># var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`</span></span>
     <span class="co"><span class="hljs-comment"># Then simplify and combine</span></span>
-    same0 <span class="op">=</span> gamma(alpha) <span class="op">/</span> gamma(alpha <span class="op">+</span> beta)
-    same1 <span class="op">=</span> gamma(alpha <span class="op">+</span> dt) <span class="op">/</span> gamma(alpha <span class="op">+</span> beta <span class="op">+</span> dt)
-    same2 <span class="op">=</span> gamma(alpha <span class="op">+</span> <span class="dv"><span class="hljs-number">2</span></span> <span class="op">*</span> dt) <span class="op">/</span> gamma(alpha <span class="op">+</span> beta <span class="op">+</span> <span class="dv"><span class="hljs-number">2</span></span> <span class="op">*</span> dt)
-    same3 <span class="op">=</span> gamma(alpha <span class="op">+</span> <span class="dv"><span class="hljs-number">3</span></span> <span class="op">*</span> dt) <span class="op">/</span> gamma(alpha <span class="op">+</span> beta <span class="op">+</span> <span class="dv"><span class="hljs-number">3</span></span> <span class="op">*</span> dt)
-    mu <span class="op">=</span> (same1 <span class="op">-</span> same2) <span class="op">/</span> (same0 <span class="op">-</span> same1)
-    var <span class="op">=</span> (same3 <span class="op">*</span> (same1 <span class="op">-</span> same0) <span class="op">+</span> same2 <span class="op">*</span>
-           (same0 <span class="op">+</span> same1 <span class="op">-</span> same2) <span class="op">-</span> same1<span class="op">**</span><span class="dv"><span class="hljs-number">2</span></span>) <span class="op">/</span> (same1 <span class="op">-</span> same0)<span class="op">**</span><span class="dv"><span class="hljs-number">2</span></span>
+
+    <span class="co"><span class="hljs-comment"># Caveat </span></span><span class="al"><span class="hljs-comment"><span class="hljs-doctag">TODO</span></span></span><span class="co"><span class="hljs-comment"><span class="hljs-doctag">:</span> if alpha+beta &gt; 1e-14 and alpha+beta+3*dt &lt; 17, we could just evaluate `gamma` directly, rather than gammaln+expm1+logsumexp. Is it worth it?</span></span>
+
+    <span class="im"><span class="hljs-keyword">from</span></span> scipy.misc <span class="im"><span class="hljs-keyword">import</span></span> logsumexp
+    <span class="im"><span class="hljs-keyword">from</span></span> numpy <span class="im"><span class="hljs-keyword">import</span></span> expm1
+
+    s <span class="op">=</span> [
+        gammaln(alpha <span class="op">+</span> n <span class="op">*</span> dt) <span class="op">-</span> gammaln(alpha <span class="op">+</span> beta <span class="op">+</span> n <span class="op">*</span> dt)
+        <span class="cf"><span class="hljs-keyword">for</span></span> n <span class="kw"><span class="hljs-keyword">in</span></span> <span class="bu">range</span>(<span class="dv"><span class="hljs-number">4</span></span>)
+    ]
+
+    mu <span class="op">=</span> expm1(s[<span class="dv"><span class="hljs-number">2</span></span>] <span class="op">-</span> s[<span class="dv"><span class="hljs-number">1</span></span>]) <span class="op">/</span> <span class="op">-</span>expm1(s[<span class="dv"><span class="hljs-number">0</span></span>] <span class="op">-</span> s[<span class="dv"><span class="hljs-number">1</span></span>])
+
+    <span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">lse</span><span class="hljs-params">(a, b)</span>:</span>
+      <span class="cf"><span class="hljs-keyword">return</span></span> <span class="bu">list</span>(logsumexp(a, b<span class="op">=</span>b, return_sign<span class="op">=</span><span class="va"><span class="hljs-keyword">True</span></span>))
+
+    n1 <span class="op">=</span> lse([s[<span class="dv"><span class="hljs-number">1</span></span>], s[<span class="dv"><span class="hljs-number">0</span></span>]], [<span class="dv"><span class="hljs-number">1</span></span>, <span class="op"><span class="hljs-number">-</span></span><span class="dv"><span class="hljs-number">1</span></span>])
+    n1[<span class="dv"><span class="hljs-number">0</span></span>] <span class="op">+=</span> s[<span class="dv"><span class="hljs-number">3</span></span>]
+    n2 <span class="op">=</span> lse([s[<span class="dv"><span class="hljs-number">0</span></span>], s[<span class="dv"><span class="hljs-number">1</span></span>], s[<span class="dv"><span class="hljs-number">2</span></span>]], [<span class="dv"><span class="hljs-number">1</span></span>, <span class="dv"><span class="hljs-number">1</span></span>, <span class="op"><span class="hljs-number">-</span></span><span class="dv"><span class="hljs-number">1</span></span>])
+    n2[<span class="dv"><span class="hljs-number">0</span></span>] <span class="op">+=</span> s[<span class="dv"><span class="hljs-number">2</span></span>]
+    n3 <span class="op">=</span> [s[<span class="dv"><span class="hljs-number">1</span></span>] <span class="op">*</span> <span class="dv"><span class="hljs-number">2</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>]
+    d <span class="op">=</span> lse([s[<span class="dv"><span class="hljs-number">1</span></span>], s[<span class="dv"><span class="hljs-number">0</span></span>]], [<span class="dv"><span class="hljs-number">1</span></span>, <span class="op"><span class="hljs-number">-</span></span><span class="dv"><span class="hljs-number">1</span></span>])
+    d[<span class="dv"><span class="hljs-number">0</span></span>] <span class="op">*=</span> <span class="dv"><span class="hljs-number">2</span></span>
+    n <span class="op">=</span> lse([n1[<span class="dv"><span class="hljs-number">0</span></span>], n2[<span class="dv"><span class="hljs-number">0</span></span>], n3[<span class="dv"><span class="hljs-number">0</span></span>]], [n1[<span class="dv"><span class="hljs-number">1</span></span>], n2[<span class="dv"><span class="hljs-number">1</span></span>], <span class="op">-</span>n3[<span class="dv"><span class="hljs-number">1</span></span>]])
+    var <span class="op">=</span> exp(n[<span class="dv"><span class="hljs-number">0</span></span>] <span class="op">-</span> d[<span class="dv"><span class="hljs-number">0</span></span>])
+
   newAlpha, newBeta <span class="op">=</span> meanVarToBeta(mu, var)
   <span class="cf"><span class="hljs-keyword">return</span></span> newAlpha, newBeta, tnow
 
@@ -2435,14 +2454,15 @@ updateRecall(<span class="fl"><span class="hljs-number">3.3</span></span>, <span
 
   <span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">test_posterior</span><span class="hljs-params">(</span></span><span class="va"><span class="hljs-function"><span class="hljs-params">self</span></span></span><span class="hljs-function"><span class="hljs-params">)</span>:</span>
 
-    <span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">inner</span><span class="hljs-params">(a, b, t0)</span>:</span>
+    <span class="kw"><span class="hljs-function"><span class="hljs-keyword">def</span></span></span><span class="hljs-function"> <span class="hljs-title">inner</span><span class="hljs-params">(a, b, t0, dts)</span>:</span>
       kl <span class="op">=</span> <span class="kw"><span class="hljs-keyword">lambda</span></span> v, w: ((klDivBeta(v[<span class="dv"><span class="hljs-number">0</span></span>], v[<span class="dv"><span class="hljs-number">1</span></span>], w[<span class="dv"><span class="hljs-number">0</span></span>], w[<span class="dv"><span class="hljs-number">1</span></span>]) <span class="op">+</span> klDivBeta(w[<span class="dv"><span class="hljs-number">0</span></span>], w[<span class="dv"><span class="hljs-number">1</span></span>], v[<span class="dv"><span class="hljs-number">0</span></span>], v[<span class="dv"><span class="hljs-number">1</span></span>])) <span class="op">/</span> <span class="dv"><span class="hljs-number">2</span></span><span class="hljs-number">.</span>)
-      <span class="cf"><span class="hljs-keyword">for</span></span> t <span class="kw"><span class="hljs-keyword">in</span></span> <span class="bu">map</span>(<span class="kw"><span class="hljs-keyword">lambda</span></span> dt: dt <span class="op">*</span> t0, [<span class="fl"><span class="hljs-number">0.1</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="fl"><span class="hljs-number">5.5</span></span>]):
+      <span class="cf"><span class="hljs-keyword">for</span></span> t <span class="kw"><span class="hljs-keyword">in</span></span> <span class="bu">map</span>(<span class="kw"><span class="hljs-keyword">lambda</span></span> dt: dt <span class="op">*</span> t0, dts):
         <span class="cf"><span class="hljs-keyword">for</span></span> x <span class="kw"><span class="hljs-keyword">in</span></span> [<span class="dv"><span class="hljs-number">0</span></span><span class="hljs-number">.</span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>]:
           msg <span class="op">=</span> <span class="st"><span class="hljs-string">'a=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">,b=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">,t0=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">,x=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">,t=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.<span class="bu">format</span>(a, b, t0, x, t)
           mc <span class="op">=</span> updateRecallMonteCarlo(a, b, t0, x, t, N<span class="op">=</span><span class="dv"><span class="hljs-number">1</span></span> <span class="op">*</span> <span class="dv"><span class="hljs-number">1000</span></span> <span class="op">*</span> <span class="dv"><span class="hljs-number">1000</span></span>)
           an <span class="op">=</span> updateRecall(a, b, t0, x, t)
-          <span class="va">self</span>.assertLess(kl(an, mc), <span class="fl"><span class="hljs-number">1e-4</span></span>, msg<span class="op">=</span>msg)
+          <span class="va">self</span>.assertLess(
+              kl(an, mc), <span class="fl"><span class="hljs-number">1e-4</span></span>, msg<span class="op">=</span>msg <span class="op">+</span> <span class="st"><span class="hljs-string">' an=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">, mc=</span></span><span class="sc"><span class="hljs-string">{}</span></span><span class="st"><span class="hljs-string">'</span></span>.<span class="bu">format</span>(an, mc))
 
           <span class="cf"><span class="hljs-keyword">try</span></span>:
             quad1 <span class="op">=</span> updateRecallQuad(a, b, t0, x, t, analyticMarginal<span class="op">=</span><span class="va"><span class="hljs-keyword">True</span></span>)
@@ -2458,19 +2478,16 @@ updateRecall(<span class="fl"><span class="hljs-number">3.3</span></span>, <span
           <span class="cf"><span class="hljs-keyword">if</span></span> quad2 <span class="kw"><span class="hljs-keyword">is</span></span> <span class="kw"><span class="hljs-keyword">not</span></span> <span class="va"><span class="hljs-keyword">None</span></span>:
             <span class="va">self</span>.assertLess(kl(quad2, mc), <span class="fl"><span class="hljs-number">1e-4</span></span>, msg<span class="op">=</span>msg)
 
-    inner(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="fl"><span class="hljs-number">5.5</span></span>)
-    inner(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="fl"><span class="hljs-number">15.5</span></span>)
-    inner(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="hljs-number">.</span><span class="dv"><span class="hljs-number">5</span></span>)
-    inner(<span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">5.5</span></span>)
-    inner(<span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">15.5</span></span>)
-    inner(<span class="fl"><span class="hljs-number">34.4</span></span>, <span class="fl"><span class="hljs-number">34.4</span></span>, <span class="hljs-number">.</span><span class="dv"><span class="hljs-number">5</span></span>)
+    inner(<span class="fl"><span class="hljs-number">3.3</span></span>, <span class="fl"><span class="hljs-number">4.4</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, [<span class="fl"><span class="hljs-number">0.1</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="fl"><span class="hljs-number">5.5</span></span>, <span class="fl"><span class="hljs-number">12.12</span></span>])
+    inner(<span class="fl"><span class="hljs-number">341.4</span></span>, <span class="fl"><span class="hljs-number">3.4</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, [<span class="fl"><span class="hljs-number">0.1</span></span>, <span class="dv"><span class="hljs-number">1</span></span><span class="hljs-number">.</span>, <span class="fl"><span class="hljs-number">5.5</span></span>, <span class="dv"><span class="hljs-number">50</span></span><span class="hljs-number">.</span>])
 
 
 <span class="cf"><span class="hljs-keyword">if</span></span> <span class="va">__name__</span> <span class="op">==</span> <span class="st"><span class="hljs-string">'__main__'</span></span>:
   unittest.TextTestRunner().run(
       unittest.TestLoader().loadTestsFromModule(TestEbisu()))</code></pre></div>
 <h3 id="demo-code">Demo code</h3>
-<div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs"><span class="im"><span class="hljs-keyword">import</span></span> scipy.stats <span class="im"><span class="hljs-keyword">as</span></span> stats
+<div class="sourceCode"><pre class="sourceCode py"><code class="sourceCode python hljs">np.spacing(<span class="fl"><span class="hljs-number">1e14</span></span>)
+<span class="im"><span class="hljs-keyword">import</span></span> scipy.stats <span class="im"><span class="hljs-keyword">as</span></span> stats
 <span class="im"><span class="hljs-keyword">import</span></span> numpy <span class="im"><span class="hljs-keyword">as</span></span> np
 <span class="im"><span class="hljs-keyword">import</span></span> matplotlib.pyplot <span class="im"><span class="hljs-keyword">as</span></span> plt
 

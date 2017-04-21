@@ -1,16 +1,18 @@
-def predictRecall(alpha, beta, t, tnow):
+def predictRecall(prior, tnow):
   # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`
   from scipy.special import gammaln
   from numpy import exp
+  alpha, beta, t = prior
   dt = tnow / t
   return exp(
       gammaln(alpha + dt) - gammaln(alpha + beta + dt) - (
           gammaln(alpha) - gammaln(alpha + beta)))
 
 
-def predictRecallVar(alpha, beta, t, tnow):
+def predictRecallVar(prior, tnow):
   from numpy import exp
   from scipy.special import gammaln
+  alpha, beta, t = prior
   # `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``
   # And then plug in mean for `m` & simplify to get:
   dt = tnow / t
@@ -22,9 +24,10 @@ def predictRecallVar(alpha, beta, t, tnow):
   return exp(md2) - exp(2 * md)
 
 
-def updateRecall(alpha, beta, t, result, tnow):
+def updateRecall(prior, result, tnow):
   from scipy.special import gammaln, gamma
   from numpy import exp
+  alpha, beta, t = prior
   dt = tnow / t
   if result == 1:
     # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
@@ -80,20 +83,19 @@ def meanVarToBeta(mean, var):
   return alpha, beta
 
 
-def priorToHalflife(alpha, beta, t, percentile=0.5, maxt=100, mint=1e-3):
+def priorToHalflife(prior, percentile=0.5, maxt=100, mint=1e-3):
   from math import sqrt
   from scipy.optimize import brentq
-  h = brentq(lambda now: predictRecall(alpha, beta, t, now) - percentile, mint,
-             maxt)
+  h = brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
   # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.
   # To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that.
   # This 'variance' number should not be taken seriously, but it can be used for notional plotting.
-  v = predictRecallVar(alpha, beta, t, h)
+  v = predictRecallVar(prior, h)
 
   from scipy.stats import beta as fbeta
   lo, hi = fbeta.interval(.68, *meanVarToBeta(percentile, v))
 
-  h2 = brentq(lambda now: predictRecall(alpha, beta, t, now) - lo, mint, maxt)
-  h3 = brentq(lambda now: predictRecall(alpha, beta, t, now) - hi, mint, maxt)
+  h2 = brentq(lambda now: predictRecall(prior, now) - lo, mint, maxt)
+  h3 = brentq(lambda now: predictRecall(prior, now) - hi, mint, maxt)
 
   return h, ((abs(h2 - h) + abs(h3 - h)) / 2)**2

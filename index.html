@@ -2172,19 +2172,21 @@ plt.show()</code></pre>
 <p>The above is in its own fenced code block because I don’t want Hydrogen to evaluate it. In Atom, I don’t work with the Ebisu module—I just interact with the raw functions.</p>
 <p>Let’s present our Python implementation of the core Ebisu functions, <code>predictRecall</code> and <code>updateRecall</code>, and a couple of other related functions that live in the main <code>ebisu</code> module.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/ebisu.py #</span>
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecall</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecall</span><span class="hljs-params">(prior, tnow)</span>:</span>
   <span class="hljs-comment"># `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`</span>
   <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln
   <span class="hljs-keyword">from</span> numpy <span class="hljs-keyword">import</span> exp
+  alpha, beta, t = prior
   dt = tnow / t
   <span class="hljs-keyword">return</span> exp(
       gammaln(alpha + dt) - gammaln(alpha + beta + dt) - (
           gammaln(alpha) - gammaln(alpha + beta)))
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecallVar</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecallVar</span><span class="hljs-params">(prior, tnow)</span>:</span>
   <span class="hljs-keyword">from</span> numpy <span class="hljs-keyword">import</span> exp
   <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln
+  alpha, beta, t = prior
   <span class="hljs-comment"># `Assuming[a&gt;0 &amp;&amp; b&gt;0 &amp;&amp; t&gt;0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``</span>
   <span class="hljs-comment"># And then plug in mean for `m` &amp; simplify to get:</span>
   dt = tnow / t
@@ -2196,9 +2198,10 @@ plt.show()</code></pre>
   <span class="hljs-keyword">return</span> exp(md2) - exp(<span class="hljs-number">2</span> * md)
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">updateRecall</span><span class="hljs-params">(alpha, beta, t, result, tnow)</span>:</span>
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">updateRecall</span><span class="hljs-params">(prior, result, tnow)</span>:</span>
   <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln, gamma
   <span class="hljs-keyword">from</span> numpy <span class="hljs-keyword">import</span> exp
+  alpha, beta, t = prior
   dt = tnow / t
   <span class="hljs-keyword">if</span> result == <span class="hljs-number">1</span>:
     <span class="hljs-comment"># marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`</span>
@@ -2254,21 +2257,20 @@ plt.show()</code></pre>
   <span class="hljs-keyword">return</span> alpha, beta
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">priorToHalflife</span><span class="hljs-params">(alpha, beta, t, percentile=<span class="hljs-number">0.5</span>, maxt=<span class="hljs-number">100</span>, mint=<span class="hljs-number">1e-3</span>)</span>:</span>
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">priorToHalflife</span><span class="hljs-params">(prior, percentile=<span class="hljs-number">0.5</span>, maxt=<span class="hljs-number">100</span>, mint=<span class="hljs-number">1e-3</span>)</span>:</span>
   <span class="hljs-keyword">from</span> math <span class="hljs-keyword">import</span> sqrt
   <span class="hljs-keyword">from</span> scipy.optimize <span class="hljs-keyword">import</span> brentq
-  h = brentq(<span class="hljs-keyword">lambda</span> now: predictRecall(alpha, beta, t, now) - percentile, mint,
-             maxt)
+  h = brentq(<span class="hljs-keyword">lambda</span> now: predictRecall(prior, now) - percentile, mint, maxt)
   <span class="hljs-comment"># `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.</span>
   <span class="hljs-comment"># To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that.</span>
   <span class="hljs-comment"># This 'variance' number should not be taken seriously, but it can be used for notional plotting.</span>
-  v = predictRecallVar(alpha, beta, t, h)
+  v = predictRecallVar(prior, h)
 
   <span class="hljs-keyword">from</span> scipy.stats <span class="hljs-keyword">import</span> beta <span class="hljs-keyword">as</span> fbeta
   lo, hi = fbeta.interval(<span class="hljs-number">.68</span>, *meanVarToBeta(percentile, v))
 
-  h2 = brentq(<span class="hljs-keyword">lambda</span> now: predictRecall(alpha, beta, t, now) - lo, mint, maxt)
-  h3 = brentq(<span class="hljs-keyword">lambda</span> now: predictRecall(alpha, beta, t, now) - hi, mint, maxt)
+  h2 = brentq(<span class="hljs-keyword">lambda</span> now: predictRecall(prior, now) - lo, mint, maxt)
+  h3 = brentq(<span class="hljs-keyword">lambda</span> now: predictRecall(prior, now) - hi, mint, maxt)
 
   <span class="hljs-keyword">return</span> h, ((abs(h2 - h) + abs(h3 - h)) / <span class="hljs-number">2</span>)**<span class="hljs-number">2</span></code></pre>
 <h3 id="alternate-ways-of-evaluating-the-same-results-as-above">Alternate ways of evaluating the same results as above</h3>
@@ -2278,9 +2280,10 @@ plt.show()</code></pre>
 <span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecallMode</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecallMode</span><span class="hljs-params">(prior, tnow)</span>:</span>
   <span class="hljs-string">"""Returns the mode of the immediate (pseudo-Beta) prior"""</span>
   <span class="hljs-comment"># [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`</span>
+  alpha, beta, t = prior
   dt = tnow / t
   pr = <span class="hljs-keyword">lambda</span> p: p**((alpha - dt) / dt) * (<span class="hljs-number">1</span> - p**(<span class="hljs-number">1</span> / dt))**(beta - <span class="hljs-number">1</span>)
 
@@ -2303,13 +2306,13 @@ plt.show()</code></pre>
   <span class="hljs-keyword">return</span> <span class="hljs-number">0.5</span> <span class="hljs-keyword">if</span> dt == <span class="hljs-number">1.</span> <span class="hljs-keyword">else</span> (<span class="hljs-number">0.</span> <span class="hljs-keyword">if</span> dt &gt; <span class="hljs-number">1</span> <span class="hljs-keyword">else</span> <span class="hljs-number">1.</span>)
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecallMedian</span><span class="hljs-params">(alpha, beta, t, tnow, percentile=<span class="hljs-number">0.5</span>)</span>:</span>
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecallMedian</span><span class="hljs-params">(prior, tnow, percentile=<span class="hljs-number">0.5</span>)</span>:</span>
   <span class="hljs-string">""""""</span>
   <span class="hljs-comment"># [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`</span>
   <span class="hljs-keyword">from</span> scipy.optimize <span class="hljs-keyword">import</span> brentq
   <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> beta <span class="hljs-keyword">as</span> fbeta
   <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> hyp2f1
-
+  alpha, beta, t = prior
   dt = tnow / t
 
   <span class="hljs-comment"># See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.</span>
@@ -2321,8 +2324,9 @@ plt.show()</code></pre>
   <span class="hljs-keyword">return</span> brentq(cdfPercentile, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>)
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecallMonteCarlo</span><span class="hljs-params">(alpha, beta, t, tnow, N=<span class="hljs-number">1000000</span>)</span>:</span>
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecallMonteCarlo</span><span class="hljs-params">(prior, tnow, N=<span class="hljs-number">1000000</span>)</span>:</span>
   <span class="hljs-keyword">import</span> scipy.stats <span class="hljs-keyword">as</span> stats
+  alpha, beta, t = prior
   tPrior = stats.beta.rvs(alpha, beta, size=N)
   tnowPrior = tPrior**(tnow / t)
   freqs, bins = np.histogram(tnowPrior, <span class="hljs-string">'auto'</span>)
@@ -2334,23 +2338,10 @@ plt.show()</code></pre>
       var=np.var(tnowPrior))
 
 
-<span class="hljs-comment"># So we have several ways of evaluating the posterior mean/var:</span>
-<span class="hljs-comment"># - Monte Carlo</span>
-<span class="hljs-comment"># - Quadrature integration</span>
-<span class="hljs-comment"># - Analytic expression, with several hyp2f1</span>
-<span class="hljs-comment"># - Simplified analytic expression with fewer hyp2f1 (recurrence relations)</span>
-
-
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">updateRecallQuad</span><span class="hljs-params">(alpha,
-                     beta,
-                     t,
-                     result,
-                     tnow,
-                     analyticMarginal=True,
-                     maxiter=<span class="hljs-number">100</span>)</span>:</span>
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">updateRecallQuad</span><span class="hljs-params">(prior, result, tnow, analyticMarginal=True, maxiter=<span class="hljs-number">100</span>)</span>:</span>
   <span class="hljs-string">"""Update a time-dependent Beta distribution with a new data sample"""</span>
   <span class="hljs-keyword">from</span> scipy.integrate <span class="hljs-keyword">import</span> quad
-
+  alpha, beta, t = prior
   dt = tnow / t
 
   <span class="hljs-keyword">if</span> result == <span class="hljs-number">1</span>:
@@ -2391,16 +2382,16 @@ plt.show()</code></pre>
   <span class="hljs-keyword">return</span> newAlpha, newBeta, tnow
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">updateRecallMonteCarlo</span><span class="hljs-params">(alpha, beta, t, result, tnow, N=<span class="hljs-number">10000</span>)</span>:</span>
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">updateRecallMonteCarlo</span><span class="hljs-params">(prior, result, tnow, N=<span class="hljs-number">10000</span>)</span>:</span>
   <span class="hljs-string">"""Update a time-dependent Beta distribution with a new data sample"""</span>
   <span class="hljs-comment"># [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&amp;oldid=769806318#Properties_of_the_Bernoulli_Distribution, third (last) equation</span>
   <span class="hljs-comment"># [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&amp;oldid=770608018#Mathematical_definition</span>
   <span class="hljs-comment"># [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&amp;oldid=770608018#Weighted_sample_variance</span>
   <span class="hljs-keyword">import</span> scipy.stats <span class="hljs-keyword">as</span> stats
 
-  tPrior = stats.beta.rvs(alpha, beta, size=N)
+  alpha, beta, t = prior
 
-  <span class="hljs-comment"># To see where this comes from, read the rest of this document!</span>
+  tPrior = stats.beta.rvs(alpha, beta, size=N)
   tnowPrior = tPrior**(tnow / t)
 
   <span class="hljs-comment"># This is the Bernoulli likelihood [bernoulliLikelihood]</span>
@@ -2418,12 +2409,12 @@ plt.show()</code></pre>
 <h3 id="test-code">Test code</h3>
 <pre class="py"><code class="hljs python"><span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">betafitBeforeLikelihood</span><span class="hljs-params">(a, b, t1, x, t2)</span>:</span>
   a2, b2 = meanVarToBeta(
-      predictRecall(a, b, t1, t2), predictRecallVar(a, b, t1, t2))
+      predictRecall((a, b, t1), t2), predictRecallVar((a, b, t1), t2))
   <span class="hljs-keyword">return</span> a2 + x, b2 + <span class="hljs-number">1</span> - x, t2
 
 
 betafitBeforeLikelihood(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">2.</span>)
-updateRecall(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">2.</span>)</code></pre>
+updateRecall((<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>), <span class="hljs-number">1.</span>, <span class="hljs-number">2.</span>)</code></pre>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/tests/test_ebisu.py</span>
 <span class="hljs-keyword">from</span> unittest <span class="hljs-keyword">import</span> TestCase
 <span class="hljs-keyword">from</span> ebisu <span class="hljs-keyword">import</span> *
@@ -2462,9 +2453,9 @@ updateRecall(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4
 
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">inner</span><span class="hljs-params">(a, b, t0)</span>:</span>
       <span class="hljs-keyword">for</span> t <span class="hljs-keyword">in</span> map(<span class="hljs-keyword">lambda</span> dt: dt * t0, [<span class="hljs-number">0.1</span>, <span class="hljs-number">.99</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">1.01</span>, <span class="hljs-number">5.5</span>]):
-        mc = predictRecallMonteCarlo(a, b, t0, t, N=<span class="hljs-number">100</span> * <span class="hljs-number">1000</span>)
-        mean = predictRecall(a, b, t0, t)
-        var = predictRecallVar(a, b, t0, t)
+        mc = predictRecallMonteCarlo((a, b, t0), t, N=<span class="hljs-number">100</span> * <span class="hljs-number">1000</span>)
+        mean = predictRecall((a, b, t0), t)
+        var = predictRecallVar((a, b, t0), t)
         self.assertLess(relerr(mean, mc[<span class="hljs-string">'mean'</span>]), <span class="hljs-number">3e-2</span>)
         self.assertLess(relerr(var, mc[<span class="hljs-string">'var'</span>]), <span class="hljs-number">3e-2</span>)
 
@@ -2482,20 +2473,20 @@ updateRecall(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4
       <span class="hljs-keyword">for</span> t <span class="hljs-keyword">in</span> map(<span class="hljs-keyword">lambda</span> dt: dt * t0, dts):
         <span class="hljs-keyword">for</span> x <span class="hljs-keyword">in</span> [<span class="hljs-number">0.</span>, <span class="hljs-number">1.</span>]:
           msg = <span class="hljs-string">'a={},b={},t0={},x={},t={}'</span>.format(a, b, t0, x, t)
-          mc = updateRecallMonteCarlo(a, b, t0, x, t, N=<span class="hljs-number">1</span> * <span class="hljs-number">1000</span> * <span class="hljs-number">1000</span>)
-          an = updateRecall(a, b, t0, x, t)
+          mc = updateRecallMonteCarlo((a, b, t0), x, t, N=<span class="hljs-number">1</span> * <span class="hljs-number">1000</span> * <span class="hljs-number">1000</span>)
+          an = updateRecall((a, b, t0), x, t)
           self.assertLess(
               kl(an, mc), <span class="hljs-number">1e-4</span>, msg=msg + <span class="hljs-string">' an={}, mc={}'</span>.format(an, mc))
 
           <span class="hljs-keyword">try</span>:
-            quad1 = updateRecallQuad(a, b, t0, x, t, analyticMarginal=<span class="hljs-keyword">True</span>)
+            quad1 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=<span class="hljs-keyword">True</span>)
           <span class="hljs-keyword">except</span> OverflowError:
             quad1 = <span class="hljs-keyword">None</span>
           <span class="hljs-keyword">if</span> quad1 <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> <span class="hljs-keyword">None</span>:
             self.assertLess(kl(quad1, mc), <span class="hljs-number">1e-4</span>, msg=msg)
 
           <span class="hljs-keyword">try</span>:
-            quad2 = updateRecallQuad(a, b, t0, x, t, analyticMarginal=<span class="hljs-keyword">False</span>)
+            quad2 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=<span class="hljs-keyword">False</span>)
           <span class="hljs-keyword">except</span> OverflowError:
             quad2 = <span class="hljs-keyword">None</span>
           <span class="hljs-keyword">if</span> quad2 <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> <span class="hljs-keyword">None</span>:
@@ -2550,9 +2541,9 @@ plt.figure()
 ax = plt.subplot(<span class="hljs-number">111</span>)
 plt.axhline(y=t0, linewidth=<span class="hljs-number">1</span>, color=<span class="hljs-string">'0.5'</span>)
 [plt.errorbar(ts,
-          np.array(list(map(<span class="hljs-keyword">lambda</span> t: priorToHalflife(*updateRecall(a, a, t0, xobs, t))[<span class="hljs-number">0</span>],
+          np.array(list(map(<span class="hljs-keyword">lambda</span> t: priorToHalflife(updateRecall((a, a, t0), xobs, t))[<span class="hljs-number">0</span>],
                             ts))),
-          v2s(np.array(list(map(<span class="hljs-keyword">lambda</span> t: priorToHalflife(*updateRecall(a, a, t0, xobs, t))[<span class="hljs-number">1</span>],
+          v2s(np.array(list(map(<span class="hljs-keyword">lambda</span> t: priorToHalflife(updateRecall((a, a, t0), xobs, t))[<span class="hljs-number">1</span>],
                             ts)))),
           marker=<span class="hljs-string">'x'</span> <span class="hljs-keyword">if</span> xobs == <span class="hljs-number">1</span> <span class="hljs-keyword">else</span> <span class="hljs-string">'o'</span>,
           color=<span class="hljs-string">'C{}'</span>.format(aidx),
@@ -2568,22 +2559,22 @@ plt.savefig(<span class="hljs-string">'figures/halflife.png'</span>, dpi=<span c
 plt.show()</code></pre>
 <p><img src="figures/models.png" alt="figures/models.png"> <img src="figures/halflife.png" alt="figures/halflife.png"></p>
 <pre class="py"><code class="hljs python">plt.figure()
-modelA = updateRecall(<span class="hljs-number">3.</span>, <span class="hljs-number">3.</span>, <span class="hljs-number">7.</span>, <span class="hljs-number">1</span>, <span class="hljs-number">15.</span>)
-modelB = updateRecall(<span class="hljs-number">12.</span>, <span class="hljs-number">12.</span>, <span class="hljs-number">7.</span>, <span class="hljs-number">1</span>, <span class="hljs-number">15.</span>)
-hlA = priorToHalflife(*modelA)
-hlB = priorToHalflife(*modelB)
+modelA = updateRecall((<span class="hljs-number">3.</span>, <span class="hljs-number">3.</span>, <span class="hljs-number">7.</span>), <span class="hljs-number">1</span>, <span class="hljs-number">15.</span>)
+modelB = updateRecall((<span class="hljs-number">12.</span>, <span class="hljs-number">12.</span>, <span class="hljs-number">7.</span>), <span class="hljs-number">1</span>, <span class="hljs-number">15.</span>)
+hlA = priorToHalflife(modelA)
+hlB = priorToHalflife(modelB)
 plt.errorbar(
     ts,
-    predictRecall(*modelA, ts),
-    v2s(predictRecallVar(*modelA, ts)),
+    predictRecall(modelA, ts),
+    v2s(predictRecallVar(modelA, ts)),
     fmt=<span class="hljs-string">'.-'</span>,
     label=<span class="hljs-string">'Model A'</span>,
     color=<span class="hljs-string">'C0'</span>)
 plt.plot(ts, <span class="hljs-number">2</span>**(-ts / hlA[<span class="hljs-number">0</span>]), <span class="hljs-string">'--'</span>, label=<span class="hljs-string">'approx A'</span>, color=<span class="hljs-string">'C0'</span>)
 plt.errorbar(
     ts,
-    predictRecall(*modelB, ts),
-    v2s(predictRecallVar(*modelB, ts)),
+    predictRecall(modelB, ts),
+    v2s(predictRecallVar(modelB, ts)),
     fmt=<span class="hljs-string">'.-'</span>,
     label=<span class="hljs-string">'Model B'</span>,
     color=<span class="hljs-string">'C1'</span>)

@@ -262,19 +262,21 @@ Let’s present our Python implementation of the core Ebisu functions, `predictR
 
 ```py
 # export ebisu/ebisu.py #
-def predictRecall(alpha, beta, t, tnow):
+def predictRecall(prior, tnow):
   # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`
   from scipy.special import gammaln
   from numpy import exp
+  alpha, beta, t = prior
   dt = tnow / t
   return exp(
       gammaln(alpha + dt) - gammaln(alpha + beta + dt) - (
           gammaln(alpha) - gammaln(alpha + beta)))
 
 
-def predictRecallVar(alpha, beta, t, tnow):
+def predictRecallVar(prior, tnow):
   from numpy import exp
   from scipy.special import gammaln
+  alpha, beta, t = prior
   # `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``
   # And then plug in mean for `m` & simplify to get:
   dt = tnow / t
@@ -286,9 +288,10 @@ def predictRecallVar(alpha, beta, t, tnow):
   return exp(md2) - exp(2 * md)
 
 
-def updateRecall(alpha, beta, t, result, tnow):
+def updateRecall(prior, result, tnow):
   from scipy.special import gammaln, gamma
   from numpy import exp
+  alpha, beta, t = prior
   dt = tnow / t
   if result == 1:
     # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
@@ -344,21 +347,20 @@ def meanVarToBeta(mean, var):
   return alpha, beta
 
 
-def priorToHalflife(alpha, beta, t, percentile=0.5, maxt=100, mint=1e-3):
+def priorToHalflife(prior, percentile=0.5, maxt=100, mint=1e-3):
   from math import sqrt
   from scipy.optimize import brentq
-  h = brentq(lambda now: predictRecall(alpha, beta, t, now) - percentile, mint,
-             maxt)
+  h = brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
   # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.
   # To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that.
   # This 'variance' number should not be taken seriously, but it can be used for notional plotting.
-  v = predictRecallVar(alpha, beta, t, h)
+  v = predictRecallVar(prior, h)
 
   from scipy.stats import beta as fbeta
   lo, hi = fbeta.interval(.68, *meanVarToBeta(percentile, v))
 
-  h2 = brentq(lambda now: predictRecall(alpha, beta, t, now) - lo, mint, maxt)
-  h3 = brentq(lambda now: predictRecall(alpha, beta, t, now) - hi, mint, maxt)
+  h2 = brentq(lambda now: predictRecall(prior, now) - lo, mint, maxt)
+  h3 = brentq(lambda now: predictRecall(prior, now) - hi, mint, maxt)
 
   return h, ((abs(h2 - h) + abs(h3 - h)) / 2)**2
 ```
@@ -374,9 +376,10 @@ from .ebisu import meanVarToBeta
 import numpy as np
 
 
-def predictRecallMode(alpha, beta, t, tnow):
+def predictRecallMode(prior, tnow):
   """Returns the mode of the immediate (pseudo-Beta) prior"""
   # [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`
+  alpha, beta, t = prior
   dt = tnow / t
   pr = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1)
 
@@ -399,13 +402,13 @@ def predictRecallMode(alpha, beta, t, tnow):
   return 0.5 if dt == 1. else (0. if dt > 1 else 1.)
 
 
-def predictRecallMedian(alpha, beta, t, tnow, percentile=0.5):
+def predictRecallMedian(prior, tnow, percentile=0.5):
   """"""
   # [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
   from scipy.optimize import brentq
   from scipy.special import beta as fbeta
   from scipy.special import hyp2f1
-
+  alpha, beta, t = prior
   dt = tnow / t
 
   # See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.
@@ -417,8 +420,9 @@ def predictRecallMedian(alpha, beta, t, tnow, percentile=0.5):
   return brentq(cdfPercentile, 0, 1)
 
 
-def predictRecallMonteCarlo(alpha, beta, t, tnow, N=1000000):
+def predictRecallMonteCarlo(prior, tnow, N=1000000):
   import scipy.stats as stats
+  alpha, beta, t = prior
   tPrior = stats.beta.rvs(alpha, beta, size=N)
   tnowPrior = tPrior**(tnow / t)
   freqs, bins = np.histogram(tnowPrior, 'auto')
@@ -430,23 +434,10 @@ def predictRecallMonteCarlo(alpha, beta, t, tnow, N=1000000):
       var=np.var(tnowPrior))
 
 
-# So we have several ways of evaluating the posterior mean/var:
-# - Monte Carlo
-# - Quadrature integration
-# - Analytic expression, with several hyp2f1
-# - Simplified analytic expression with fewer hyp2f1 (recurrence relations)
-
-
-def updateRecallQuad(alpha,
-                     beta,
-                     t,
-                     result,
-                     tnow,
-                     analyticMarginal=True,
-                     maxiter=100):
+def updateRecallQuad(prior, result, tnow, analyticMarginal=True, maxiter=100):
   """Update a time-dependent Beta distribution with a new data sample"""
   from scipy.integrate import quad
-
+  alpha, beta, t = prior
   dt = tnow / t
 
   if result == 1:
@@ -487,16 +478,16 @@ def updateRecallQuad(alpha,
   return newAlpha, newBeta, tnow
 
 
-def updateRecallMonteCarlo(alpha, beta, t, result, tnow, N=10000):
+def updateRecallMonteCarlo(prior, result, tnow, N=10000):
   """Update a time-dependent Beta distribution with a new data sample"""
   # [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&oldid=769806318#Properties_of_the_Bernoulli_Distribution, third (last) equation
   # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
   # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
   import scipy.stats as stats
 
-  tPrior = stats.beta.rvs(alpha, beta, size=N)
+  alpha, beta, t = prior
 
-  # To see where this comes from, read the rest of this document!
+  tPrior = stats.beta.rvs(alpha, beta, size=N)
   tnowPrior = tPrior**(tnow / t)
 
   # This is the Bernoulli likelihood [bernoulliLikelihood]
@@ -517,12 +508,12 @@ def updateRecallMonteCarlo(alpha, beta, t, result, tnow, N=10000):
 ```py
 def betafitBeforeLikelihood(a, b, t1, x, t2):
   a2, b2 = meanVarToBeta(
-      predictRecall(a, b, t1, t2), predictRecallVar(a, b, t1, t2))
+      predictRecall((a, b, t1), t2), predictRecallVar((a, b, t1), t2))
   return a2 + x, b2 + 1 - x, t2
 
 
 betafitBeforeLikelihood(3.3, 4.4, 1., 1., 2.)
-updateRecall(3.3, 4.4, 1., 1., 2.)
+updateRecall((3.3, 4.4, 1.), 1., 2.)
 ```
 
 ```py
@@ -567,9 +558,9 @@ class TestEbisu(unittest.TestCase):
 
     def inner(a, b, t0):
       for t in map(lambda dt: dt * t0, [0.1, .99, 1., 1.01, 5.5]):
-        mc = predictRecallMonteCarlo(a, b, t0, t, N=100 * 1000)
-        mean = predictRecall(a, b, t0, t)
-        var = predictRecallVar(a, b, t0, t)
+        mc = predictRecallMonteCarlo((a, b, t0), t, N=100 * 1000)
+        mean = predictRecall((a, b, t0), t)
+        var = predictRecallVar((a, b, t0), t)
         self.assertLess(relerr(mean, mc['mean']), 3e-2)
         self.assertLess(relerr(var, mc['var']), 3e-2)
 
@@ -587,20 +578,20 @@ class TestEbisu(unittest.TestCase):
       for t in map(lambda dt: dt * t0, dts):
         for x in [0., 1.]:
           msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
-          mc = updateRecallMonteCarlo(a, b, t0, x, t, N=1 * 1000 * 1000)
-          an = updateRecall(a, b, t0, x, t)
+          mc = updateRecallMonteCarlo((a, b, t0), x, t, N=1 * 1000 * 1000)
+          an = updateRecall((a, b, t0), x, t)
           self.assertLess(
               kl(an, mc), 1e-4, msg=msg + ' an={}, mc={}'.format(an, mc))
 
           try:
-            quad1 = updateRecallQuad(a, b, t0, x, t, analyticMarginal=True)
+            quad1 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=True)
           except OverflowError:
             quad1 = None
           if quad1 is not None:
             self.assertLess(kl(quad1, mc), 1e-4, msg=msg)
 
           try:
-            quad2 = updateRecallQuad(a, b, t0, x, t, analyticMarginal=False)
+            quad2 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=False)
           except OverflowError:
             quad2 = None
           if quad2 is not None:
@@ -659,9 +650,9 @@ plt.figure()
 ax = plt.subplot(111)
 plt.axhline(y=t0, linewidth=1, color='0.5')
 [plt.errorbar(ts,
-          np.array(list(map(lambda t: priorToHalflife(*updateRecall(a, a, t0, xobs, t))[0],
+          np.array(list(map(lambda t: priorToHalflife(updateRecall((a, a, t0), xobs, t))[0],
                             ts))),
-          v2s(np.array(list(map(lambda t: priorToHalflife(*updateRecall(a, a, t0, xobs, t))[1],
+          v2s(np.array(list(map(lambda t: priorToHalflife(updateRecall((a, a, t0), xobs, t))[1],
                             ts)))),
           marker='x' if xobs == 1 else 'o',
           color='C{}'.format(aidx),
@@ -681,22 +672,22 @@ plt.show()
 
 ```py
 plt.figure()
-modelA = updateRecall(3., 3., 7., 1, 15.)
-modelB = updateRecall(12., 12., 7., 1, 15.)
-hlA = priorToHalflife(*modelA)
-hlB = priorToHalflife(*modelB)
+modelA = updateRecall((3., 3., 7.), 1, 15.)
+modelB = updateRecall((12., 12., 7.), 1, 15.)
+hlA = priorToHalflife(modelA)
+hlB = priorToHalflife(modelB)
 plt.errorbar(
     ts,
-    predictRecall(*modelA, ts),
-    v2s(predictRecallVar(*modelA, ts)),
+    predictRecall(modelA, ts),
+    v2s(predictRecallVar(modelA, ts)),
     fmt='.-',
     label='Model A',
     color='C0')
 plt.plot(ts, 2**(-ts / hlA[0]), '--', label='approx A', color='C0')
 plt.errorbar(
     ts,
-    predictRecall(*modelB, ts),
-    v2s(predictRecallVar(*modelB, ts)),
+    predictRecall(modelB, ts),
+    v2s(predictRecallVar(modelB, ts)),
     fmt='.-',
     label='Model B',
     color='C1')
@@ -733,3 +724,4 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 Many thanks to Drew Benedetti for reviewing this manuscript.
 
 I use [Modest CSS](http://markdowncss.github.io/modest/).
+

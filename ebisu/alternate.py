@@ -2,9 +2,10 @@ from .ebisu import meanVarToBeta
 import numpy as np
 
 
-def predictRecallMode(alpha, beta, t, tnow):
+def predictRecallMode(prior, tnow):
   """Returns the mode of the immediate (pseudo-Beta) prior"""
   # [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`
+  alpha, beta, t = prior
   dt = tnow / t
   pr = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1)
 
@@ -27,13 +28,13 @@ def predictRecallMode(alpha, beta, t, tnow):
   return 0.5 if dt == 1. else (0. if dt > 1 else 1.)
 
 
-def predictRecallMedian(alpha, beta, t, tnow, percentile=0.5):
+def predictRecallMedian(prior, tnow, percentile=0.5):
   """"""
   # [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
   from scipy.optimize import brentq
   from scipy.special import beta as fbeta
   from scipy.special import hyp2f1
-
+  alpha, beta, t = prior
   dt = tnow / t
 
   # See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.
@@ -45,8 +46,9 @@ def predictRecallMedian(alpha, beta, t, tnow, percentile=0.5):
   return brentq(cdfPercentile, 0, 1)
 
 
-def predictRecallMonteCarlo(alpha, beta, t, tnow, N=1000000):
+def predictRecallMonteCarlo(prior, tnow, N=1000000):
   import scipy.stats as stats
+  alpha, beta, t = prior
   tPrior = stats.beta.rvs(alpha, beta, size=N)
   tnowPrior = tPrior**(tnow / t)
   freqs, bins = np.histogram(tnowPrior, 'auto')
@@ -58,23 +60,10 @@ def predictRecallMonteCarlo(alpha, beta, t, tnow, N=1000000):
       var=np.var(tnowPrior))
 
 
-# So we have several ways of evaluating the posterior mean/var:
-# - Monte Carlo
-# - Quadrature integration
-# - Analytic expression, with several hyp2f1
-# - Simplified analytic expression with fewer hyp2f1 (recurrence relations)
-
-
-def updateRecallQuad(alpha,
-                     beta,
-                     t,
-                     result,
-                     tnow,
-                     analyticMarginal=True,
-                     maxiter=100):
+def updateRecallQuad(prior, result, tnow, analyticMarginal=True, maxiter=100):
   """Update a time-dependent Beta distribution with a new data sample"""
   from scipy.integrate import quad
-
+  alpha, beta, t = prior
   dt = tnow / t
 
   if result == 1:
@@ -115,16 +104,16 @@ def updateRecallQuad(alpha,
   return newAlpha, newBeta, tnow
 
 
-def updateRecallMonteCarlo(alpha, beta, t, result, tnow, N=10000):
+def updateRecallMonteCarlo(prior, result, tnow, N=10000):
   """Update a time-dependent Beta distribution with a new data sample"""
   # [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&oldid=769806318#Properties_of_the_Bernoulli_Distribution, third (last) equation
   # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
   # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
   import scipy.stats as stats
 
-  tPrior = stats.beta.rvs(alpha, beta, size=N)
+  alpha, beta, t = prior
 
-  # To see where this comes from, read the rest of this document!
+  tPrior = stats.beta.rvs(alpha, beta, size=N)
   tnowPrior = tPrior**(tnow / t)
 
   # This is the Bernoulli likelihood [bernoulliLikelihood]

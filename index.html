@@ -89,6 +89,7 @@
 <li><a href="https://github.com/fasiha/ebisu">GitHub repo</a></li>
 <li><a href="https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb">IPython Notebook crash course</a></li>
 <li><a href="https://pypi.python.org/pypi/ebisu/">PyPI package</a></li>
+<li><a href="https://fasiha.github.io/#contact">Contact</a></li>
 </ul>
 <h2 id="introduction">Introduction</h2>
 <p>Consider a student that is memorizing a set of facts.</p>
@@ -2199,10 +2200,25 @@ Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\
 </svg></span> is the time elapsed between this fact’s last quiz and the one just used in the update.</p>
 <p>We are done. That’s all the math.</p>
 <h2 id="source-code">Source code</h2>
+<p>Before presenting the source code, I must somewhat apologetically explain a bit more about my workflow in writing and editing this document. I use the <a href="https://atom.io">Atom</a> text editor with the <a href="https://atom.io/packages/hydrogen">Hydrogen</a> plugin, which allows Atom to communicate with <a href="http://jupyter.org/">Jupyter</a> kernels. Jupyter used to be called IPython, and is a standard protocol for programming REPLs to communicate with more modern applications like browsers or text editors. With this setup, I can write code in Atom and send it to a behind-the-scenes Python or Node.js or Haskell or Matlab REPL for evaluation, which sends back the result.</p>
+<p>Hydrogen developer Lukas Geiger <a href="https://github.com/nteract/hydrogen/pull/637">recently</a> added support for evaluating fenced code blocks in Markdown—a long-time dream of mine. This document is a Github-Flavored Markdown file to which I add fenced code blocks. Some of these code blocks I intend to just be demo code, and not end up in the Ebisu library proper, while the code below does need to go into <code>.py</code> files.</p>
+<p>In order to untangle the code from the Markdown file to runnable files, I wrote a completely ad hoc undocumented Node.js script called <a href="https://github.com/fasiha/ebisu/blob/gh-pages/md2code.js">md2code.js</a> which</p>
+<ul>
+<li>slurps the Markdown,</li>
+<li>looks for fenced code blocks that open with a comment indicating a file destination, e.g., <code># export target.py</code>,</li>
+<li>prettifies Python with <a href="https://github.com/google/yapf">Yapf</a>, JavaScript with <a href="https://clang.llvm.org/docs/ClangFormatStyleOptions.html">clang-format</a>, etc.,</li>
+<li>dumps the code block contents into these files (appending after the first code block), and finally,</li>
+<li>updates the Markdown file itself with this prettified code.</li>
+</ul>
+<p>All this enables me to stay in Atom, writing prose and editing/testing code by evaluating fenced code blocks, while also spitting out a proper Python or JavaScript library.</p>
+<p>The major downside to this is that I cannot edit the untangled code files directly, and line numbers there don’t map to this document. I am tempted to append a commented-out line number in each untangled line…</p>
 <h3 id="core-library">Core library</h3>
+<p>Python Ebisu contains a sub-module called <code>ebisu.alternate</code> which contains a number of alternative implementations of <code>predictRecall</code> and <code>updateRecall</code>. The <code>__init__</code> file sets up this module hierarchy.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/__init__.py #</span>
 <span class="hljs-keyword">from</span> .ebisu <span class="hljs-keyword">import</span> *
 <span class="hljs-keyword">from</span> . <span class="hljs-keyword">import</span> alternate</code></pre>
+<p>The above is in its own fenced code block because I don’t want Hydrogen to evaluate it. In Atom, I don’t work with the Ebisu module—I just interact with the raw functions.</p>
+<p>Let’s present our Python implementation of the core Ebisu functions, <code>predictRecall</code> and <code>updateRecall</code>, and a couple of other related functions that live in the main <code>ebisu</code> module.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/ebisu.py #</span>
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecall</span><span class="hljs-params">(alpha, beta, t, tnow)</span>:</span>
   <span class="hljs-comment"># `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`</span>

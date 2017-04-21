@@ -6,6 +6,7 @@
 - [GitHub repo](https://github.com/fasiha/ebisu)
 - [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb)
 - [PyPI package](https://pypi.python.org/pypi/ebisu/)
+- [Contact](https://fasiha.github.io/#contact)
 
 ## Introduction
 
@@ -237,13 +238,34 @@ We are done. That’s all the math.
 
 ## Source code
 
+Before presenting the source code, I must somewhat apologetically explain a bit more about my workflow in writing and editing this document. I use the [Atom](https://atom.io) text editor with the [Hydrogen](https://atom.io/packages/hydrogen) plugin, which allows Atom to communicate with [Jupyter](http://jupyter.org/) kernels. Jupyter used to be called IPython, and is a standard protocol for programming REPLs to communicate with more modern applications like browsers or text editors. With this setup, I can write code in Atom and send it to a behind-the-scenes Python or Node.js or Haskell or Matlab REPL for evaluation, which sends back the result.
+
+Hydrogen developer Lukas Geiger [recently](https://github.com/nteract/hydrogen/pull/637) added support for evaluating fenced code blocks in Markdown—a long-time dream of mine. This document is a Github-Flavored Markdown file to which I add fenced code blocks. Some of these code blocks I intend to just be demo code, and not end up in the Ebisu library proper, while the code below does need to go into `.py` files.
+
+In order to untangle the code from the Markdown file to runnable files, I wrote a completely ad hoc undocumented Node.js script called [md2code.js](https://github.com/fasiha/ebisu/blob/gh-pages/md2code.js) which
+- slurps the Markdown,
+- looks for fenced code blocks that open with a comment indicating a file destination, e.g., `# export target.py`,
+- prettifies Python with [Yapf](https://github.com/google/yapf), JavaScript with [clang-format](https://clang.llvm.org/docs/ClangFormatStyleOptions.html), etc.,
+- dumps the code block contents into these files (appending after the first code block), and finally,
+- updates the Markdown file itself with this prettified code.
+
+All this enables me to stay in Atom, writing prose and editing/testing code by evaluating fenced code blocks, while also spitting out a proper Python or JavaScript library.
+
+The major downside to this is that I cannot edit the untangled code files directly, and line numbers there don’t map to this document. I am tempted to append a commented-out line number in each untangled line…
+
 ### Core library
+
+Python Ebisu contains a sub-module called `ebisu.alternate` which contains a number of alternative implementations of `predictRecall` and `updateRecall`. The `__init__` file sets up this module hierarchy.
 
 ```py
 # export ebisu/__init__.py #
 from .ebisu import *
 from . import alternate
 ```
+
+The above is in its own fenced code block because I don’t want Hydrogen to evaluate it. In Atom, I don’t work with the Ebisu module—I just interact with the raw functions.
+
+Let’s present our Python implementation of the core Ebisu functions, `predictRecall` and `updateRecall`, and a couple of other related functions that live in the main `ebisu` module.
 
 ```py
 # export ebisu/ebisu.py #
@@ -719,4 +741,3 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 Many thanks to Drew Benedetti for reviewing this manuscript.
 
 I use [Modest CSS](http://markdowncss.github.io/modest/).
-

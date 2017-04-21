@@ -162,11 +162,11 @@
 <p>The Mozer group’s algorithms also fit a hierarchical Bayesian model that links quiz performance to memory, taking into account inter-fact and inter-student variability, but the training step is again computationally-intensive.</p>
 <p>Like Duolingo and Mozer’s approaches, Ebisu explicitly tracks the exponential forgetting curve to provide a list of facts sorted by most to least likely to be forgotten. However, Ebisu formulates the problem very differently—while memory is understood to decay exponentially, Ebisu posits a <em>probability distribution</em> on the half-life and uses quiz results to update its beliefs in a fully Bayesian way. These updates, while a bit more computationally-burdensome than Anki’s scheduler, are much lighter-weight than Duolingo’s industrial-strength approach.</p>
 <p>This gives small quiz apps the same intelligent scheduling as Duolingo’s approach—real-time recall probabilities for any fact—but with immediate incorporation of quiz results, even on mobile apps.</p>
-<p>To appreciate this further, consider this example. Imagine a fact with half-life of a week: after a week we expect the recall probability to drop to 50%. However, Ebisu can entertain an infinite range of beliefs about this recall probability: it can be very uncertain that it’ll be 50% (the “α=β=3” model below), or it can be very confident in that prediction (“α=β=12” case):<br>
-<img src="figures/models.png" alt="figures/models.png"><br>
-Under either of these models of recall probability, we can ask Ebisu what the expected half-life is after the student is quizzed on this fact a day, a week, or a month after their last review, and whether they passed or failed the quiz:<br>
-<img src="figures/halflife.png" alt="figures/halflife.png"><br>
-If the student correctly answers the quiz, Ebisu expects the new half-life to be greater than a week. If the student answers correctly after just a day, the half-life rises a little bit, since we expected the student to remember this fact that soon after reviewing it. If the student surprises us by <em>failing</em> the quiz just a day after they last reviewed it, the projected half-life drops. The more tentative “α=β=3” model aggressively adjusts the half-life, while the more assured “α=β=12” model is more conservative in its update. (The vertical bars indicate Ebisu’s confidence about the new half-life. The code for these two charts is <a href="#demo-code">below</a>. Finally, each fact has an α and β associated with it and I explain what they mean mathematically in the next section.)</p>
+<p>To appreciate this further, consider this example. Imagine a fact with half-life of a week: after a week we expect the recall probability to drop to 50%. However, Ebisu can entertain an infinite range of beliefs about this recall probability: it can be very uncertain that it’ll be 50% (the “α=β=3” model below), or it can be very confident in that prediction (“α=β=12” case):</p>
+<p><img src="figures/models.png" alt="figures/models.png"></p>
+<p>Under either of these models of recall probability, we can ask Ebisu what the expected half-life is after the student is quizzed on this fact a day, a week, or a month after their last review, and whether they passed or failed the quiz:</p>
+<p><img src="figures/halflife.png" alt="figures/halflife.png"></p>
+<p>If the student correctly answers the quiz, Ebisu expects the new half-life to be greater than a week. If the student answers correctly after just a day, the half-life rises a little bit, since we expected the student to remember this fact that soon after reviewing it. If the student surprises us by <em>failing</em> the quiz just a day after they last reviewed it, the projected half-life drops. The more tentative “α=β=3” model aggressively adjusts the half-life, while the more assured “α=β=12” model is more conservative in its update. (The vertical bars indicate Ebisu’s confidence about the new half-life. The code for these two charts is <a href="#demo-code">below</a>. Finally, each fact has an α and β associated with it and I explain what they mean mathematically in the next section.)</p>
 <p>Similarly, if the student fails the quiz after a whole month of not reviewing it, this isn’t a surprise—the half-life drops a bit from the initial half-life of a week. If she does surprise us, passing the quiz after a month of not studying it, then Ebisu boosts its expectated half-life—by a lot for the “α=β=3” model, less for the “α=β=12” one.</p>
 <blockquote>
 <p>Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how facts are related the way Duolingo can with its sentences. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.</p>
@@ -255,8 +255,7 @@ If the student correctly answers the quiz, Ebisu expects the new half-life to be
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-213"></use>
 </g>
-</svg></span> follow a Beta distribution, that is, if<br>
-<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.399ex" height="2.843ex" style="vertical-align: -0.838ex; margin-left: -0.089ex;" viewBox="-38.5 -863.1 7491.1 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-16-Title">
+</svg></span> follow a Beta distribution, that is, if <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.399ex" height="2.843ex" style="vertical-align: -0.838ex; margin-left: -0.089ex;" viewBox="-38.5 -863.1 7491.1 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-16-Title">
 <title id="MathJax-SVG-16-Title">p_t ∼ Beta(α_t, β_t)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
@@ -278,8 +277,7 @@ If the student correctly answers the quiz, Ebisu expects the new half-life to be
 </g>
  <use xlink:href="#MJMAIN-29" x="7063" y="0"></use>
 </g>
-</svg></span><br>
-for specific <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.314ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 996.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-17-Title">
+</svg></span> for specific <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.314ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 996.1 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-17-Title">
 <title id="MathJax-SVG-17-Title">α_t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
@@ -291,8 +289,7 @@ for specific <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink
  <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="801" y="-326"></use>
 </g>
-</svg></span>, then observing the quiz result updates our belief about the recall probability to be:<br>
-<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.843ex" height="2.843ex" style="vertical-align: -0.838ex; margin-left: -0.089ex;" viewBox="-38.5 -863.1 15001.8 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-19-Title">
+</svg></span>, then observing the quiz result updates our belief about the recall probability to be: <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.843ex" height="2.843ex" style="vertical-align: -0.838ex; margin-left: -0.089ex;" viewBox="-38.5 -863.1 15001.8 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-19-Title">
 <title id="MathJax-SVG-19-Title">p_t | x_t ∼ Beta(α_t + x_t, β_t + 1 - x_t).</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
@@ -450,8 +447,7 @@ for specific <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
 </g>
-</svg></span> is<br>
-<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.866ex" height="3.176ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -1078.4 4678.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-35-Title">
+</svg></span> is <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.866ex" height="3.176ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -1078.4 4678.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-35-Title">
 <title id="MathJax-SVG-35-Title">p_t = 2^{-t/h},</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
@@ -468,8 +464,7 @@ for specific <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink
 </g>
  <use xlink:href="#MJMAIN-2C" x="4361" y="0"></use>
 </g>
-</svg></span><br>
-for some notional half-life <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.339ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 576.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-36-Title">
+</svg></span> for some notional half-life <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.339ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 576.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-36-Title">
 <title id="MathJax-SVG-36-Title">h</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-68" x="0" y="0"></use>
@@ -484,8 +479,7 @@ for some notional half-life <span class="mjpage"><svg xmlns:xlink="http://www.w3
  <use xlink:href="#MJMAIN-22C5" x="2816" y="0"></use>
  <use xlink:href="#MJMATHI-74" x="3316" y="0"></use>
 </g>
-</svg></span>. Then,<br>
-<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="37.022ex" height="3.509ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -1078.4 15940.2 1510.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-38-Title">
+</svg></span>. Then, <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="37.022ex" height="3.509ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -1078.4 15940.2 1510.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-38-Title">
 <title id="MathJax-SVG-38-Title">p_{t_2} = p_{δ t} = 2^{-δt/h} = (2^{-t/h})^δ = (p_t)^δ.</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
@@ -539,8 +533,7 @@ for some notional half-life <span class="mjpage"><svg xmlns:xlink="http://www.w3
 </g>
  <use xlink:href="#MJMAIN-2E" x="15623" y="0"></use>
 </g>
-</svg></span><br>
-That is, to fast-forward or rewind <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-39-Title">
+</svg></span> That is, to fast-forward or rewind <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-39-Title">
 <title id="MathJax-SVG-39-Title">p_t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
@@ -683,7 +676,7 @@ plt.show()</code></pre>
  <use xlink:href="#MJMAIN-2260" x="722" y="0"></use>
  <use xlink:href="#MJMAIN-31" x="1778" y="0"></use>
 </g>
-</svg></span> as indeed not Beta. I initially fit a Beta distribution to them and sought to make this point visually but alas, for reasonable values of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.488ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 640.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-52-Title">
+</svg></span> are indeed not Beta. For these <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.488ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 640.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-52-Title">
 <title id="MathJax-SVG-52-Title">α</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
@@ -698,23 +691,16 @@ plt.show()</code></pre>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
 </g>
-</svg></span>, a histogram for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-55-Title">
+</svg></span> used here, they are close to Beta, but especially when over- or under-reviewing, the histograms become skewed and are no longer well-matched by any Beta distribution.</p>
+<p>So let’s derive analytically the probability density function (PDF) for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-55-Title">
 <title id="MathJax-SVG-55-Title">p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
 </g>
-</svg></span> was well-matched by a Beta distribution.</p>
-<p>So let’s derive analytically the probability density function (PDF) for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-56-Title">
-<title id="MathJax-SVG-56-Title">p_t^δ</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
-</g>
-</svg></span>. Recall the conventional way to obtain the density of a <a href="https://en.wikipedia.org/w/index.php?title=Random_variable&amp;oldid=771423505#Functions_of_random_variables">nonlinearly-transformed random variable</a>: let <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="6.424ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 2765.7 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-57-Title">
-<title id="MathJax-SVG-57-Title">x=p_t</title>
+</svg></span>. Recall the conventional way to obtain the density of a <a href="https://en.wikipedia.org/w/index.php?title=Random_variable&amp;oldid=771423505#Functions_of_random_variables">nonlinearly-transformed random variable</a>: let <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="6.424ex" height="2.009ex" style="vertical-align: -0.671ex;" viewBox="0 -576.1 2765.7 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-56-Title">
+<title id="MathJax-SVG-56-Title">x=p_t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="850" y="0"></use>
@@ -723,8 +709,8 @@ plt.show()</code></pre>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-213"></use>
 </g>
 </g>
-</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.899ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 5984.4 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-58-Title">
-<title id="MathJax-SVG-58-Title">y = g(x) = x^δ</title>
+</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.899ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 5984.4 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-57-Title">
+<title id="MathJax-SVG-57-Title">y = g(x) = x^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-79" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="775" y="0"></use>
@@ -738,8 +724,8 @@ plt.show()</code></pre>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="809" y="513"></use>
 </g>
 </g>
-</svg></span> be the forward transform, so <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.45ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 5791 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-59-Title">
-<title id="MathJax-SVG-59-Title">g^{-1}(y) = x^{1/δ}</title>
+</svg></span> be the forward transform, so <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.45ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 5791 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-58-Title">
+<title id="MathJax-SVG-58-Title">g^{-1}(y) = x^{1/δ}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-67" x="0" y="0"></use>
 <g transform="translate(481,362)">
@@ -759,13 +745,13 @@ plt.show()</code></pre>
 </g>
 </g>
 </g>
-</svg></span> is its inverse. Then, with <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.33ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 572.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-60-Title">
-<title id="MathJax-SVG-60-Title">x</title>
+</svg></span> is its inverse. Then, with <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.33ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 572.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-59-Title">
+<title id="MathJax-SVG-59-Title">x</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
 </g>
-</svg></span> being <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.564ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4548.2 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-61-Title">
-<title id="MathJax-SVG-61-Title">Beta(α,β)</title>
+</svg></span> being <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.564ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4548.2 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-60-Title">
+<title id="MathJax-SVG-60-Title">Beta(α,β)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-42" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-65" x="759" y="0"></use>
@@ -777,9 +763,8 @@ plt.show()</code></pre>
  <use xlink:href="#MJMATHI-3B2" x="3592" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="4158" y="0"></use>
 </g>
-</svg></span>,<br>
-<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="31.383ex" height="6.009ex" style="vertical-align: -2.505ex;" viewBox="0 -1508.9 13512.2 2587.3" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-62-Title">
-<title id="MathJax-SVG-62-Title">P_{Y}(y) = P_{x}(g^{-1}(y)) · \frac{∂}{∂y} g^{-1}(y),</title>
+</svg></span>, <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="31.383ex" height="6.009ex" style="vertical-align: -2.505ex;" viewBox="0 -1508.9 13512.2 2587.3" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-61-Title">
+<title id="MathJax-SVG-61-Title">P_{Y}(y) = P_{x}(g^{-1}(y)) · \frac{∂}{∂y} g^{-1}(y),</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-59" x="908" y="-213"></use>
@@ -826,10 +811,8 @@ plt.show()</code></pre>
  <use xlink:href="#MJMAIN-29" x="12844" y="0"></use>
  <use xlink:href="#MJMAIN-2C" x="13233" y="0"></use>
 </g>
-</svg></span><br>
-and this after some Wolfram Alpha and hand-manipulation becomes<br>
-<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="44.588ex" height="3.343ex" style="vertical-align: -0.838ex;" viewBox="0 -1078.4 19197.6 1439.2" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-63-Title">
-<title id="MathJax-SVG-63-Title">P_{Y}(y) = y^{(α-δ)/δ} · (1-y^{1/δ})^{β-1} / (δ · B(α, β)),</title>
+</svg></span> and this after some Wolfram Alpha and hand-manipulation becomes <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="44.588ex" height="3.343ex" style="vertical-align: -0.838ex;" viewBox="0 -1078.4 19197.6 1439.2" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-62-Title">
+<title id="MathJax-SVG-62-Title">P_{Y}(y) = y^{(α-δ)/δ} · (1-y^{1/δ})^{β-1} / (δ · B(α, β)),</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-59" x="908" y="-213"></use>
@@ -882,9 +865,8 @@ and this after some Wolfram Alpha and hand-manipulation becomes<br>
  <use xlink:href="#MJMAIN-29" x="18529" y="0"></use>
  <use xlink:href="#MJMAIN-2C" x="18919" y="0"></use>
 </g>
-</svg></span><br>
-where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="31.584ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 13598.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-64-Title">
-<title id="MathJax-SVG-64-Title">B(α, β) = Γ(α) · Γ(β) / Γ(α + β)</title>
+</svg></span> where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="31.584ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 13598.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-63-Title">
+<title id="MathJax-SVG-63-Title">B(α, β) = Γ(α) · Γ(β) / Γ(α + β)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-42" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-28" x="759" y="0"></use>
@@ -910,8 +892,8 @@ where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width
  <use xlink:href="#MJMATHI-3B2" x="12642" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="13209" y="0"></use>
 </g>
-</svg></span> is <a href="https://en.wikipedia.org/wiki/Beta_function">beta function</a>, also the normalizing denominator in the Beta density (very confusing, sorry; here <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="3.909ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 1683 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-65-Title">
-<title id="MathJax-SVG-65-Title">Γ(·)</title>
+</svg></span> is <a href="https://en.wikipedia.org/wiki/Beta_function">beta function</a>, also the normalizing denominator in the Beta density (very confusing, sorry; here <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="3.909ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 1683 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-64-Title">
+<title id="MathJax-SVG-64-Title">Γ(·)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-393" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-28" x="625" y="0"></use>
@@ -922,18 +904,18 @@ where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width
 <blockquote>
 <p>To check this, type in <code>y^((a-1)/d) * (1 - y^(1/d))^(b-1) / Beta[a,b] * D[y^(1/d), y]</code> at <a href="https://www.wolframalpha.com">Wolfram Alpha</a>.</p>
 </blockquote>
-<p>Replacing the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.98ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 852.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-66-Title">
-<title id="MathJax-SVG-66-Title">X</title>
+<p>Replacing the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.98ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 852.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-65-Title">
+<title id="MathJax-SVG-65-Title">X</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-58" x="0" y="0"></use>
 </g>
-</svg></span>’s and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.773ex" height="2.009ex" style="vertical-align: -0.171ex;" viewBox="0 -791.3 763.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-67-Title">
-<title id="MathJax-SVG-67-Title">Y</title>
+</svg></span>’s and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.773ex" height="2.009ex" style="vertical-align: -0.171ex;" viewBox="0 -791.3 763.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-66-Title">
+<title id="MathJax-SVG-66-Title">Y</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-59" x="0" y="0"></use>
 </g>
-</svg></span>’s with our usual variables, we have the probability density for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="8.147ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 3507.5 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-68-Title">
-<title id="MathJax-SVG-68-Title">p_{t_2} = p_t^δ</title>
+</svg></span>’s with our usual variables, we have the probability density for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="8.147ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 3507.5 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-67-Title">
+<title id="MathJax-SVG-67-Title">p_{t_2} = p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
 <g transform="translate(503,-150)">
@@ -947,15 +929,14 @@ where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
 </g>
 </g>
-</svg></span> in terms of the original density for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-69-Title">
-<title id="MathJax-SVG-69-Title">p_t</title>
+</svg></span> in terms of the original density for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-68-Title">
+<title id="MathJax-SVG-68-Title">p_t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-213"></use>
 </g>
-</svg></span>:<br>
-<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="32.091ex" height="6.843ex" style="vertical-align: -2.671ex;" viewBox="0 -1796 13817.1 2946.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-70-Title">
-<title id="MathJax-SVG-70-Title">P(p_t^δ) = \frac{p^{(α - δ)/δ} · (1-p^{1/δ})^{β-1}}{δ · B(α, β)}.</title>
+</svg></span>: <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="32.091ex" height="6.843ex" style="vertical-align: -2.671ex;" viewBox="0 -1796 13817.1 2946.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-69-Title">
+<title id="MathJax-SVG-69-Title">P(p_t^δ) = \frac{p^{(α - δ)/δ} · (1-p^{1/δ})^{β-1}}{δ · B(α, β)}.</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-28" x="751" y="0"></use>
@@ -1015,10 +996,9 @@ where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width
 </g>
  <use xlink:href="#MJMAIN-2E" x="13538" y="0"></use>
 </g>
-</svg></span><br>
-I tried but failed to rewrite this as a Beta distribution, and indeed, we can show numerically that this density does indeed diverge from the best-approximating Beta density.</p>
-<p>We will use the density of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-71-Title">
-<title id="MathJax-SVG-71-Title">p_t^δ</title>
+</svg></span> I tried but failed to rewrite this as a Beta distribution, and indeed, we can show numerically that this density does indeed diverge from the best-approximating Beta density.</p>
+<p>We will use the density of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-70-Title">
+<title id="MathJax-SVG-70-Title">p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
@@ -1030,8 +1010,8 @@ I tried but failed to rewrite this as a Beta distribution, and indeed, we can sh
 <li>how do I update my estimate of that recall probability given quiz results?</li>
 </ul>
 <h3 id="mean-and-variance-of-the-recall-probability-right-now">Mean and variance of the recall probability right now</h3>
-<p>Let’s see how to get the recall probability right now. Recall that we start out with a prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="15.747ex" height="2.843ex" style="vertical-align: -0.838ex; margin-left: -0.089ex;" viewBox="-38.5 -863.1 6779.8 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-72-Title">
-<title id="MathJax-SVG-72-Title">p_t ∼ Beta(α, β)</title>
+<p>Let’s see how to get the recall probability right now. Recall that we start out with a prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="15.747ex" height="2.843ex" style="vertical-align: -0.838ex; margin-left: -0.089ex;" viewBox="-38.5 -863.1 6779.8 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-71-Title">
+<title id="MathJax-SVG-71-Title">p_t ∼ Beta(α, β)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-213"></use>
@@ -1046,13 +1026,13 @@ I tried but failed to rewrite this as a Beta distribution, and indeed, we can sh
  <use xlink:href="#MJMATHI-3B2" x="5785" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="6351" y="0"></use>
 </g>
-</svg></span>, that is, we believe the recall probability on a quiz conducted <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-73-Title">
-<title id="MathJax-SVG-73-Title">t</title>
+</svg></span>, that is, we believe the recall probability on a quiz conducted <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-72-Title">
+<title id="MathJax-SVG-72-Title">t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
 </g>
-</svg></span> days after the last review for a given fact is <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.564ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4548.2 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-74-Title">
-<title id="MathJax-SVG-74-Title">Beta(α, β)</title>
+</svg></span> days after the last review for a given fact is <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.564ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4548.2 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-73-Title">
+<title id="MathJax-SVG-73-Title">Beta(α, β)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-42" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-65" x="759" y="0"></use>
@@ -1064,8 +1044,8 @@ I tried but failed to rewrite this as a Beta distribution, and indeed, we can sh
  <use xlink:href="#MJMATHI-3B2" x="3592" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="4158" y="0"></use>
 </g>
-</svg></span>-distributed. This prior is parameterized by three positive real numbers: <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="7.005ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 3015.8 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-75-Title">
-<title id="MathJax-SVG-75-Title">[α, β, t]</title>
+</svg></span>-distributed. This prior is parameterized by three positive real numbers: <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="7.005ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 3015.8 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-74-Title">
+<title id="MathJax-SVG-74-Title">[α, β, t]</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-5B" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-3B1" x="278" y="0"></use>
@@ -1075,8 +1055,8 @@ I tried but failed to rewrite this as a Beta distribution, and indeed, we can sh
  <use xlink:href="#MJMATHI-74" x="2375" y="0"></use>
  <use xlink:href="#MJMAIN-5D" x="2737" y="0"></use>
 </g>
-</svg></span>. Let <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-76-Title">
-<title id="MathJax-SVG-76-Title">δ = t_{now} / t</title>
+</svg></span>. Let <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-75-Title">
+<title id="MathJax-SVG-75-Title">δ = t_{now} / t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
@@ -1091,8 +1071,8 @@ I tried but failed to rewrite this as a Beta distribution, and indeed, we can sh
  <use xlink:href="#MJMAIN-2F" x="3514" y="0"></use>
  <use xlink:href="#MJMATHI-74" x="4015" y="0"></use>
 </g>
-</svg></span>, where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.032ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 1736.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-77-Title">
-<title id="MathJax-SVG-77-Title">t_{now}</title>
+</svg></span>, where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.032ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 1736.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-76-Title">
+<title id="MathJax-SVG-76-Title">t_{now}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
 <g transform="translate(361,-150)">
@@ -1101,12 +1081,8 @@ I tried but failed to rewrite this as a Beta distribution, and indeed, we can sh
  <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
 </g>
 </g>
-</svg></span> is the time currently elapsed since the last review. The expected recall probability right now is<br>
-<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.734ex" height="12.843ex" style="vertical-align: -5.838ex;" viewBox="0 -3015.9 14954.7 5529.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-78-Title">
-<title id="MathJax-SVG-78-Title">\begin{align} 
-E[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · p \, dp \\ 
-&amp;= \frac{Γ(α + β)}{Γ(α)} · \frac{Γ(α + δ)}{Γ(α + β + δ)}. 
-\end{align}</title>
+</svg></span> is the time currently elapsed since the last review. The expected recall probability right now is <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.734ex" height="12.843ex" style="vertical-align: -5.838ex;" viewBox="0 -3015.9 14954.7 5529.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-77-Title">
+<title id="MathJax-SVG-77-Title">\begin{align} E[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · p \, dp \\ &amp;= \frac{Γ(α + β)}{Γ(α)} · \frac{Γ(α + δ)}{Γ(α + β + δ)}. \end{align}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
 <g transform="translate(167,0)">
 <g transform="translate(-11,0)">
@@ -1196,26 +1172,22 @@ E[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · p \, dp \\
 <blockquote>
 <p>Mathematica code to verify on Wolfram Alpha: <code>Integrate[p^((a - d)/d) * (1 - p^(1/d))^(b - 1) / (d * Gamma[a]*Gamma[b]/Gamma[a+b]) * p, {p, 0, 1}]</code>.</p>
 </blockquote>
-<p>It’s also useful to know how much uncertainty is in our belief about <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-79-Title">
+<p>It’s also useful to know how much uncertainty is in our belief about <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-78-Title">
+<title id="MathJax-SVG-78-Title">p_t^δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
+</g>
+</svg></span>. We can evaluate the variance of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-79-Title">
 <title id="MathJax-SVG-79-Title">p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
 </g>
-</svg></span>. We can evaluate the variance of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-80-Title">
-<title id="MathJax-SVG-80-Title">p_t^δ</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
-</g>
-</svg></span>:<br>
-<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="37.459ex" height="9.676ex" style="vertical-align: -4.003ex; margin-bottom: -0.335ex;" viewBox="0 -2298.3 16128 4166" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-81-Title">
-<title id="MathJax-SVG-81-Title">\begin{align} 
-Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\ 
-&amp;= E[p_t^{2 δ}] - (E[p_t^δ])^2. 
-\end{align}</title>
+</svg></span>: <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="37.459ex" height="9.676ex" style="vertical-align: -4.003ex; margin-bottom: -0.335ex;" viewBox="0 -2298.3 16128 4166" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-80-Title">
+<title id="MathJax-SVG-80-Title">\begin{align} Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\ &amp;= E[p_t^{2 δ}] - (E[p_t^δ])^2. \end{align}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
 <g transform="translate(167,0)">
 <g transform="translate(-11,0)">
@@ -1300,8 +1272,8 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
 </g>
 </g>
 </svg></span></p>
-<p>That first value <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="6.023ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 2593.2 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-82-Title">
-<title id="MathJax-SVG-82-Title">E[p_t^{2 δ}]</title>
+<p>That first value <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="6.023ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 2593.2 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-81-Title">
+<title id="MathJax-SVG-81-Title">E[p_t^{2 δ}]</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
@@ -1315,14 +1287,14 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
 </g>
  <use xlink:href="#MJMAIN-5D" x="2314" y="0"></use>
 </g>
-</svg></span> means evaluate the expected recall probability for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.211ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 952 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-83-Title">
-<title id="MathJax-SVG-83-Title">2 δ</title>
+</svg></span> means evaluate the expected recall probability for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.211ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 952 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-82-Title">
+<title id="MathJax-SVG-82-Title">2 δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-32" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-3B4" x="500" y="0"></use>
 </g>
-</svg></span>, that is, at another <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.032ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 1736.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-84-Title">
-<title id="MathJax-SVG-84-Title">t_{now}</title>
+</svg></span>, that is, at another <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.032ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 1736.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-83-Title">
+<title id="MathJax-SVG-83-Title">t_{now}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
 <g transform="translate(361,-150)">
@@ -1331,17 +1303,16 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
  <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
 </g>
 </g>
-</svg></span> days in the future. It might be just coincidence but the fact that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.211ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 952 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-85-Title">
-<title id="MathJax-SVG-85-Title">2 δ</title>
+</svg></span> days in the future. It might be just coincidence but the fact that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.211ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 952 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-84-Title">
+<title id="MathJax-SVG-84-Title">2 δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-32" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-3B4" x="500" y="0"></use>
 </g>
 </svg></span> shows up in this way surprised me.</p>
 <blockquote>
-<p>Verifying this in Mathematica/Wolfram Alpha is a bit more involved. First,<br>
-<code>Assuming[a&gt;0 &amp;&amp; b&gt;0 &amp;&amp; t&gt;0, {Integrate[p^((a - d)/d) * (1 - p^(1/d))^(b - 1) / (d * Gamma[a]*Gamma[b]/Gamma[a+b]) * (p-m)^2, {p, 0, 1}]}]</code> gives the result in terms of mean <code>m</code> = <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.201ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 2239.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-86-Title">
-<title id="MathJax-SVG-86-Title">E[p_t^δ]</title>
+<p>Verifying this in Mathematica/Wolfram Alpha is a bit more involved. First, <code>Assuming[a&gt;0 &amp;&amp; b&gt;0 &amp;&amp; t&gt;0, {Integrate[p^((a - d)/d) * (1 - p^(1/d))^(b - 1) / (d * Gamma[a]*Gamma[b]/Gamma[a+b]) * (p-m)^2, {p, 0, 1}]}]</code> gives the result in terms of mean <code>m</code> = <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.201ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 2239.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-85-Title">
+<title id="MathJax-SVG-85-Title">E[p_t^δ]</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
@@ -1355,8 +1326,8 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
 </svg></span>. Then plug in that value for <code>m</code> and simplify by hand.</p>
 </blockquote>
 <p>So far we have found three analytical expressions. Suffice it to say that I tested both the derivations as well as my implementations of them in the code thoroughly to confirm that they matched the answers given by quadrature integration as well as Monte Carlo analysis. Code to do that is provided below, and when I present it, I will show how the above formulae are corroborated.</p>
-<p>A quiz app can implement at least the expectation <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.201ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 2239.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-87-Title">
-<title id="MathJax-SVG-87-Title">E[p_t^δ]</title>
+<p>A quiz app can implement at least the expectation <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.201ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 2239.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-86-Title">
+<title id="MathJax-SVG-86-Title">E[p_t^δ]</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
@@ -1368,24 +1339,24 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
  <use xlink:href="#MJMAIN-5D" x="1960" y="0"></use>
 </g>
 </svg></span> above to identify the facts most at risk of being forgotten.</p>
-<h3 id="initial-choice-for---and-t">Initial choice for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.488ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 640.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-88-Title">
-<title id="MathJax-SVG-88-Title">α</title>
+<h3 id="initial-choice-for---and-t">Initial choice for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.488ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 640.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-87-Title">
+<title id="MathJax-SVG-87-Title">α</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
 </g>
-</svg></span>, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.332ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 573.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-89-Title">
-<title id="MathJax-SVG-89-Title">β</title>
+</svg></span>, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.332ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 573.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-88-Title">
+<title id="MathJax-SVG-88-Title">β</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
 </g>
-</svg></span>, and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-90-Title">
-<title id="MathJax-SVG-90-Title">t</title>
+</svg></span>, and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-89-Title">
+<title id="MathJax-SVG-89-Title">t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
 </g>
 </svg></span></h3>
-<p>Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="7.005ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 3015.8 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-91-Title">
-<title id="MathJax-SVG-91-Title">[α, β, t]</title>
+<p>Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="7.005ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 3015.8 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-90-Title">
+<title id="MathJax-SVG-90-Title">[α, β, t]</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-5B" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-3B1" x="278" y="0"></use>
@@ -1395,18 +1366,18 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
  <use xlink:href="#MJMATHI-74" x="2375" y="0"></use>
  <use xlink:href="#MJMAIN-5D" x="2737" y="0"></use>
 </g>
-</svg></span> initially, for example when the student has first learned a fact. I propose setting <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-92-Title">
+</svg></span> initially, for example when the student has first learned a fact. I propose setting <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-91-Title">
+<title id="MathJax-SVG-91-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span> equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-92-Title">
 <title id="MathJax-SVG-92-Title">t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
 </g>
-</svg></span> equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-93-Title">
-<title id="MathJax-SVG-93-Title">t</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
-</g>
-</svg></span> to four hours or a day, respectively. Then, set <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.163ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 4375.6 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-94-Title">
-<title id="MathJax-SVG-94-Title">α = β ≥ 2</title>
+</svg></span> to four hours or a day, respectively. Then, set <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.163ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 4375.6 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-93-Title">
+<title id="MathJax-SVG-93-Title">α = β ≥ 2</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
@@ -1414,27 +1385,27 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
  <use xlink:href="#MJMAIN-2265" x="2818" y="0"></use>
  <use xlink:href="#MJMAIN-32" x="3875" y="0"></use>
 </g>
-</svg></span>: the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-95-Title">
-<title id="MathJax-SVG-95-Title">α = β</title>
+</svg></span>: the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-94-Title">
+<title id="MathJax-SVG-94-Title">α = β</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
  <use xlink:href="#MJMATHI-3B2" x="1974" y="0"></use>
 </g>
-</svg></span> part will center the Beta distribution for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-96-Title">
+</svg></span> part will center the Beta distribution for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-95-Title">
+<title id="MathJax-SVG-95-Title">p_t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-213"></use>
+</g>
+</svg></span> at 0.5, and then the actual value will constrain the variability of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-96-Title">
 <title id="MathJax-SVG-96-Title">p_t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-213"></use>
 </g>
-</svg></span> at 0.5, and then the actual value will constrain the variability of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-97-Title">
-<title id="MathJax-SVG-97-Title">p_t</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-213"></use>
-</g>
-</svg></span>. Specifically, the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.564ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4548.2 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-98-Title">
-<title id="MathJax-SVG-98-Title">Beta(α, β)</title>
+</svg></span>. Specifically, the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.564ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4548.2 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-97-Title">
+<title id="MathJax-SVG-97-Title">Beta(α, β)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-42" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-65" x="759" y="0"></use>
@@ -1448,8 +1419,8 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
 </g>
 </svg></span> distribution has</p>
 <ul>
-<li>mean <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.103ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4349.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-99-Title">
-<title id="MathJax-SVG-99-Title">α / (α + β)</title>
+<li>mean <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.103ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4349.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-98-Title">
+<title id="MathJax-SVG-98-Title">α / (α + β)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-2F" x="640" y="0"></use>
@@ -1459,23 +1430,23 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
  <use xlink:href="#MJMATHI-3B2" x="3393" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="3960" y="0"></use>
 </g>
-</svg></span> or <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.972ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 1279.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-100-Title">
-<title id="MathJax-SVG-100-Title">0.5</title>
+</svg></span> or <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.972ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 1279.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-99-Title">
+<title id="MathJax-SVG-99-Title">0.5</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-30"></use>
  <use xlink:href="#MJMAIN-2E" x="500" y="0"></use>
  <use xlink:href="#MJMAIN-35" x="779" y="0"></use>
 </g>
-</svg></span> if <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-101-Title">
-<title id="MathJax-SVG-101-Title">α = β</title>
+</svg></span> if <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-100-Title">
+<title id="MathJax-SVG-100-Title">α = β</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
  <use xlink:href="#MJMATHI-3B2" x="1974" y="0"></use>
 </g>
 </svg></span>, and</li>
-<li>variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="26.771ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 11526.2 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-102-Title">
-<title id="MathJax-SVG-102-Title">α · β / (α + β)^ 2 / (α + β + 1)</title>
+<li>variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="26.771ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 11526.2 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-101-Title">
+<title id="MathJax-SVG-101-Title">α · β / (α + β)^ 2 / (α + β + 1)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-22C5" x="862" y="0"></use>
@@ -1498,8 +1469,8 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
  <use xlink:href="#MJMAIN-31" x="10636" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="11136" y="0"></use>
 </g>
-</svg></span> which simplifies to <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.759ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 5923.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-103-Title">
-<title id="MathJax-SVG-103-Title">1/(4 (2 α + 1))</title>
+</svg></span> which simplifies to <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.759ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 5923.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-102-Title">
+<title id="MathJax-SVG-102-Title">1/(4 (2 α + 1))</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-31" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-2F" x="500" y="0"></use>
@@ -1513,8 +1484,8 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
  <use xlink:href="#MJMAIN-29" x="5144" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="5534" y="0"></use>
 </g>
-</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-104-Title">
-<title id="MathJax-SVG-104-Title">α = β</title>
+</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-103-Title">
+<title id="MathJax-SVG-103-Title">α = β</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
@@ -1522,38 +1493,38 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
 </g>
 </svg></span>.
 <ul>
-<li>(Recall the traditional explanation of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.488ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 640.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-105-Title">
-<title id="MathJax-SVG-105-Title">α</title>
+<li>(Recall the traditional explanation of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.488ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 640.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-104-Title">
+<title id="MathJax-SVG-104-Title">α</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
 </g>
-</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.332ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 573.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-106-Title">
-<title id="MathJax-SVG-106-Title">β</title>
+</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.332ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 573.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-105-Title">
+<title id="MathJax-SVG-105-Title">β</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
 </g>
-</svg></span> are the number of successes and failures, respectively, that have been observed by flipping a weighted coin—or in our application, the number of successful versus unsuccessful quiz results for a sequence of quizzes on the same fact <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-107-Title">
-<title id="MathJax-SVG-107-Title">t</title>
+</svg></span> are the number of successes and failures, respectively, that have been observed by flipping a weighted coin—or in our application, the number of successful versus unsuccessful quiz results for a sequence of quizzes on the same fact <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-106-Title">
+<title id="MathJax-SVG-106-Title">t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
 </g>
 </svg></span> days apart.)</li>
 </ul></li>
 </ul>
-<p>A higher value for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-108-Title">
-<title id="MathJax-SVG-108-Title">α = β</title>
+<p>A higher value for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.918ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 2548.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-107-Title">
+<title id="MathJax-SVG-107-Title">α = β</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
  <use xlink:href="#MJMATHI-3B2" x="1974" y="0"></use>
 </g>
-</svg></span> encodes <em>higher</em> confidence in the expected half-life <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-109-Title">
-<title id="MathJax-SVG-109-Title">t</title>
+</svg></span> encodes <em>higher</em> confidence in the expected half-life <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-108-Title">
+<title id="MathJax-SVG-108-Title">t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
 </g>
-</svg></span>, which in turn makes the model (which we’ll detail below) <em>less</em> sensitive to quiz results. In our experiments below, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="11.325ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 4876.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-110-Title">
-<title id="MathJax-SVG-110-Title">α = β = 12</title>
+</svg></span>, which in turn makes the model (which we’ll detail below) <em>less</em> sensitive to quiz results. In our experiments below, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="11.325ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 4876.1 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-109-Title">
+<title id="MathJax-SVG-109-Title">α = β = 12</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
@@ -1564,8 +1535,8 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
  <use xlink:href="#MJMAIN-32" x="500" y="0"></use>
 </g>
 </g>
-</svg></span> is our least sensitive model, while <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.163ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 4375.6 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-111-Title">
-<title id="MathJax-SVG-111-Title">α = β = 3</title>
+</svg></span> is our least sensitive model, while <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.163ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 4375.6 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-110-Title">
+<title id="MathJax-SVG-110-Title">α = β = 3</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="918" y="0"></use>
@@ -1576,17 +1547,16 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
 </svg></span> is our most sensitive model. In the absence of strong feelings, a quiz app author can pick a number between these.</p>
 <p>Now, let us turn to the final piece of the math, how to update our Beta prior on a fact’s recall probability when a quiz result arrives.</p>
 <h3 id="updating-the-posterior-with-quiz-results">Updating the posterior with quiz results</h3>
-<p>One option could be this: since we have analytical expressions for the mean and variance of the prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-112-Title">
-<title id="MathJax-SVG-112-Title">p_t^δ</title>
+<p>One option could be this: since we have analytical expressions for the mean and variance of the prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-111-Title">
+<title id="MathJax-SVG-111-Title">p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
 </g>
 </svg></span>, convert these to the <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">closest Beta distribution</a> and straightforwardly update with the Bernoulli likelihood (straightforward because of conjugacy). However, it is better to delay the Beta fit till we have the posterior, and do the likelihood update analytically. Lucky for us, this is tractable and we will see code later that demonstrates the boost in accuracy with respect to a computationally-expensive Monte Carlo simulation.</p>
-<p>By application of Bayes rule, the posterior is<br>
-<span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="44.161ex" height="7.343ex" style="vertical-align: -3.505ex;" viewBox="0 -1652.5 19013.7 3161.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-113-Title">
-<title id="MathJax-SVG-113-Title">Posterior(p|x) = \frac{Prior(p) · Lik(x|p)}{\int_0^1 Prior(p) · Lik(x|p) \, dp},</title>
+<p>By application of Bayes rule, the posterior is <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="44.161ex" height="7.343ex" style="vertical-align: -3.505ex;" viewBox="0 -1652.5 19013.7 3161.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-112-Title">
+<title id="MathJax-SVG-112-Title">Posterior(p|x) = \frac{Prior(p) · Lik(x|p)}{\int_0^1 Prior(p) · Lik(x|p) \, dp},</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-6F" x="751" y="0"></use>
@@ -1653,21 +1623,20 @@ Var[p_t^δ] &amp;= \int_0^1 P(p_t^δ) · (p - E[p_t^δ])^2 \, dp \\
 </g>
  <use xlink:href="#MJMAIN-2C" x="18735" y="0"></use>
 </g>
-</svg></span><br>
-where “posterior” and “prior” are the Beta densities, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="3.597ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 1548.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-114-Title">
-<title id="MathJax-SVG-114-Title">Lik</title>
+</svg></span> where “posterior” and “prior” are the Beta densities, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="3.597ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 1548.5 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-113-Title">
+<title id="MathJax-SVG-113-Title">Lik</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-4C" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-69" x="681" y="0"></use>
  <use xlink:href="#MJMATHI-6B" x="1027" y="0"></use>
 </g>
-</svg></span> is the Bernoulli likelihood, and the denominator is the marginal probability of the observation <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.33ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 572.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-115-Title">
-<title id="MathJax-SVG-115-Title">x</title>
+</svg></span> is the Bernoulli likelihood, and the denominator is the marginal probability of the observation <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.33ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 572.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-114-Title">
+<title id="MathJax-SVG-114-Title">x</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
 </g>
-</svg></span>. <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="12.82ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 5519.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-116-Title">
-<title id="MathJax-SVG-116-Title">Lik(x|p) = p</title>
+</svg></span>. <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="12.82ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 5519.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-115-Title">
+<title id="MathJax-SVG-115-Title">Lik(x|p) = p</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-4C" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-69" x="681" y="0"></use>
@@ -1680,39 +1649,39 @@ where “posterior” and “prior” are the Beta densities, <span class="mjpag
  <use xlink:href="#MJMAIN-3D" x="3959" y="0"></use>
  <use xlink:href="#MJMATHI-70" x="5016" y="0"></use>
 </g>
-</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-117-Title">
-<title id="MathJax-SVG-117-Title">x=1</title>
+</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-116-Title">
+<title id="MathJax-SVG-116-Title">x=1</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="850" y="0"></use>
  <use xlink:href="#MJMAIN-31" x="1906" y="0"></use>
 </g>
-</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.172ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 2226.9 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-118-Title">
-<title id="MathJax-SVG-118-Title">1-p</title>
+</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.172ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 2226.9 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-117-Title">
+<title id="MathJax-SVG-117-Title">1-p</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-31" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-2212" x="722" y="0"></use>
  <use xlink:href="#MJMATHI-70" x="1723" y="0"></use>
 </g>
-</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-119-Title">
-<title id="MathJax-SVG-119-Title">x=0</title>
+</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-118-Title">
+<title id="MathJax-SVG-118-Title">x=0</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="850" y="0"></use>
  <use xlink:href="#MJMAIN-30" x="1906" y="0"></use>
 </g>
-</svg></span>. (Here we’re dropping the time-subscripts since all recall probabilities <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.259ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 542 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-120-Title">
-<title id="MathJax-SVG-120-Title">p</title>
+</svg></span>. (Here we’re dropping the time-subscripts since all recall probabilities <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.259ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 542 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-119-Title">
+<title id="MathJax-SVG-119-Title">p</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
 </g>
-</svg></span> and quiz results <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.33ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 572.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-121-Title">
-<title id="MathJax-SVG-121-Title">x</title>
+</svg></span> and quiz results <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.33ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 572.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-120-Title">
+<title id="MathJax-SVG-120-Title">x</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
 </g>
-</svg></span> are at the same <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="8.56ex" height="2.676ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -863.1 3685.4 1152.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-122-Title">
-<title id="MathJax-SVG-122-Title">t_2 = t · δ</title>
+</svg></span> are at the same <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="8.56ex" height="2.676ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -863.1 3685.4 1152.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-121-Title">
+<title id="MathJax-SVG-121-Title">t_2 = t · δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
@@ -1722,22 +1691,22 @@ where “posterior” and “prior” are the Beta densities, <span class="mjpag
  <use xlink:href="#MJMATHI-3B4" x="3233" y="0"></use>
 </g>
 </svg></span>.)</p>
-<p>Next we compute the mean and variance of this posterior, because that’s how we’ll fit it to a Beta distribution to function as our subsequent prior. We’ll break this down into the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-123-Title">
-<title id="MathJax-SVG-123-Title">x=1</title>
+<p>Next we compute the mean and variance of this posterior, because that’s how we’ll fit it to a Beta distribution to function as our subsequent prior. We’ll break this down into the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-122-Title">
+<title id="MathJax-SVG-122-Title">x=1</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="850" y="0"></use>
  <use xlink:href="#MJMAIN-31" x="1906" y="0"></use>
 </g>
-</svg></span> (success) and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-124-Title">
-<title id="MathJax-SVG-124-Title">x=0</title>
+</svg></span> (success) and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-123-Title">
+<title id="MathJax-SVG-123-Title">x=0</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="850" y="0"></use>
  <use xlink:href="#MJMAIN-30" x="1906" y="0"></use>
 </g>
-</svg></span> (failure) cases. In the following, let <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.232ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 14738.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-125-Title">
-<title id="MathJax-SVG-125-Title">γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)</title>
+</svg></span> (failure) cases. In the following, let <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.232ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 14738.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-124-Title">
+<title id="MathJax-SVG-124-Title">γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="733" y="-357"></use>
@@ -1763,8 +1732,8 @@ where “posterior” and “prior” are the Beta densities, <span class="mjpag
  <use xlink:href="#MJMAIN-29" x="14349" y="0"></use>
 </g>
 </svg></span>; this exposes numerical symmetries that an implementation can take advantage of.</p>
-<p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="51.656ex" height="6.176ex" style="vertical-align: -2.338ex;" viewBox="0 -1652.5 22240.7 2659.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-126-Title">
-<title id="MathJax-SVG-126-Title">E[p | x=1] = \int_0^1 p · Posterior(p|x=1) \, dp = γ_2 / γ_1.</title>
+<p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="51.656ex" height="6.176ex" style="vertical-align: -2.338ex;" viewBox="0 -1652.5 22240.7 2659.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-125-Title">
+<title id="MathJax-SVG-125-Title">E[p | x=1] = \int_0^1 p · Posterior(p|x=1) \, dp = γ_2 / γ_1.</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
@@ -1813,11 +1782,8 @@ where “posterior” and “prior” are the Beta densities, <span class="mjpag
  <use xlink:href="#MJMAIN-2E" x="21962" y="0"></use>
 </g>
 </svg></span></p>
-<p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="61.066ex" height="9.509ex" style="vertical-align: -3.981ex; margin-bottom: -0.19ex;" viewBox="0 -2298.3 26292.1 4094.3" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-127-Title">
-<title id="MathJax-SVG-127-Title">\begin{align} 
-Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\ 
-&amp;= γ_3 / γ_1 - (E[p|x=1])^2. 
-\end{align}</title>
+<p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="61.066ex" height="9.509ex" style="vertical-align: -3.981ex; margin-bottom: -0.19ex;" viewBox="0 -2298.3 26292.1 4094.3" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-126-Title">
+<title id="MathJax-SVG-126-Title">\begin{align} Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\ &amp;= γ_3 / γ_1 - (E[p|x=1])^2. \end{align}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
 <g transform="translate(167,0)">
 <g transform="translate(-11,0)">
@@ -1908,16 +1874,16 @@ Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\
 </g>
 </g>
 </svg></span></p>
-<p>The posterior mean and variance when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-128-Title">
-<title id="MathJax-SVG-128-Title">x=0</title>
+<p>The posterior mean and variance when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.591ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2407.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-127-Title">
+<title id="MathJax-SVG-127-Title">x=0</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="850" y="0"></use>
  <use xlink:href="#MJMAIN-30" x="1906" y="0"></use>
 </g>
 </svg></span> (failed quiz) are:</p>
-<p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="22.415ex" height="5.843ex" style="vertical-align: -2.505ex;" viewBox="0 -1437.2 9650.9 2515.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-129-Title">
-<title id="MathJax-SVG-129-Title">E[p | x=0] = \frac{γ_2 - γ_1}{γ_1 - γ_0}.</title>
+<p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="22.415ex" height="5.843ex" style="vertical-align: -2.505ex;" viewBox="0 -1437.2 9650.9 2515.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-128-Title">
+<title id="MathJax-SVG-128-Title">E[p | x=0] = \frac{γ_2 - γ_1}{γ_1 - γ_0}.</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
@@ -1954,8 +1920,8 @@ Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\
  <use xlink:href="#MJMAIN-2E" x="9372" y="0"></use>
 </g>
 </svg></span></p>
-<p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="53.236ex" height="6.676ex" style="vertical-align: -2.671ex;" viewBox="0 -1724.2 22921.1 2874.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-130-Title">
-<title id="MathJax-SVG-130-Title">Var[p | x=0] = \frac{γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2}{(γ_1 - γ_0)^2}.</title>
+<p><span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="53.236ex" height="6.676ex" style="vertical-align: -2.671ex;" viewBox="0 -1724.2 22921.1 2874.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-129-Title">
+<title id="MathJax-SVG-129-Title">Var[p | x=0] = \frac{γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2}{(γ_1 - γ_0)^2}.</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-56" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-61" x="769" y="0"></use>
@@ -2036,8 +2002,8 @@ Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\
 </svg></span></p>
 <blockquote>
 <p><strong>Note 1</strong> The Mathematica expressions used in deriving these are given in the source code below. Unlike the first few analytical results above, these required considerable hand-simplification, and we will double-check them against both Monte Carlo simulation and quadrature integration below.</p>
-<p><strong>Note 2</strong> Something I haven’t commented on at all this whole while but that I must address with this expression for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="12.766ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 5496.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-131-Title">
-<title id="MathJax-SVG-131-Title">Var[p | x=0]</title>
+<p><strong>Note 2</strong> Something I haven’t commented on at all this whole while but that I must address with this expression for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="12.766ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 5496.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-130-Title">
+<title id="MathJax-SVG-130-Title">Var[p | x=0]</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-56" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-61" x="769" y="0"></use>
@@ -2050,8 +2016,8 @@ Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\
  <use xlink:href="#MJMAIN-30" x="4717" y="0"></use>
  <use xlink:href="#MJMAIN-5D" x="5218" y="0"></use>
 </g>
-</svg></span>. The gamma function is the generalization of factorial—it’s a rapidly-growing function. With double-precision floats, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="15.728ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 6771.8 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-132-Title">
-<title id="MathJax-SVG-132-Title">Γ(19) ≈ 6·10^{15}</title>
+</svg></span>. The gamma function is the generalization of factorial—it’s a rapidly-growing function. With double-precision floats, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="15.728ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 6771.8 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-131-Title">
+<title id="MathJax-SVG-131-Title">Γ(19) ≈ 6·10^{15}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-393" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-28" x="625" y="0"></use>
@@ -2076,8 +2042,8 @@ Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\
 </blockquote>
 <p>With the mean and variance of the posterior in hand, it is straightforward to find a well-approximating Beta distribution using the <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">method of moments</a>:</p>
 <ul>
-<li>a new <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="24.644ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 10610.7 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-133-Title">
-<title id="MathJax-SVG-133-Title">α' = μ (μ (1-μ) / σ^2 - 1)</title>
+<li>a new <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="24.644ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 10610.7 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-132-Title">
+<title id="MathJax-SVG-132-Title">α' = μ (μ (1-μ) / σ^2 - 1)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-2032" x="905" y="513"></use>
@@ -2100,8 +2066,8 @@ Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\
  <use xlink:href="#MJMAIN-29" x="10221" y="0"></use>
 </g>
 </svg></span> and</li>
-<li><span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="30.284ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 13039.1 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-134-Title">
-<title id="MathJax-SVG-134-Title">β' = (1-μ) (μ (1-μ) / σ^2 - 1)</title>
+<li><span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="30.284ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 13039.1 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-133-Title">
+<title id="MathJax-SVG-133-Title">β' = (1-μ) (μ (1-μ) / σ^2 - 1)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-2032" x="801" y="612"></use>
@@ -2129,8 +2095,8 @@ Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\
 </g>
 </svg></span>,
 <ul>
-<li>for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.715ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4613.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-135-Title">
-<title id="MathJax-SVG-135-Title">μ = E[p|x]</title>
+<li>for <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.715ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4613.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-134-Title">
+<title id="MathJax-SVG-134-Title">μ = E[p|x]</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3BC" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="881" y="0"></use>
@@ -2141,8 +2107,8 @@ Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\
  <use xlink:href="#MJMATHI-78" x="3762" y="0"></use>
  <use xlink:href="#MJMAIN-5D" x="4335" y="0"></use>
 </g>
-</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.985ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 6021.5 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-136-Title">
-<title id="MathJax-SVG-136-Title">σ^2 = Var[p|x]</title>
+</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.985ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 6021.5 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-135-Title">
+<title id="MathJax-SVG-135-Title">σ^2 = Var[p|x]</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3C3" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="808" y="513"></use>
@@ -2159,8 +2125,8 @@ Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\
 </svg></span>.</li>
 </ul></li>
 </ul>
-<p>The updated posterior becomes the new prior, parameterized by this <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.428ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 4059.4 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-137-Title">
-<title id="MathJax-SVG-137-Title">[α', β', t_2]</title>
+<p>The updated posterior becomes the new prior, parameterized by this <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.428ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 4059.4 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-136-Title">
+<title id="MathJax-SVG-136-Title">[α', β', t_2]</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-5B" x="0" y="0"></use>
 <g transform="translate(278,0)">
@@ -2179,8 +2145,8 @@ Var[p | x=1] &amp;= \int_0^1 (p - E[p | x=1])^2 · Posterior(p|x=1) \, dp \\
 </g>
  <use xlink:href="#MJMAIN-5D" x="3780" y="0"></use>
 </g>
-</svg></span>, where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.894ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 815.4 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-138-Title">
-<title id="MathJax-SVG-138-Title">t_2</title>
+</svg></span>, where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.894ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 815.4 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-137-Title">
+<title id="MathJax-SVG-137-Title">t_2</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
@@ -2602,8 +2568,7 @@ plt.ylabel(<span class="hljs-string">'Half-life (days)'</span>)
 plt.savefig(<span class="hljs-string">'figures/halflife.svg'</span>)
 plt.savefig(<span class="hljs-string">'figures/halflife.png'</span>, dpi=<span class="hljs-number">300</span>)
 plt.show()</code></pre>
-<p><img src="figures/models.png" alt="figures/models.png"><br>
-<img src="figures/halflife.png" alt="figures/halflife.png"></p>
+<p><img src="figures/models.png" alt="figures/models.png"> <img src="figures/halflife.png" alt="figures/halflife.png"></p>
 <pre class="py"><code class="hljs python">plt.figure()
 modelA = updateRecall(<span class="hljs-number">3.</span>, <span class="hljs-number">3.</span>, <span class="hljs-number">7.</span>, <span class="hljs-number">1</span>, <span class="hljs-number">15.</span>)
 modelB = updateRecall(<span class="hljs-number">12.</span>, <span class="hljs-number">12.</span>, <span class="hljs-number">7.</span>, <span class="hljs-number">1</span>, <span class="hljs-number">15.</span>)

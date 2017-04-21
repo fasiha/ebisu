@@ -68,9 +68,13 @@ Like Duolingo and Mozer’s approaches, Ebisu explicitly tracks the exponential 
 This gives small quiz apps the same intelligent scheduling as Duolingo’s approach—real-time recall probabilities for any fact—but with immediate incorporation of quiz results, even on mobile apps.
 
 To appreciate this further, consider this example. Imagine a fact with half-life of a week: after a week we expect the recall probability to drop to 50%. However, Ebisu can entertain an infinite range of beliefs about this recall probability: it can be very uncertain that it’ll be 50% (the “α=β=3” model below), or it can be very confident in that prediction (“α=β=12” case):
+
 ![figures/models.png](figures/models.png)
+
 Under either of these models of recall probability, we can ask Ebisu what the expected half-life is after the student is quizzed on this fact a day, a week, or a month after their last review, and whether they passed or failed the quiz:
+
 ![figures/halflife.png](figures/halflife.png)
+
 If the student correctly answers the quiz, Ebisu expects the new half-life to be greater than a week. If the student answers correctly after just a day, the half-life rises a little bit, since we expected the student to remember this fact that soon after reviewing it. If the student surprises us by *failing* the quiz just a day after they last reviewed it, the projected half-life drops. The more tentative “α=β=3” model aggressively adjusts the half-life, while the more assured “α=β=12” model is more conservative in its update. (The vertical bars indicate Ebisu’s confidence about the new half-life. The code for these two charts is [below](#demo-code). Finally, each fact has an α and β associated with it and I explain what they mean mathematically in the next section.)
 
 Similarly, if the student fails the quiz after a whole month of not reviewing it, this isn’t a surprise—the half-life drops a bit from the initial half-life of a week. If she does surprise us, passing the quiz after a month of not studying it, then Ebisu boosts its expectated half-life—by a lot for the “α=β=3” model, less for the “α=β=12” one.
@@ -132,9 +136,10 @@ plt.savefig('figures/pidelta.svg')
 plt.savefig('figures/pidelta.png', dpi=150)
 plt.show()
 ```
+
 ![figures/pidelta.png](figures/pidelta.png)
 
-You’ll have to take my word for it that the histograms where \\(δ≠1\\) as indeed not Beta. I initially fit a Beta distribution to them and sought to make this point visually but alas, for reasonable values of \\(α\\), \\(β\\), and \\(δ\\), a histogram for \\(p_t^δ\\) was well-matched by a Beta distribution.
+You’ll have to take my word for it that the histograms where \\(δ≠1\\) are indeed not Beta. For these \\(α\\), \\(β\\), and \\(δ\\) used here, they are close to Beta, but especially when over- or under-reviewing, the histograms become skewed and are no longer well-matched by any Beta distribution.
 
 So let’s derive analytically the probability density function (PDF) for \\(p_t^δ\\). Recall the conventional way to obtain the density of a [nonlinearly-transformed random variable](https://en.wikipedia.org/w/index.php?title=Random_variable&oldid=771423505#Functions_of_random_variables): let \\(x=p_t\\) and \\(y = g(x) = x^δ\\) be the forward transform, so \\(g^{-1}(y) = x^{1/δ}\\) is its inverse. Then, with \\(x\\) being \\(Beta(α,β)\\),
 \\[P_{Y}(y) = P_{x}(g^{-1}(y)) · \frac{∂}{∂y} g^{-1}(y),\\]

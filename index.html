@@ -409,7 +409,7 @@ for specific <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
 </g>
-</svg></span>? That is, we have a Beta prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-28-Title">
+</svg></span>: we had a Beta prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-28-Title">
 <title id="MathJax-SVG-28-Title">p_t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
@@ -661,25 +661,13 @@ plt.rcParams[<span class="hljs-string">'svg.fonttype'</span>] = <span class="hlj
 
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">generatePis</span><span class="hljs-params">(deltaT, alpha=<span class="hljs-number">12.0</span>, beta=<span class="hljs-number">12.0</span>)</span>:</span>
   <span class="hljs-keyword">import</span> scipy.stats <span class="hljs-keyword">as</span> stats
-  <span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
-  <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> beta <span class="hljs-keyword">as</span> fbeta
 
   piT = stats.beta.rvs(alpha, beta, size=<span class="hljs-number">50</span> * <span class="hljs-number">1000</span>)
   piT2 = piT**deltaT
-
   plt.hist(piT2, bins=<span class="hljs-number">20</span>, label=<span class="hljs-string">'δ={}'</span>.format(deltaT), alpha=<span class="hljs-number">0.25</span>, normed=<span class="hljs-keyword">True</span>)
-  <span class="hljs-comment"># p = np.linspace(0, 1, num=1000)</span>
-  <span class="hljs-comment"># a, b, _, _ = stats.beta.fit(piT2, floc=0, fscale=1)</span>
-  <span class="hljs-comment"># plt.plot(p, stats.beta.pdf(p, a, b), ls='dotted', lw=4, alpha=0.5, color='0.5')</span>
-  <span class="hljs-comment"># pr = lambda a,b,d,p: p**((a-d)/d) * (1-p**(1/d))**(b-1) / d / fbeta(a,b)</span>
-  <span class="hljs-comment"># plt.plot(p, pr(alpha,beta,deltaT,p), ls='dashed', color='0.25', alpha=0.35)</span>
-
-  <span class="hljs-keyword">return</span> piT2
 
 
-generatePis(<span class="hljs-number">0.3</span>)
-generatePis(<span class="hljs-number">1.</span>)
-generatePis(<span class="hljs-number">3.</span>)
+[generatePis(p) <span class="hljs-keyword">for</span> p <span class="hljs-keyword">in</span> [<span class="hljs-number">0.3</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">3.</span>]]
 plt.xlabel(<span class="hljs-string">'p (recall probability)'</span>)
 plt.ylabel(<span class="hljs-string">'Probability(p)'</span>)
 plt.title(<span class="hljs-string">'Histograms of p_t^δ for different δ'</span>)

@@ -94,7 +94,7 @@ for specific \\(α_t\\) and \\(β_t\\), then observing the quiz result updates o
 >
 > **Aside 2** Even if you’re familiar with Bayesian statistics, if you’ve never worked with priors on probabilities, the meta-ness here might confuse you. What the above means is that, before we flipped our \\(p_t\\)-weighted coin (before we administered the quiz), we had a specific probability distribution representing the coin’s weighting \\(p_t\\), *not* just a scalar number. After we observed the result of the coin flip, we updated our belief about the coin’s weighting—it *still* makes total sense to talk about the probability of something happening after it happens. Said another way, since we’re being Bayesian, something actually happening doesn’t preclude us from maintaining beliefs about what *could* have happened.
 
-This is totally ordinary, bread-and-butter Bayesian statistics. However, the major complication arises when the experiment took place not at time \\(t\\) but \\(t_2\\)? That is, we have a Beta prior on \\(p_t\\) (probability of  recall at time \\(t\\)) but the test is administered at some other time \\(t_2\\).
+This is totally ordinary, bread-and-butter Bayesian statistics. However, the major complication arises when the experiment took place not at time \\(t\\) but \\(t_2\\): we had a Beta prior on \\(p_t\\) (probability of  recall at time \\(t\\)) but the test is administered at some other time \\(t_2\\).
 
 How can we update our beliefs about the recall probability at time \\(t\\) to another time \\(t_2\\), either earlier or later than \\(t\\)?
 
@@ -117,25 +117,13 @@ plt.rcParams['svg.fonttype'] = 'none'
 
 def generatePis(deltaT, alpha=12.0, beta=12.0):
   import scipy.stats as stats
-  import numpy as np
-  from scipy.special import beta as fbeta
 
   piT = stats.beta.rvs(alpha, beta, size=50 * 1000)
   piT2 = piT**deltaT
-
   plt.hist(piT2, bins=20, label='δ={}'.format(deltaT), alpha=0.25, normed=True)
-  # p = np.linspace(0, 1, num=1000)
-  # a, b, _, _ = stats.beta.fit(piT2, floc=0, fscale=1)
-  # plt.plot(p, stats.beta.pdf(p, a, b), ls='dotted', lw=4, alpha=0.5, color='0.5')
-  # pr = lambda a,b,d,p: p**((a-d)/d) * (1-p**(1/d))**(b-1) / d / fbeta(a,b)
-  # plt.plot(p, pr(alpha,beta,deltaT,p), ls='dashed', color='0.25', alpha=0.35)
-
-  return piT2
 
 
-generatePis(0.3)
-generatePis(1.)
-generatePis(3.)
+[generatePis(p) for p in [0.3, 1., 3.]]
 plt.xlabel('p (recall probability)')
 plt.ylabel('Probability(p)')
 plt.title('Histograms of p_t^δ for different δ')

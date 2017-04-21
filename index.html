@@ -2455,15 +2455,11 @@ updateRecall((<span class="hljs-number">3.3</span>, <span class="hljs-number">4.
         mc = predictRecallMonteCarlo((a, b, t0), t, N=<span class="hljs-number">100</span> * <span class="hljs-number">1000</span>)
         mean = predictRecall((a, b, t0), t)
         var = predictRecallVar((a, b, t0), t)
-        self.assertLess(relerr(mean, mc[<span class="hljs-string">'mean'</span>]), <span class="hljs-number">3e-2</span>)
-        self.assertLess(relerr(var, mc[<span class="hljs-string">'var'</span>]), <span class="hljs-number">3e-2</span>)
+        self.assertLess(relerr(mean, mc[<span class="hljs-string">'mean'</span>]), <span class="hljs-number">5e-2</span>)
+        self.assertLess(relerr(var, mc[<span class="hljs-string">'var'</span>]), <span class="hljs-number">5e-2</span>)
 
-    inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">5.5</span>)
-    inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">15.5</span>)
-    inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">.5</span>)
-    inner(<span class="hljs-number">34.4</span>, <span class="hljs-number">34.4</span>, <span class="hljs-number">5.5</span>)
-    inner(<span class="hljs-number">34.4</span>, <span class="hljs-number">34.4</span>, <span class="hljs-number">15.5</span>)
-    inner(<span class="hljs-number">34.4</span>, <span class="hljs-number">34.4</span>, <span class="hljs-number">.5</span>)
+    inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>)
+    inner(<span class="hljs-number">34.4</span>, <span class="hljs-number">34.4</span>, <span class="hljs-number">1.</span>)
 
   <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">test_posterior</span><span class="hljs-params">(self)</span>:</span>
 
@@ -2472,24 +2468,24 @@ updateRecall((<span class="hljs-number">3.3</span>, <span class="hljs-number">4.
       <span class="hljs-keyword">for</span> t <span class="hljs-keyword">in</span> map(<span class="hljs-keyword">lambda</span> dt: dt * t0, dts):
         <span class="hljs-keyword">for</span> x <span class="hljs-keyword">in</span> [<span class="hljs-number">0.</span>, <span class="hljs-number">1.</span>]:
           msg = <span class="hljs-string">'a={},b={},t0={},x={},t={}'</span>.format(a, b, t0, x, t)
-          mc = updateRecallMonteCarlo((a, b, t0), x, t, N=<span class="hljs-number">1</span> * <span class="hljs-number">1000</span> * <span class="hljs-number">1000</span>)
+          mc = updateRecallMonteCarlo((a, b, t0), x, t, N=<span class="hljs-number">1</span> * <span class="hljs-number">100</span> * <span class="hljs-number">1000</span>)
           an = updateRecall((a, b, t0), x, t)
           self.assertLess(
-              kl(an, mc), <span class="hljs-number">1e-4</span>, msg=msg + <span class="hljs-string">' an={}, mc={}'</span>.format(an, mc))
+              kl(an, mc), <span class="hljs-number">1e-3</span>, msg=msg + <span class="hljs-string">' an={}, mc={}'</span>.format(an, mc))
 
           <span class="hljs-keyword">try</span>:
             quad1 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=<span class="hljs-keyword">True</span>)
           <span class="hljs-keyword">except</span> OverflowError:
             quad1 = <span class="hljs-keyword">None</span>
           <span class="hljs-keyword">if</span> quad1 <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> <span class="hljs-keyword">None</span>:
-            self.assertLess(kl(quad1, mc), <span class="hljs-number">1e-4</span>, msg=msg)
+            self.assertLess(kl(quad1, mc), <span class="hljs-number">1e-3</span>, msg=msg)
 
           <span class="hljs-keyword">try</span>:
             quad2 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=<span class="hljs-keyword">False</span>)
           <span class="hljs-keyword">except</span> OverflowError:
             quad2 = <span class="hljs-keyword">None</span>
           <span class="hljs-keyword">if</span> quad2 <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> <span class="hljs-keyword">None</span>:
-            self.assertLess(kl(quad2, mc), <span class="hljs-number">1e-4</span>, msg=msg)
+            self.assertLess(kl(quad2, mc), <span class="hljs-number">1e-3</span>, msg=msg)
 
     inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>, [<span class="hljs-number">0.1</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">5.5</span>, <span class="hljs-number">12.12</span>])
     inner(<span class="hljs-number">341.4</span>, <span class="hljs-number">3.4</span>, <span class="hljs-number">1.</span>, [<span class="hljs-number">0.1</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">5.5</span>, <span class="hljs-number">50.</span>])

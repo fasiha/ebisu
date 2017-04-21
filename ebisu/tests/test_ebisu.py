@@ -37,15 +37,11 @@ class TestEbisu(unittest.TestCase):
         mc = predictRecallMonteCarlo((a, b, t0), t, N=100 * 1000)
         mean = predictRecall((a, b, t0), t)
         var = predictRecallVar((a, b, t0), t)
-        self.assertLess(relerr(mean, mc['mean']), 3e-2)
-        self.assertLess(relerr(var, mc['var']), 3e-2)
+        self.assertLess(relerr(mean, mc['mean']), 5e-2)
+        self.assertLess(relerr(var, mc['var']), 5e-2)
 
-    inner(3.3, 4.4, 5.5)
-    inner(3.3, 4.4, 15.5)
-    inner(3.3, 4.4, .5)
-    inner(34.4, 34.4, 5.5)
-    inner(34.4, 34.4, 15.5)
-    inner(34.4, 34.4, .5)
+    inner(3.3, 4.4, 1.)
+    inner(34.4, 34.4, 1.)
 
   def test_posterior(self):
 
@@ -54,24 +50,24 @@ class TestEbisu(unittest.TestCase):
       for t in map(lambda dt: dt * t0, dts):
         for x in [0., 1.]:
           msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
-          mc = updateRecallMonteCarlo((a, b, t0), x, t, N=1 * 1000 * 1000)
+          mc = updateRecallMonteCarlo((a, b, t0), x, t, N=1 * 100 * 1000)
           an = updateRecall((a, b, t0), x, t)
           self.assertLess(
-              kl(an, mc), 1e-4, msg=msg + ' an={}, mc={}'.format(an, mc))
+              kl(an, mc), 1e-3, msg=msg + ' an={}, mc={}'.format(an, mc))
 
           try:
             quad1 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=True)
           except OverflowError:
             quad1 = None
           if quad1 is not None:
-            self.assertLess(kl(quad1, mc), 1e-4, msg=msg)
+            self.assertLess(kl(quad1, mc), 1e-3, msg=msg)
 
           try:
             quad2 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=False)
           except OverflowError:
             quad2 = None
           if quad2 is not None:
-            self.assertLess(kl(quad2, mc), 1e-4, msg=msg)
+            self.assertLess(kl(quad2, mc), 1e-3, msg=msg)
 
     inner(3.3, 4.4, 1., [0.1, 1., 5.5, 12.12])
     inner(341.4, 3.4, 1., [0.1, 1., 5.5, 50.])

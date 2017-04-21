@@ -625,7 +625,6 @@ if __name__ == '__main__':
 ### Demo code
 
 ```py
-np.spacing(1e14)
 import scipy.stats as stats
 import numpy as np
 import matplotlib.pyplot as plt

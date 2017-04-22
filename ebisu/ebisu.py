@@ -37,12 +37,14 @@ def predictRecallVar(prior, tnow):
   from scipy.special import gammaln
   alpha, beta, t = prior
   dt = tnow / t
-  same0 = gammaln(alpha) - gammaln(alpha + beta)
-  same1 = gammaln(alpha + dt) - gammaln(alpha + beta + dt)
-  same2 = gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt)
-  md = same1 - same0
-  md2 = same2 - same0
-  return exp(md2) - exp(2 * md)
+  s = [
+      gammaln(alpha + n * dt) - gammaln(alpha + beta + n * dt) for n in range(3)
+  ]
+  md = 2 * (s[1] - s[0])
+  md2 = s[2] - s[0]
+
+  maxval = max(md, md2)
+  return exp(maxval) * (exp(md2 - maxval) - exp(md - maxval))
 def updateRecall(prior, result, tnow):
   """Update a prior on recall probability with a quiz result and time 🍌
 

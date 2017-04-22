@@ -2295,7 +2295,7 @@ plt.show()</code></pre>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="513"></use>
 </g>
 </g>
-</svg></span>. This might be a helpful value and is computed by <code>predictRecallVar</code> (🍋 below). As much as possible is evaluated in the log-domain, but the final subtraction is done as a normal subtraction, rather than <code>logsumexp</code> as we have to do later, since the result of this subtraction is the overall result, and as the variance of a random variable on the unit interval (between 0 and 1), neither summand is expected to be large.</p>
+</svg></span>. This might be a helpful value and is computed by <code>predictRecallVar</code> (🍋 below). We evaluate both summands in the log-domain and use a simplification of <code>logsumexp</code> to evaluate the subtraction—this trick uses the following identity to avoid subtracting potentially very large floats: <code>exp(x) - exp(y) = exp(m) * (exp(a-m) - exp(b-m))</code> where <code>m = max(x, y)</code> and where <code>x</code> and <code>y</code> are logs of the two summands. This is basically <code>logsumexp</code> without the final <code>log</code>, so this trick is just “<code>sumexp</code>”.</p>
 <p>These two functions have the same signature: they consume</p>
 <ul>
 <li>a <code>model</code>: represents the Beta prior on recall probability at one specific time since the fact’s last review, and</li>
@@ -2339,12 +2339,14 @@ plt.show()</code></pre>
   <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln
   alpha, beta, t = prior
   dt = tnow / t
-  same0 = gammaln(alpha) - gammaln(alpha + beta)
-  same1 = gammaln(alpha + dt) - gammaln(alpha + beta + dt)
-  same2 = gammaln(alpha + <span class="hljs-number">2</span> * dt) - gammaln(alpha + beta + <span class="hljs-number">2</span> * dt)
-  md = same1 - same0
-  md2 = same2 - same0
-  <span class="hljs-keyword">return</span> exp(md2) - exp(<span class="hljs-number">2</span> * md)</code></pre>
+  s = [
+      gammaln(alpha + n * dt) - gammaln(alpha + beta + n * dt) <span class="hljs-keyword">for</span> n <span class="hljs-keyword">in</span> range(<span class="hljs-number">3</span>)
+  ]
+  md = <span class="hljs-number">2</span> * (s[<span class="hljs-number">1</span>] - s[<span class="hljs-number">0</span>])
+  md2 = s[<span class="hljs-number">2</span>] - s[<span class="hljs-number">0</span>]
+
+  maxval = max(md, md2)
+  <span class="hljs-keyword">return</span> exp(maxval) * (exp(md2 - maxval) - exp(md - maxval))</code></pre>
 <p>Next is the implementation of <code>updateRecall</code> (🍌), which accepts</p>
 <ul>
 <li>a <code>model</code> (as above, represents the Beta prior on recall probability at one specific time since the fact’s last review),</li>

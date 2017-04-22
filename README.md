@@ -264,7 +264,7 @@ Let’s present our Python implementation of the core Ebisu functions, `predictR
 
 In the [math section](#mean-and-variance-of-the-recall-probability-right-now) above we derived the mean recall probability at time \\(t_{now} = t · δ\\) given a model \\(α, β, t\\): \\(E[p_t^δ] = Γ(α + β) · Γ(α) / (Γ(α + δ) · Γ(α + β + δ))\\). There are no sums-of-gammas here, so this is readily computed using log-gamma routine (`gammaln` in Scipy) to avoid overflowing and precision-loss in `predictRecall` (🍏 below).
 
-We also derived the variance, \\(Var[p_t^δ] = E[p_t^{2 δ}] - (E[p_t^δ])^2\\). This might be a helpful value and is computed by `predictRecallVar` (🍋 below). As much as possible is evaluated in the log-domain, but the final subtraction is done as a normal subtraction, rather than `logsumexp` as we have to do later, since the result of this subtraction is the overall result, and as the variance of a random variable on the unit interval (between 0 and 1), neither summand is expected to be large.
+We also derived the variance, \\(Var[p_t^δ] = E[p_t^{2 δ}] - (E[p_t^δ])^2\\). This might be a helpful value and is computed by `predictRecallVar` (🍋 below). We evaluate both summands in the log-domain and use a simplification of `logsumexp` to evaluate the subtraction—this trick uses the following identity to avoid subtracting potentially very large floats: `exp(x) - exp(y) = exp(m) * (exp(a-m) - exp(b-m))` where `m = max(x, y)` and where `x` and `y` are logs of the two summands. This is basically `logsumexp` without the final `log`, so this trick is just “`sumexp`”.
 
 These two functions have the same signature: they consume
 - a `model`: represents the Beta prior on recall probability at one specific time since the fact’s last review, and
@@ -309,12 +309,14 @@ def predictRecallVar(prior, tnow):
   from scipy.special import gammaln
   alpha, beta, t = prior
   dt = tnow / t
-  same0 = gammaln(alpha) - gammaln(alpha + beta)
-  same1 = gammaln(alpha + dt) - gammaln(alpha + beta + dt)
-  same2 = gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt)
-  md = same1 - same0
-  md2 = same2 - same0
-  return exp(md2) - exp(2 * md)
+  s = [
+      gammaln(alpha + n * dt) - gammaln(alpha + beta + n * dt) for n in range(3)
+  ]
+  md = 2 * (s[1] - s[0])
+  md2 = s[2] - s[0]
+
+  maxval = max(md, md2)
+  return exp(maxval) * (exp(md2 - maxval) - exp(md - maxval))
 ```
 
 Next is the implementation of `updateRecall` (🍌), which accepts

@@ -258,12 +258,36 @@ from . import alternate
 
 The above is in its own fenced code block because I don’t want Hydrogen to evaluate it. In Atom, I don’t work with the Ebisu module—I just interact with the raw functions.
 
-Let’s present our Python implementation of the core Ebisu functions, `predictRecall` and `updateRecall`, and a couple of other related functions that live in the main `ebisu` module.
+Let’s present our Python implementation of the core Ebisu functions, `predictRecall` and `updateRecall`, and a couple of other related functions that live in the main `ebisu` module. All these functions consume a model encoding a Beta prior on recall probabilities at time \\(t\\), consisting of a 3-tuple containing \\((α, β, t)\\). I could have gone all object-oriented here but I chose to leave all these functions as stand-alone functions that consume and transform this 3-tuple because (1) I’m not an OOP devotee, and (2) I wanted to maximize the transparency of of this implementation so it can readily be ported to non-OOP, non-Pythonic languages.
+
+> **Important** Note how none of these functions deal with *timestamps*. All time is captured in “time since last review”, and your external application has to store timestamps (as illustrated in the [Ebisu Jupyter Notebook](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb)). This is a deliberate choice! Ebisu wants to know as *little* about your facts as possible.
+
+In the [math section](#mean-and-variance-of-the-recall-probability-right-now) above we derived the mean recall probability at time \\(t_{now} = t · δ\\) given a model \\(α, β, t\\): \\(E[p_t^δ] = Γ(α + β) · Γ(α) / (Γ(α + δ) · Γ(α + β + δ))\\). There are no sums-of-gammas here, so this is readily computed using log-gamma routine (`gammaln` in Scipy) to avoid overflowing and precision-loss in `predictRecall` (🍏 below).
+
+We also derived the variance, \\(Var[p_t^δ] = E[p_t^{2 δ}] - (E[p_t^δ])^2\\). This might be a helpful value and is computed by `predictRecallVar` (🍋 below). As much as possible is evaluated in the log-domain, but the final subtraction is done as a normal subtraction, rather than `logsumexp` as we have to do later, since the result of this subtraction is the overall result, and as the variance of a random variable on the unit interval (between 0 and 1), neither summand is expected to be large.
+
+These two functions have the same signature: they consume
+- a `model`: represents the Beta prior on recall probability at one specific time since the fact’s last review, and
+- a `tnow`, the time elapsed since the last time this fact was quizzed.
 
 ```py
 # export ebisu/ebisu.py #
 def predictRecall(prior, tnow):
-  # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`
+  """Expected recall probability now, given a prior distribution on it 🍏
+
+  `prior` is a tuple representing the prior distribution on recall probability
+  after a specific unit of time has elapsed since this fact's last review.
+  Specifically,  it's a 3-tuple, `(alpha, beta, t)` where `alpha` and `beta`
+  parameterize a Beta distribution that is the prior on recall probability at
+  time `t`.
+
+  `tnow` is the *actual* time elapsed since this fact's most recent review.
+
+  Returns the expectation of the recall probability `tnow` after last review, a
+  float between 0 and 1.
+
+  See documentation for derivation.
+  """
   from scipy.special import gammaln
   from numpy import exp
   alpha, beta, t = prior
@@ -274,11 +298,16 @@ def predictRecall(prior, tnow):
 
 
 def predictRecallVar(prior, tnow):
+  """Variance of recall probability now 🍋
+
+  This function returns the variance of the distribution whose mean is given by
+  `ebisu.predictRecall`. See it's documentation for details.
+
+  Returns a float.
+  """
   from numpy import exp
   from scipy.special import gammaln
   alpha, beta, t = prior
-  # `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``
-  # And then plug in mean for `m` & simplify to get:
   dt = tnow / t
   same0 = gammaln(alpha) - gammaln(alpha + beta)
   same1 = gammaln(alpha + dt) - gammaln(alpha + beta + dt)
@@ -286,14 +315,48 @@ def predictRecallVar(prior, tnow):
   md = same1 - same0
   md2 = same2 - same0
   return exp(md2) - exp(2 * md)
+```
 
+Next is the implementation of `updateRecall` (🍌), which accepts
+- a `model` (as above, represents the Beta prior on recall probability at one specific time since the fact’s last review),
+- a quiz `result`: a truthy value meaning “passed quiz” and a false-ish value meaning “failed quiz”, and
+- `tnow`, the actual time since last quiz that this quiz was administered.
 
+and returns a *new* model, representing an updated Beta prior on recall probability, this time after `tnow` time has elapsed since a fact was quizzed.
+
+**In case of successful quiz** `updateRecall` analytically computes the true posterior’s
+- mean (expectation) \\(γ_2 / γ_1\\), which can be evaluated completely in the log domain, and
+- variance \\(γ_3 / γ_1 - (E[p|x=1])^2\\), which as the previous variance we evaluate in the log domain and convert back to real numbers before subtracting,
+    - where \\(γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)\\).
+
+**In case of unsuccessful quiz** these values are
+- mean \\((γ_2 - γ_1) / (γ_1 - γ_0)\\), which we rewrite to remain in the log domain and use a ratio of two `expm1`s, which accurately evaluates `exp(x) - 1`—recall that subtraction with large floating-point numbers is more risky than division; and
+- variance \\((γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2) / (γ_1 - γ_0)^2\\). This we evaluate with a sequence of *four* `logsumexp`s to minimize risk of floating-point precision loss.
+
+> Recall that \\(α\\) and \\(β\\) come from the model representing the prior, while \\(δ = t / t_{now}\\) depends on both \\(t\\) (from the model) and the actual time since the previous quiz \\(t_{now}\\).
+
+```py
+# export ebisu/ebisu.py #
 def updateRecall(prior, result, tnow):
-  from scipy.special import gammaln, gamma
+  """Update a prior on recall probability with a quiz result and time 🍌
+
+  `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
+  representing a prior distribution on recall probability at some specific time
+  after a fact's most recent review.
+
+  `result` is truthy for a successful quiz, false-ish otherwise.
+
+  `tnow` is the time elapsed between this fact's last review and the review
+  being used to update.
+
+  Returns a new object (like `prior`) describing the posterior distribution of
+  recall probability at `tnow`.
+  """
+  from scipy.special import gammaln
   from numpy import exp
   alpha, beta, t = prior
   dt = tnow / t
-  if result == 1:
+  if result:
     # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
     # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`
     # variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
@@ -348,7 +411,6 @@ def meanVarToBeta(mean, var):
 
 
 def priorToHalflife(prior, percentile=0.5, maxt=100, mint=1e-3):
-  from math import sqrt
   from scipy.optimize import brentq
   h = brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
   # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.
@@ -720,5 +782,4 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 Many thanks to Drew Benedetti for reviewing this manuscript.
 
 I use [Modest CSS](http://markdowncss.github.io/modest/).
-
 

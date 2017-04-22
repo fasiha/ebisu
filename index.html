@@ -2169,10 +2169,155 @@ plt.show()</code></pre>
 <span class="hljs-keyword">from</span> .ebisu <span class="hljs-keyword">import</span> *
 <span class="hljs-keyword">from</span> . <span class="hljs-keyword">import</span> alternate</code></pre>
 <p>The above is in its own fenced code block because I don’t want Hydrogen to evaluate it. In Atom, I don’t work with the Ebisu module—I just interact with the raw functions.</p>
-<p>Let’s present our Python implementation of the core Ebisu functions, <code>predictRecall</code> and <code>updateRecall</code>, and a couple of other related functions that live in the main <code>ebisu</code> module.</p>
+<p>Let’s present our Python implementation of the core Ebisu functions, <code>predictRecall</code> and <code>updateRecall</code>, and a couple of other related functions that live in the main <code>ebisu</code> module. All these functions consume a model encoding a Beta prior on recall probabilities at time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-137-Title">
+<title id="MathJax-SVG-137-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span>, consisting of a 3-tuple containing <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="7.52ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 3237.8 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-138-Title">
+<title id="MathJax-SVG-138-Title">(α, β, t)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-28" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="389" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="1030" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1475" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="2041" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="2486" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="2848" y="0"></use>
+</g>
+</svg></span>. I could have gone all object-oriented here but I chose to leave all these functions as stand-alone functions that consume and transform this 3-tuple because (1) I’m not an OOP devotee, and (2) I wanted to maximize the transparency of of this implementation so it can readily be ported to non-OOP, non-Pythonic languages.</p>
+<blockquote>
+<p><strong>Important</strong> Note how none of these functions deal with <em>timestamps</em>. All time is captured in “time since last review”, and your external application has to store timestamps (as illustrated in the <a href="https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb">Ebisu Jupyter Notebook</a>). This is a deliberate choice! Ebisu wants to know as <em>little</em> about your facts as possible.</p>
+</blockquote>
+<p>In the <a href="#mean-and-variance-of-the-recall-probability-right-now">math section</a> above we derived the mean recall probability at time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.698ex" height="2.676ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -863.1 4606.1 1152.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-139-Title">
+<title id="MathJax-SVG-139-Title">t_{now} = t · δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+<g transform="translate(361,-150)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6F" x="600" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
+</g>
+ <use xlink:href="#MJMAIN-3D" x="2013" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="3070" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="3653" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="4154" y="0"></use>
+</g>
+</svg></span> given a model <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.711ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 2458.8 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-140-Title">
+<title id="MathJax-SVG-140-Title">α, β, t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="640" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="1085" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="1652" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="2097" y="0"></use>
+</g>
+</svg></span>: <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="49.686ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 21392.5 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-141-Title">
+<title id="MathJax-SVG-141-Title">E[p_t^δ] = Γ(α + β) · Γ(α) / (Γ(α + δ) · Γ(α + β + δ))</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
+<g transform="translate(1043,0)">
+ <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="1960" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="2517" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="3573" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="4198" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="4588" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="5451" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="6451" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="7018" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="7630" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="8130" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="8756" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="9145" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="9786" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="10175" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="10676" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="11065" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="11691" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="12080" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="12943" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="13944" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="14388" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="15000" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="15501" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="16126" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="16516" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="17378" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="18379" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="19168" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="20169" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="20613" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="21003" y="0"></use>
+</g>
+</svg></span>. There are no sums-of-gammas here, so this is readily computed using log-gamma routine (<code>gammaln</code> in Scipy) to avoid overflowing and precision-loss in <code>predictRecall</code> (🍏 below).</p>
+<p>We also derived the variance, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="27.517ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 11847.7 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-142-Title">
+<title id="MathJax-SVG-142-Title">Var[p_t^δ] = E[p_t^{2 δ}] - (E[p_t^δ])^2</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-56" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-61" x="769" y="0"></use>
+ <use xlink:href="#MJMATHI-72" x="1299" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="1750" y="0"></use>
+<g transform="translate(2029,0)">
+ <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="2946" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="3503" y="0"></use>
+ <use xlink:href="#MJMATHI-45" x="4559" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="5323" y="0"></use>
+<g transform="translate(5602,0)">
+ <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
+<g transform="translate(503,352)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="500" y="0"></use>
+</g>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="6874" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="7374" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="8375" y="0"></use>
+ <use xlink:href="#MJMATHI-45" x="8765" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="9529" y="0"></use>
+<g transform="translate(9808,0)">
+ <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
+</g>
+ <use xlink:href="#MJMAIN-5D" x="10725" y="0"></use>
+<g transform="translate(11004,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="513"></use>
+</g>
+</g>
+</svg></span>. This might be a helpful value and is computed by <code>predictRecallVar</code> (🍋 below). As much as possible is evaluated in the log-domain, but the final subtraction is done as a normal subtraction, rather than <code>logsumexp</code> as we have to do later, since the result of this subtraction is the overall result, and as the variance of a random variable on the unit interval (between 0 and 1), neither summand is expected to be large.</p>
+<p>These two functions have the same signature: they consume</p>
+<ul>
+<li>a <code>model</code>: represents the Beta prior on recall probability at one specific time since the fact’s last review, and</li>
+<li>a <code>tnow</code>, the time elapsed since the last time this fact was quizzed.</li>
+</ul>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/ebisu.py #</span>
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecall</span><span class="hljs-params">(prior, tnow)</span>:</span>
-  <span class="hljs-comment"># `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`</span>
+  <span class="hljs-string">"""Expected recall probability now, given a prior distribution on it 🍏
+
+  `prior` is a tuple representing the prior distribution on recall probability
+  after a specific unit of time has elapsed since this fact's last review.
+  Specifically,  it's a 3-tuple, `(alpha, beta, t)` where `alpha` and `beta`
+  parameterize a Beta distribution that is the prior on recall probability at
+  time `t`.
+
+  `tnow` is the *actual* time elapsed since this fact's most recent review.
+
+  Returns the expectation of the recall probability `tnow` after last review, a
+  float between 0 and 1.
+
+  See documentation for derivation.
+  """</span>
   <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln
   <span class="hljs-keyword">from</span> numpy <span class="hljs-keyword">import</span> exp
   alpha, beta, t = prior
@@ -2183,26 +2328,260 @@ plt.show()</code></pre>
 
 
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecallVar</span><span class="hljs-params">(prior, tnow)</span>:</span>
+  <span class="hljs-string">"""Variance of recall probability now 🍋
+
+  This function returns the variance of the distribution whose mean is given by
+  `ebisu.predictRecall`. See it's documentation for details.
+
+  Returns a float.
+  """</span>
   <span class="hljs-keyword">from</span> numpy <span class="hljs-keyword">import</span> exp
   <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln
   alpha, beta, t = prior
-  <span class="hljs-comment"># `Assuming[a&gt;0 &amp;&amp; b&gt;0 &amp;&amp; t&gt;0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``</span>
-  <span class="hljs-comment"># And then plug in mean for `m` &amp; simplify to get:</span>
   dt = tnow / t
   same0 = gammaln(alpha) - gammaln(alpha + beta)
   same1 = gammaln(alpha + dt) - gammaln(alpha + beta + dt)
   same2 = gammaln(alpha + <span class="hljs-number">2</span> * dt) - gammaln(alpha + beta + <span class="hljs-number">2</span> * dt)
   md = same1 - same0
   md2 = same2 - same0
-  <span class="hljs-keyword">return</span> exp(md2) - exp(<span class="hljs-number">2</span> * md)
-
-
+  <span class="hljs-keyword">return</span> exp(md2) - exp(<span class="hljs-number">2</span> * md)</code></pre>
+<p>Next is the implementation of <code>updateRecall</code> (🍌), which accepts</p>
+<ul>
+<li>a <code>model</code> (as above, represents the Beta prior on recall probability at one specific time since the fact’s last review),</li>
+<li>a quiz <code>result</code>: a truthy value meaning “passed quiz” and a false-ish value meaning “failed quiz”, and</li>
+<li><code>tnow</code>, the actual time since last quiz that this quiz was administered.</li>
+</ul>
+<p>and returns a <em>new</em> model, representing an updated Beta prior on recall probability, this time after <code>tnow</code> time has elapsed since a fact was quizzed.</p>
+<p><strong>In case of successful quiz</strong> <code>updateRecall</code> analytically computes the true posterior’s</p>
+<ul>
+<li>mean (expectation) <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.679ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 2445.3 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-143-Title">
+<title id="MathJax-SVG-143-Title">γ_2 / γ_1</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
+ <use xlink:href="#MJMAIN-2F" x="972" y="0"></use>
+<g transform="translate(1472,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+</g>
+</svg></span>, which can be evaluated completely in the log domain, and</li>
+<li>variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="21.86ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 9411.7 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-144-Title">
+<title id="MathJax-SVG-144-Title">γ_3 / γ_1 - (E[p|x=1])^2</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-33" x="733" y="-357"></use>
+ <use xlink:href="#MJMAIN-2F" x="972" y="0"></use>
+<g transform="translate(1472,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2212" x="2667" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="3668" y="0"></use>
+ <use xlink:href="#MJMATHI-45" x="4057" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="4822" y="0"></use>
+ <use xlink:href="#MJMATHI-70" x="5100" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="5604" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="5882" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="6733" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="7789" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="8289" y="0"></use>
+<g transform="translate(8568,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="513"></use>
+</g>
+</g>
+</svg></span>, which as the previous variance we evaluate in the log domain and convert back to real numbers before subtracting,
+<ul>
+<li>where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.232ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 14738.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-145-Title">
+<title id="MathJax-SVG-145-Title">γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="733" y="-357"></use>
+ <use xlink:href="#MJMAIN-3D" x="1320" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="2377" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="3002" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="3392" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="4254" y="0"></use>
+ <use xlink:href="#MJMATHI-6E" x="5255" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="6078" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="6579" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="7023" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="7413" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="7913" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="8539" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="8928" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="9791" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="10792" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="11580" y="0"></use>
+ <use xlink:href="#MJMATHI-6E" x="12581" y="0"></use>
+ <use xlink:href="#MJMAIN-22C5" x="13404" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="13904" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="14349" y="0"></use>
+</g>
+</svg></span>.</li>
+</ul></li>
+</ul>
+<p><strong>In case of unsuccessful quiz</strong> these values are</p>
+<ul>
+<li>mean <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="19.496ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 8394 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-146-Title">
+<title id="MathJax-SVG-146-Title">(γ_2 - γ_1) / (γ_1 - γ_0)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-28" x="0" y="0"></use>
+<g transform="translate(389,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2212" x="1584" y="0"></use>
+<g transform="translate(2584,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="3557" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="3946" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="4447" y="0"></use>
+<g transform="translate(4836,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2212" x="6031" y="0"></use>
+<g transform="translate(7032,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="8004" y="0"></use>
+</g>
+</svg></span>, which we rewrite to remain in the log domain and use a ratio of two <code>expm1</code>s, which accurately evaluates <code>exp(x) - 1</code>—recall that subtraction with large floating-point numbers is more risky than division; and</li>
+<li>variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="49.081ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 21132.1 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-147-Title">
+<title id="MathJax-SVG-147-Title">(γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2) / (γ_1 - γ_0)^2</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-28" x="0" y="0"></use>
+<g transform="translate(389,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-33" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-28" x="1361" y="0"></use>
+<g transform="translate(1751,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2212" x="2946" y="0"></use>
+<g transform="translate(3946,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="4919" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="5530" y="0"></use>
+<g transform="translate(6531,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-28" x="7504" y="0"></use>
+<g transform="translate(7893,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2B" x="9088" y="0"></use>
+<g transform="translate(10088,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2212" x="11283" y="0"></use>
+<g transform="translate(12284,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="13256" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="13868" y="0"></use>
+<g transform="translate(14869,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="488"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-435"></use>
+</g>
+ <use xlink:href="#MJMAIN-29" x="15841" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="16230" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="16731" y="0"></use>
+<g transform="translate(17120,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
+</g>
+ <use xlink:href="#MJMAIN-2212" x="18315" y="0"></use>
+<g transform="translate(19316,0)">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="733" y="-357"></use>
+</g>
+<g transform="translate(20288,0)">
+ <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="513"></use>
+</g>
+</g>
+</svg></span>. This we evaluate with a sequence of <em>four</em> <code>logsumexp</code>s to minimize risk of floating-point precision loss.</li>
+</ul>
+<blockquote>
+<p>Recall that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.488ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 640.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-148-Title">
+<title id="MathJax-SVG-148-Title">α</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+</g>
+</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.332ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 573.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-149-Title">
+<title id="MathJax-SVG-149-Title">β</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
+</g>
+</svg></span> come from the model representing the prior, while <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-150-Title">
+<title id="MathJax-SVG-150-Title">δ = t / t_{now}</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="1778" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="2140" y="0"></use>
+<g transform="translate(2640,0)">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+<g transform="translate(361,-150)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6F" x="600" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
+</g>
+</g>
+</g>
+</svg></span> depends on both <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-151-Title">
+<title id="MathJax-SVG-151-Title">t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+</g>
+</svg></span> (from the model) and the actual time since the previous quiz <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.032ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 1736.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-152-Title">
+<title id="MathJax-SVG-152-Title">t_{now}</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+<g transform="translate(361,-150)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6F" x="600" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
+</g>
+</g>
+</svg></span>.</p>
+</blockquote>
+<pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/ebisu.py #</span>
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">updateRecall</span><span class="hljs-params">(prior, result, tnow)</span>:</span>
-  <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln, gamma
+  <span class="hljs-string">"""Update a prior on recall probability with a quiz result and time 🍌
+
+  `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
+  representing a prior distribution on recall probability at some specific time
+  after a fact's most recent review.
+
+  `result` is truthy for a successful quiz, false-ish otherwise.
+
+  `tnow` is the time elapsed between this fact's last review and the review
+  being used to update.
+
+  Returns a new object (like `prior`) describing the posterior distribution of
+  recall probability at `tnow`.
+  """</span>
+  <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln
   <span class="hljs-keyword">from</span> numpy <span class="hljs-keyword">import</span> exp
   alpha, beta, t = prior
   dt = tnow / t
-  <span class="hljs-keyword">if</span> result == <span class="hljs-number">1</span>:
+  <span class="hljs-keyword">if</span> result:
     <span class="hljs-comment"># marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`</span>
     <span class="hljs-comment"># mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`</span>
     <span class="hljs-comment"># variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`</span>
@@ -2257,7 +2636,6 @@ plt.show()</code></pre>
 
 
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">priorToHalflife</span><span class="hljs-params">(prior, percentile=<span class="hljs-number">0.5</span>, maxt=<span class="hljs-number">100</span>, mint=<span class="hljs-number">1e-3</span>)</span>:</span>
-  <span class="hljs-keyword">from</span> math <span class="hljs-keyword">import</span> sqrt
   <span class="hljs-keyword">from</span> scipy.optimize <span class="hljs-keyword">import</span> brentq
   h = brentq(<span class="hljs-keyword">lambda</span> now: predictRecall(prior, now) - percentile, mint, maxt)
   <span class="hljs-comment"># `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.</span>

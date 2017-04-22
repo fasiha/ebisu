@@ -1,5 +1,21 @@
+# -*- coding: utf-8 -*-
+
 def predictRecall(prior, tnow):
-  # `Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p)/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]`
+  """Expected recall probability now, given a prior distribution on it 🍏
+
+  `prior` is a tuple representing the prior distribution on recall probability
+  after a specific unit of time has elapsed since this fact's last review.
+  Specifically,  it's a 3-tuple, `(alpha, beta, t)` where `alpha` and `beta`
+  parameterize a Beta distribution that is the prior on recall probability at
+  time `t`.
+
+  `tnow` is the *actual* time elapsed since this fact's most recent review.
+
+  Returns the expectation of the recall probability `tnow` after last review, a
+  float between 0 and 1.
+
+  See documentation for derivation.
+  """
   from scipy.special import gammaln
   from numpy import exp
   alpha, beta, t = prior
@@ -10,11 +26,16 @@ def predictRecall(prior, tnow):
 
 
 def predictRecallVar(prior, tnow):
+  """Variance of recall probability now 🍋
+
+  This function returns the variance of the distribution whose mean is given by
+  `ebisu.predictRecall`. See it's documentation for details.
+
+  Returns a float.
+  """
   from numpy import exp
   from scipy.special import gammaln
   alpha, beta, t = prior
-  # `Assuming[a>0 && b>0 && t>0, {Integrate[p^((a - t)/t) * (1 - p^(1/t))^(b - 1) * (p-m)^2/t/(Gamma[a]*Gamma[b]/Gamma[a+b]), {p, 0, 1}]}]``
-  # And then plug in mean for `m` & simplify to get:
   dt = tnow / t
   same0 = gammaln(alpha) - gammaln(alpha + beta)
   same1 = gammaln(alpha + dt) - gammaln(alpha + beta + dt)
@@ -22,14 +43,26 @@ def predictRecallVar(prior, tnow):
   md = same1 - same0
   md2 = same2 - same0
   return exp(md2) - exp(2 * md)
-
-
 def updateRecall(prior, result, tnow):
-  from scipy.special import gammaln, gamma
+  """Update a prior on recall probability with a quiz result and time 🍌
+
+  `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
+  representing a prior distribution on recall probability at some specific time
+  after a fact's most recent review.
+
+  `result` is truthy for a successful quiz, false-ish otherwise.
+
+  `tnow` is the time elapsed between this fact's last review and the review
+  being used to update.
+
+  Returns a new object (like `prior`) describing the posterior distribution of
+  recall probability at `tnow`.
+  """
+  from scipy.special import gammaln
   from numpy import exp
   alpha, beta, t = prior
   dt = tnow / t
-  if result == 1:
+  if result:
     # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
     # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`
     # variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
@@ -84,7 +117,6 @@ def meanVarToBeta(mean, var):
 
 
 def priorToHalflife(prior, percentile=0.5, maxt=100, mint=1e-3):
-  from math import sqrt
   from scipy.optimize import brentq
   h = brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
   # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.

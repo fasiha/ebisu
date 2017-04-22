@@ -22,11 +22,10 @@ _.chunk(fencepos, 2).forEach(([ [ _, i ], [ __, j ] ]) => {
   var contents = lines.slice(contentStart, j).join('');
 
   if (language === 'py' || language === 'python') {
-    contents =
-        spawnSync('yapf',
-                  [ "--style", '{based_on_style: chromium}' ],
-                  {input : contents, encoding : 'utf8'})
-            .stdout;
+    contents = spawnSync('yapf', [ "--style", '{based_on_style: chromium}' ], {
+                 input : contents,
+                 encoding : 'utf8'
+               }).stdout;
     replacement.push({start : i, end : j, contentStart, contents});
   }
 
@@ -34,7 +33,12 @@ _.chunk(fencepos, 2).forEach(([ [ _, i ], [ __, j ] ]) => {
     if (seen.has(fname)) {
       fs.appendFileSync(fname, contents);
     } else {
-      fs.writeFileSync(fname, contents);
+      if (language === 'py' || language === 'python') {
+        fs.writeFileSync(fname, '# -*- coding: utf-8 -*-\n\n'); // I need emoji!
+        fs.appendFileSync(fname, contents);
+      } else {
+        fs.writeFileSync(fname, contents);
+      }
       seen.add(fname);
     }
   }

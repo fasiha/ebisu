@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from .ebisu import meanVarToBeta
 import numpy as np
 

@@ -956,6 +956,7 @@ I think this speaks to the surprising nature of random variables and the benefit
     - scipy, numpy
     - nose for tests
 - [Pandoc](http://pandoc.org)
+- [pydoc-markdown](https://pypi.python.org/pypi/pydoc-markdown)
 - JavaScript
     - [Yarn](https://yarnpkg.com)
         - Yarn installs packages that help untangle this Markdown document to source code, weave it into an HTML file, and parse LaTeX math equations.
@@ -969,4 +970,3 @@ Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/3
 Many thanks also to Drew Benedetti for reviewing this manuscript.
 
 John Otander’s [Modest CSS](http://markdowncss.github.io/modest/) is used to style the Markdown output.
-

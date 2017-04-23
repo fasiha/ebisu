@@ -6,6 +6,7 @@
   "author": "Ahmed Fasih <wuzzyview@gmail.com>",
   "license": "Unlicense",
   "scripts": {
+    "doc": "pydoc-markdown ebisu.ebisu  > doc/doc.md",
     "build": "node md2code.js",
     "html": "cp header.html index.html && pandoc --no-highlight -f markdown_github-hard_line_breaks -t html5 README.md | sed 's/\\\\&amp;/\\&/g' >> index.html && node_modules/.bin/mjpage < index.html | grep -v HLJS_CLIENTSIDE > tmp && mv tmp index.html",
     "test": "yarn build && python3 -m \"nose\" -v",

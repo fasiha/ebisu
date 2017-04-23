@@ -444,11 +444,21 @@ With the exception of `priorToHalflife` and `predictRecallVar`, all the above fu
 
 The functions in the following section are either for illustrative or debugging purposes.
 
-### Alternate ways of evaluating the same results as above
+### Miscellaneous functions
+I wrote a number of other functions that help provide insight or help debug the above functions in the main `ebisu` workspace but are not necessary for an actual implementation. These are in the `ebisu.alternate` submodule and not nearly as much time has been spent on polish or optimization as the above core functions.
+
 ```py
 # export ebisu/alternate.py #
 from .ebisu import meanVarToBeta
 ```
+
+`predictRecallMode` and `predictRecallMedian` return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variance \\(p_t^δ\\) whose mean is returned by `predictRecall` (🍏 above). Recall that \\(δ = t / t_{now}\\).
+
+The mode has an analytical expression, and while it is more meaningful than the mean, the distribution can blow up to infinity at 0 or 1 when \\(δ\\) is either much smaller or much larger than 1, in which case the analytical expression may yield nonsense, so a number of not-very-rigorous checks are in place to attempt to detect this.
+
+I could not find a closed-form expression for the median of \\(p_t^δ\\), so I use a bracketed root search (Brent’s algorithm) on the cumulative distribution function (the CDF), for which Wolfram Alpha can yield an analytical expression. This can get numerically burdensome, which is unacceptable because one may need to predict the recall probability for thousands of facts. For these reasons, although I would have preferred to make `predictRecall` evaluate the mode or median, I made it return the mean.
+
+`predictRecallMonteCarlo` is the simplest function. It evaluates the mean, variance, mode (via histogram), and median of \\(p_t^δ\\) by drawing samples from the Beta prior on \\(p_t\\) and raising them to the \\(δ\\)-power. The unit tests for `predictRecall` and `predictRecallVar` in the next section use this Monte Carlo to test both derivations and implementations. While fool-proof, Monte Carlo simulation is obviously far too computationally-burdensome for regular use.
 
 ```py
 # export ebisu/alternate.py #
@@ -456,16 +466,22 @@ import numpy as np
 
 
 def predictRecallMode(prior, tnow):
-  """Returns the mode of the immediate (pseudo-Beta) prior"""
-  # [peak] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Solve%5B+D%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1),+p%5D+%3D%3D+0,+p%5D) for `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`
+  """Mode of the immediate recall probability.
+
+  Same arguments as `ebisu.predictRecall`, see that docstring for details. A
+  returned value of 0 or 1 may indicate divergence.
+  """
+  # [1] Mathematica: `Solve[ D[p**((a-t)/t) * (1-p**(1/t))**(b-1), p] == 0, p]`
   alpha, beta, t = prior
   dt = tnow / t
   pr = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1)
 
-  # See [peak]. The actual mode is `modeBase ** dt`, but since `modeBase` might be negative or otherwise invalid, check it.
+  # See [1]. The actual mode is `modeBase ** dt`, but since `modeBase` might
+  # be negative or otherwise invalid, check it.
   modeBase = (alpha - dt) / (alpha + beta - dt - 1)
   if modeBase >= 0 and modeBase <= 1:
-    # Still need to confirm this is not a minimum (anti-mode). Do this with a coarse check of other points likely to be the mode.
+    # Still need to confirm this is not a minimum (anti-mode). Do this with a
+    # coarse check of other points likely to be the mode.
     mode = modeBase**dt
     modePr = pr(mode)
 
@@ -477,21 +493,30 @@ def predictRecallMode(prior, tnow):
     otherPr = map(pr, others)
     if max(otherPr) <= modePr:
       return mode
-  # If anti-mode detected, that means one of the edges is the mode, likely caused by a very large or very small `dt`. Just use `dt` to guess which extreme it was pushed to. If `dt` == 1.0, and we get to this point, likely we have malformed alpha/beta (i.e., <1)
+  # If anti-mode detected, that means one of the edges is the mode, likely
+  # caused by a very large or very small `dt`. Just use `dt` to guess which
+  # extreme it was pushed to. If `dt` == 1.0, and we get to this point, likely
+  # we have malformed alpha/beta (i.e., <1)
   return 0.5 if dt == 1. else (0. if dt > 1 else 1.)
 
 
 def predictRecallMedian(prior, tnow, percentile=0.5):
-  """"""
-  # [cdf] [WolframAlpha result](https://www.wolframalpha.com/input/?i=Integrate%5Bp%5E((a-t)%2Ft)+*+(1-p%5E(1%2Ft))%5E(b-1)+%2F+t+%2F+Beta%5Ba,b%5D,+p%5D) for `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
+  """Median (or percentile) of the immediate recall probability.
+
+  Same arguments as `ebisu.predictRecall`, see that docstring for details.
+
+  An extra keyword argument, `percentile`, is a float between 0 and 1, and
+  specifies the percentile rather than 50% (median).
+  """
+  # [1] `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
   from scipy.optimize import brentq
   from scipy.special import beta as fbeta
   from scipy.special import hyp2f1
   alpha, beta, t = prior
   dt = tnow / t
 
-  # See [cdf]. If the mode doesn't exist (or can't be found), find the median (or `percentile`) using a root-finder and the cumulative distribution function.
-  # N.B. I prefer to try to find the mode (above) because it will be much faster than this.
+  # See [1]. If the mode doesn't exist (or can't be found), find the median (or
+  # `percentile`) using a root-finder and the cumulative distribution function.
   cdfPercentile = lambda p: (p**(alpha/dt) *
                              hyp2f1(alpha, 1 - beta, 1 + alpha, p**(1/dt)) /
                              alpha /
@@ -499,7 +524,15 @@ def predictRecallMedian(prior, tnow, percentile=0.5):
   return brentq(cdfPercentile, 0, 1)
 
 
-def predictRecallMonteCarlo(prior, tnow, N=1000000):
+def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
+  """Monte Carlo simulation of the immediate recall probability.
+
+  Same arguments as `ebisu.predictRecall`, see that docstring for details. An
+  extra keyword argument, `N`, specifies the number of samples to draw.
+
+  This function returns a dict containing the mean, variance, median, and mode
+  of the current recall probability.
+  """
   import scipy.stats as stats
   alpha, beta, t = prior
   tPrior = stats.beta.rvs(alpha, beta, size=N)
@@ -511,10 +544,27 @@ def predictRecallMonteCarlo(prior, tnow, N=1000000):
       median=np.median(tnowPrior),
       mode=bincenters[freqs.argmax()],
       var=np.var(tnowPrior))
+```
 
+Next we have alternate approaches to `updateRecall` (🍌 above), namely, using quadrature integration (i.e., numerical integration) and Monte Carlo simulation.
 
-def updateRecallQuad(prior, result, tnow, analyticMarginal=True, maxiter=100):
-  """Update a time-dependent Beta distribution with a new data sample"""
+`updateRecallQuad` uses quadrature integration to evaluate the expectation and variance of of \\(p_t^δ | x\\), both of which can be expressed as integrals—recall that \\(E[f(p)] = \int_0^1 f(p) P(p) \, dp\\) for any function \\(f(p)\\), and where \\(P(p)\\) is the density function. Also recall from [above](#updating-the-posterior-with-quiz-results) that the posterior has the form
+\\[Posterior(p|x) = \frac{Prior(p) · Lik(x|p)}{\int_0^1 Prior(p) · Lik(x|p) \, dp}.\\]
+That denominator (the marginal of \\(x\\)) can be evaluated via quadrature, or by an analytical expression obtained from Wolfram Alpha (the unit tests below do both, overkill). However, the *prior* on \\(p_t^δ\\), derived [above](#moving-beta-distributions-through-time), is used here as-is since it has been extensively tested using Monte Carlo (see `predictRecallMonteCarlo` above). Any of the three integrals can fail to converge to a sensible value, in which case an exception is thrown (and in that case, the unit test is skipped).
+
+`updateRecallMonteCarlo` is deceptively simple. Like `predictRecallMonteCarlo` above, it draws samples from the Beta distribution in `model` and propagates them through Ebbinghaus’ forgetting curve to the time specified, but then it assigns weights to each sample—each weight is that sample’s probability according to the Bernoulli likelihood. This is equivalent to multiplying the prior with the likelihood—and we needn’t bother with the marginal because it’s just a normalizing factor which would scale all weights equally. The function then computes the *weighted* mean and variance (reference links in the source below) before straightforwardly converting these to a new Beta prior as done by `updateRecall`. (I am grateful to [mxwsn](https://stats.stackexchange.com/q/273221/31187) for suggesting this elegant approach.)
+
+```py
+# export ebisu/alternate.py #
+def updateRecallQuad(prior, result, tnow, analyticMarginal=True):
+  """Update recall probability with quiz result via quadrature integration.
+
+  Same arguments as `ebisu.updateRecall`, see that docstring for details.
+
+  An extra keyword argument: `analyticMarginal` if false will compute the
+  marginal (the denominator in Bayes rule) using quadrature as well. If true, an
+  analytical expression will be used.
+  """
   from scipy.integrate import quad
   alpha, beta, t = prior
   dt = tnow / t
@@ -557,9 +607,14 @@ def updateRecallQuad(prior, result, tnow, analyticMarginal=True, maxiter=100):
   return newAlpha, newBeta, tnow
 
 
-def updateRecallMonteCarlo(prior, result, tnow, N=10000):
-  """Update a time-dependent Beta distribution with a new data sample"""
-  # [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&oldid=769806318#Properties_of_the_Bernoulli_Distribution, third (last) equation
+def updateRecallMonteCarlo(prior, result, tnow, N=10 * 1000):
+  """Update recall probability with quiz result via Monte Carlo simulation.
+
+  Same arguments as `ebisu.updateRecall`, see that docstring for details.
+
+  An extra keyword argument `N` specifies the number of samples to draw.
+  """
+  # [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&oldid=769806318#Properties_of_the_Bernoulli_Distribution, third equation
   # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
   # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
   import scipy.stats as stats
@@ -583,7 +638,10 @@ def updateRecallMonteCarlo(prior, result, tnow, N=10000):
   return newAlpha, newBeta, tnow
 ```
 
+That’s it—that’s all the code in the `ebisu` module!
+
 ### Test code
+
 ```py
 def betafitBeforeLikelihood(a, b, t1, x, t2):
   a2, b2 = meanVarToBeta(
@@ -798,7 +856,9 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 
 ## Acknowledgements
 
-Many thanks to Drew Benedetti for reviewing this manuscript.
+Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/31187) as well as [jth](https://stats.stackexchange.com/q/272834/31187) for their advice and patience with my statistical incompetence.
 
-I use [Modest CSS](http://markdowncss.github.io/modest/).
+Many thanks also to Drew Benedetti for reviewing this manuscript.
+
+John Otander’s [Modest CSS](http://markdowncss.github.io/modest/) is used to style the Markdown output.
 

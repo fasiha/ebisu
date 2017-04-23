@@ -3031,18 +3031,68 @@ plt.show()</code></pre>
   <span class="hljs-keyword">return</span> newAlpha, newBeta, tnow</code></pre>
 <p>That’s it—that’s all the code in the <code>ebisu</code> module!</p>
 <h3 id="test-code">Test code</h3>
+<p>Before diving into unit tests, I promised <a href="#updating-the-posterior-with-quiz-results">above</a> to show the suboptimality of fitting a Beta to the prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-168-Title">
+<title id="MathJax-SVG-168-Title">p_t^δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
+</g>
+</svg></span> and performing a straightforward conjugate update. Assume you can trust <code>updateRecall</code> for now, which fits a Beta to the full <em>posterior</em>. The following shows the difference between the two models: the numerical differences start in the first digit after the decimal point.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">betafitBeforeLikelihood</span><span class="hljs-params">(a, b, t1, x, t2)</span>:</span>
   a2, b2 = meanVarToBeta(
       predictRecall((a, b, t1), t2), predictRecallVar((a, b, t1), t2))
   <span class="hljs-keyword">return</span> a2 + x, b2 + <span class="hljs-number">1</span> - x, t2
 
 
-betafitBeforeLikelihood(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">2.</span>)
-updateRecall((<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>), <span class="hljs-number">1.</span>, <span class="hljs-number">2.</span>)</code></pre>
+print(<span class="hljs-string">"Beta fit BEFORE posterior:"</span>, updateRecall((<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>), <span class="hljs-number">1.</span>, <span class="hljs-number">2.</span>))
+print(<span class="hljs-string">"Beta fit AFTER posterior:"</span>, betafitBeforeLikelihood(
+    <span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">2.</span>))
+<span class="hljs-comment"># Output:</span>
+<span class="hljs-comment"># Beta fit BEFORE posterior: (2.2138973610926804, 4.6678159395305334, 2.0)</span>
+<span class="hljs-comment"># Beta fit AFTER posterior: (2.3075328265376691, 4.8652384243261961, 2.0)</span></code></pre>
+<p>I use the built-in <code>unittest</code>, and I can run all the tests from Atom via Hydrogen/Jupyter but for historic reasons I don’t want Jupyter to deal with the <code>ebisu</code> namespace, just functions (since most of these functions and tests existed before the module’s layout was decided). So the following is in its own fenced code block that I don’t evaluate in Atom.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/tests/test_ebisu.py</span>
-<span class="hljs-keyword">from</span> unittest <span class="hljs-keyword">import</span> TestCase
 <span class="hljs-keyword">from</span> ebisu <span class="hljs-keyword">import</span> *
 <span class="hljs-keyword">from</span> ebisu.alternate <span class="hljs-keyword">import</span> *</code></pre>
+<p>In these unit tests, I compare</p>
+<ul>
+<li><code>predictRecall</code> and <code>predictRecallVar</code> against <code>predictRecallMonteCarlo</code>, and</li>
+<li><code>updateRecall</code> against <code>updateRecallQuad</code> (both with analytical and numerical marginal) and against <code>updateRecallMonteCarlo</code>.</li>
+</ul>
+<p>For the latter, since all the functions return a Beta distribution’s parameters, I compare the resulting distributions in terms of <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Quantities_of_information_.28entropy.29">Kullback–Leibler divergence</a> (actually, the symmetric distance version), which is a nice way to measure the difference between two probability distributions. There is also a little unit test for my implementation for the KL divergence on Beta distributions.</p>
+<p>For the former, I compare means and variances using relative error, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.231ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4404.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-169-Title">
+<title id="MathJax-SVG-169-Title">|x-y| / |y|</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-7C" x="0" y="0"></use>
+ <use xlink:href="#MJMATHI-78" x="278" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="1073" y="0"></use>
+ <use xlink:href="#MJMATHI-79" x="2073" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="2571" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="2849" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="3350" y="0"></use>
+ <use xlink:href="#MJMATHI-79" x="3628" y="0"></use>
+ <use xlink:href="#MJMAIN-7C" x="4126" y="0"></use>
+</g>
+</svg></span>, since they do not return distributions, only means/variances.</p>
+<p>For both sets of functions, a range of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-170-Title">
+<title id="MathJax-SVG-170-Title">δ = t_{now} / t</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
+<g transform="translate(1778,0)">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+<g transform="translate(361,-150)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6F" x="600" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
+</g>
+</g>
+ <use xlink:href="#MJMAIN-2F" x="3514" y="0"></use>
+ <use xlink:href="#MJMATHI-74" x="4015" y="0"></use>
+</g>
+</svg></span> and both outcomes of quiz results (true and false) are tested to ensure they all produce the same answers. Sometimes, quadrature integration fails to find a solution, in which case it is not compared to the Monte Carlo and analytical versions.</p>
+<p>Often the unit tests fails because the tolerances are a little tight, and the random number generator seed is variable, which leads to errors exceeding thresholds. I actually prefer to see these occasional test failures because it gives me confidence that the thresholds are where I want them to be (if I set the thresholds too loose, and I somehow accidentally greatly improved accuracy, I might never know). However, I realize it can be annoying for automated tests or continuous integration systems, so I am open to fixing a seed and fixing the error threshold for it.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/tests/test_ebisu.py</span>
 <span class="hljs-keyword">import</span> unittest
 
@@ -3064,6 +3114,11 @@ updateRecall((<span class="hljs-number">3.3</span>, <span class="hljs-number">4.
   right = np.array([a2, b2])
   <span class="hljs-keyword">return</span> gammaln(sum(left)) - gammaln(sum(right)) - sum(gammaln(left)) + sum(
       gammaln(right)) + np.dot(left - right, psi(left) - psi(sum(left)))
+
+
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">kl</span><span class="hljs-params">(v, w)</span>:</span>
+  <span class="hljs-keyword">return</span> (klDivBeta(v[<span class="hljs-number">0</span>], v[<span class="hljs-number">1</span>], w[<span class="hljs-number">0</span>], w[<span class="hljs-number">1</span>]) + klDivBeta(w[<span class="hljs-number">0</span>], w[<span class="hljs-number">1</span>], v[<span class="hljs-number">0</span>], v[<span class="hljs-number">1</span>])
+         ) / <span class="hljs-number">2.</span>
 
 
 <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">TestEbisu</span><span class="hljs-params">(unittest.TestCase)</span>:</span>
@@ -3089,7 +3144,6 @@ updateRecall((<span class="hljs-number">3.3</span>, <span class="hljs-number">4.
   <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">test_posterior</span><span class="hljs-params">(self)</span>:</span>
 
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">inner</span><span class="hljs-params">(a, b, t0, dts)</span>:</span>
-      kl = <span class="hljs-keyword">lambda</span> v, w: ((klDivBeta(v[<span class="hljs-number">0</span>], v[<span class="hljs-number">1</span>], w[<span class="hljs-number">0</span>], w[<span class="hljs-number">1</span>]) + klDivBeta(w[<span class="hljs-number">0</span>], w[<span class="hljs-number">1</span>], v[<span class="hljs-number">0</span>], v[<span class="hljs-number">1</span>])) / <span class="hljs-number">2.</span>)
       <span class="hljs-keyword">for</span> t <span class="hljs-keyword">in</span> map(<span class="hljs-keyword">lambda</span> dt: dt * t0, dts):
         <span class="hljs-keyword">for</span> x <span class="hljs-keyword">in</span> [<span class="hljs-number">0.</span>, <span class="hljs-number">1.</span>]:
           msg = <span class="hljs-string">'a={},b={},t0={},x={},t={}'</span>.format(a, b, t0, x, t)
@@ -3112,13 +3166,14 @@ updateRecall((<span class="hljs-number">3.3</span>, <span class="hljs-number">4.
           <span class="hljs-keyword">if</span> quad2 <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> <span class="hljs-keyword">None</span>:
             self.assertLess(kl(quad2, mc), <span class="hljs-number">1e-3</span>, msg=msg)
 
-    inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>, [<span class="hljs-number">0.1</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">5.5</span>, <span class="hljs-number">12.12</span>])
+    inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>, [<span class="hljs-number">0.1</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">9.5</span>])
     inner(<span class="hljs-number">341.4</span>, <span class="hljs-number">3.4</span>, <span class="hljs-number">1.</span>, [<span class="hljs-number">0.1</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">5.5</span>, <span class="hljs-number">50.</span>])
 
 
 <span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">'__main__'</span>:
   unittest.TextTestRunner().run(
       unittest.TestLoader().loadTestsFromModule(TestEbisu()))</code></pre>
+<p>That <code>if __name__ == '__main__'</code> is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., <code>python3 -m nose</code> (which is wrapped in a Yarn script: if you look in <code>package.json</code> you’ll see that <code>yarn html</code> will run the eqivalent of <code>node md2code.js &amp;&amp; python3 -m "nose"</code>: this Markdown file is untangled into Python source files first, and then nose is invoked).</p>
 <h3 id="demo-code">Demo code</h3>
 <pre class="py"><code class="hljs python"><span class="hljs-keyword">import</span> scipy.stats <span class="hljs-keyword">as</span> stats
 <span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np

@@ -642,6 +642,8 @@ That’s it—that’s all the code in the `ebisu` module!
 
 ### Test code
 
+Before diving into unit tests, I promised [above](#updating-the-posterior-with-quiz-results) to show the suboptimality of fitting a Beta to the prior on \\(p_t^δ\\) and performing a straightforward conjugate update. Assume you can trust `updateRecall` for now, which fits a Beta to the full *posterior*. The following shows the difference between the two models: the numerical differences start in the first digit after the decimal point.
+
 ```py
 def betafitBeforeLikelihood(a, b, t1, x, t2):
   a2, b2 = meanVarToBeta(
@@ -649,16 +651,33 @@ def betafitBeforeLikelihood(a, b, t1, x, t2):
   return a2 + x, b2 + 1 - x, t2
 
 
-betafitBeforeLikelihood(3.3, 4.4, 1., 1., 2.)
-updateRecall((3.3, 4.4, 1.), 1., 2.)
+print("Beta fit BEFORE posterior:", updateRecall((3.3, 4.4, 1.), 1., 2.))
+print("Beta fit AFTER posterior:", betafitBeforeLikelihood(
+    3.3, 4.4, 1., 1., 2.))
+# Output:
+# Beta fit BEFORE posterior: (2.2138973610926804, 4.6678159395305334, 2.0)
+# Beta fit AFTER posterior: (2.3075328265376691, 4.8652384243261961, 2.0)
 ```
+
+I use the built-in `unittest`, and I can run all the tests from Atom via Hydrogen/Jupyter but for historic reasons I don’t want Jupyter to deal with the `ebisu` namespace, just functions (since most of these functions and tests existed before the module’s layout was decided). So the following is in its own fenced code block that I don’t evaluate in Atom.
 
 ```py
 # export ebisu/tests/test_ebisu.py
-from unittest import TestCase
 from ebisu import *
 from ebisu.alternate import *
 ```
+
+In these unit tests, I compare
+- `predictRecall` and `predictRecallVar` against `predictRecallMonteCarlo`, and
+- `updateRecall` against `updateRecallQuad` (both with analytical and numerical marginal) and against `updateRecallMonteCarlo`.
+
+For the latter, since all the functions return a Beta distribution’s parameters, I compare the resulting distributions in terms of [Kullback–Leibler divergence](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Quantities_of_information_.28entropy.29) (actually, the symmetric distance version), which is a nice way to measure the difference between two probability distributions. There is also a little unit test for my implementation for the KL divergence on Beta distributions.
+
+For the former, I compare means and variances using relative error, \\(|x-y| / |y|\\), since they do not return distributions, only means/variances.
+
+For both sets of functions, a range of \\(δ = t_{now} / t\\) and both outcomes of quiz results (true and false) are tested to ensure they all produce the same answers. Sometimes, quadrature integration fails to find a solution, in which case it is not compared to the Monte Carlo and analytical versions.
+
+Often the unit tests fails because the tolerances are a little tight, and the random number generator seed is variable, which leads to errors exceeding thresholds. I actually prefer to see these occasional test failures because it gives me confidence that the thresholds are where I want them to be (if I set the thresholds too loose, and I somehow accidentally greatly improved accuracy, I might never know). However, I realize it can be annoying for automated tests or continuous integration systems, so I am open to fixing a seed and fixing the error threshold for it.
 
 ```py
 # export ebisu/tests/test_ebisu.py
@@ -684,6 +703,10 @@ def klDivBeta(a, b, a2, b2):
       gammaln(right)) + np.dot(left - right, psi(left) - psi(sum(left)))
 
 
+def klDivBetaSymmetric(x, y):
+  return (klDivBeta(*x, *y) + klDivBeta(*y, *x)) / 2
+
+
 class TestEbisu(unittest.TestCase):
 
   def test_kl(self):
@@ -707,28 +730,29 @@ class TestEbisu(unittest.TestCase):
   def test_posterior(self):
 
     def inner(a, b, t0, dts):
-      kl = lambda v, w: ((klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])) / 2.)
       for t in map(lambda dt: dt * t0, dts):
         for x in [0., 1.]:
           msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
           mc = updateRecallMonteCarlo((a, b, t0), x, t, N=1 * 100 * 1000)
           an = updateRecall((a, b, t0), x, t)
           self.assertLess(
-              kl(an, mc), 1e-3, msg=msg + ' an={}, mc={}'.format(an, mc))
+              klDivBetaSymmetric(an, mc),
+              1e-3,
+              msg=msg + ' an={}, mc={}'.format(an, mc))
 
           try:
             quad1 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=True)
           except OverflowError:
             quad1 = None
           if quad1 is not None:
-            self.assertLess(kl(quad1, mc), 1e-3, msg=msg)
+            self.assertLess(klDivBetaSymmetric(quad1, mc), 1e-3, msg=msg)
 
           try:
             quad2 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=False)
           except OverflowError:
             quad2 = None
           if quad2 is not None:
-            self.assertLess(kl(quad2, mc), 1e-3, msg=msg)
+            self.assertLess(klDivBetaSymmetric(quad2, mc), 1e-3, msg=msg)
 
     inner(3.3, 4.4, 1., [0.1, 1., 5.5, 12.12])
     inner(341.4, 3.4, 1., [0.1, 1., 5.5, 50.])
@@ -738,6 +762,8 @@ if __name__ == '__main__':
   unittest.TextTestRunner().run(
       unittest.TestLoader().loadTestsFromModule(TestEbisu()))
 ```
+
+That `if __name__ == '__main__'` is for running the unit test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., `python3 -m nose`
 
 ### Demo code
 
@@ -861,4 +887,3 @@ Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/3
 Many thanks also to Drew Benedetti for reviewing this manuscript.
 
 John Otander’s [Modest CSS](http://markdowncss.github.io/modest/) is used to style the Markdown output.
-

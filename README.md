@@ -766,6 +766,10 @@ That `if __name__ == '__main__'` is for running the test suite in Atom via Hydro
 
 ### Demo code
 
+The code snippets here are intended to demonstrate some Ebisu functionality.
+
+The first snippet produces the half-life plots shown above, and included below, scroll down.
+
 ```py
 import scipy.stats as stats
 import numpy as np
@@ -774,15 +778,7 @@ import matplotlib.pyplot as plt
 plt.style.use('ggplot')
 plt.rcParams['svg.fonttype'] = 'none'
 
-betaa = 4. / 3
-betab = 4. / 3
-
-betaa = 12.
-betab = 12.
-
 t0 = 7.
-
-v2s = lambda var: np.sqrt(var) / 10
 
 ts = np.arange(1, 31.)
 ps = np.linspace(0, 1., 200)
@@ -827,42 +823,78 @@ plt.savefig('figures/halflife.svg')
 plt.savefig('figures/halflife.png', dpi=300)
 plt.show()
 ```
+
 ![figures/models.png](figures/models.png)
+
 ![figures/halflife.png](figures/halflife.png)
 
+---
+
+This second snippet addresses a potential approximation which isn’t too accurate but might be useful in some situations. The function `predictRecall` (🍏 above) evaluates the log-gamma function four times and an `exp` once. One may ask, why not use the half-life returned by `priorToHalflife` and Ebbinghaus’ forgetting curve, thereby approximating the current recall probability for a fact as `2 ** (-tnow / priorToHalflife(model))`? While this is likely more computationally efficient (after computing the half-life up-front), it is also less precise:
+
 ```py
-plt.figure()
+v2s = lambda var: np.sqrt(var) / 10
+ts = np.linspace(1, 41)
+
 modelA = updateRecall((3., 3., 7.), 1, 15.)
 modelB = updateRecall((12., 12., 7.), 1, 15.)
 hlA = priorToHalflife(modelA)
 hlB = priorToHalflife(modelB)
-plt.errorbar(
-    ts,
-    predictRecall(modelA, ts),
-    v2s(predictRecallVar(modelA, ts)),
-    fmt='.-',
-    label='Model A',
-    color='C0')
-plt.plot(ts, 2**(-ts / hlA), '--', label='approx A', color='C0')
-plt.errorbar(
-    ts,
-    predictRecall(modelB, ts),
-    v2s(predictRecallVar(modelB, ts)),
-    fmt='.-',
-    label='Model B',
-    color='C1')
-plt.plot(ts, 2**(-ts / hlB), '--', label='approx B', color='C1')
+
+plt.figure()
+[
+    plt.errorbar(
+        ts,
+        predictRecall(model, ts),
+        v2s(predictRecallVar(model, ts)),
+        fmt='.-',
+        label='Model ' + label,
+        color=color)
+    for model, color, label in [(modelA, 'C0', 'A'), (modelB, 'C1', 'B')]
+]
+[
+    plt.plot(
+        ts, 2**(-ts / halflife), '--', label='approx ' + label, color=color)
+    for halflife, color, label in [(hlA, 'C0', 'A'), (hlB, 'C1', 'B')]
+]
+# plt.yscale('log')
 plt.legend(loc=0)
 plt.ylim([0, 1])
-plt.grid(True)
 plt.xlabel('Time (days)')
 plt.ylabel('Recall probability')
-plt.title('Predicted forgetting curves (A: α=β=3, B: α=β=12)')
+plt.title('Predicted forgetting curves (halflife A={:0.0f}, B={:0.0f})'.format(
+    hlA, hlB))
 plt.savefig('figures/forgetting-curve.svg')
 plt.savefig('figures/forgetting-curve.png', dpi=300)
 plt.show()
 ```
+
 ![figures/forgetting-curve.png](figures/forgetting-curve.png)
+
+This plot shows `predictRecall`’s fully analytical solution for two separate models over time as well as this approximation: model A has half-life of eleven days while model B has half-life of 7.9 days. We see that the approximation diverges a bit from the true solution.
+
+This also indicates that placing a prior on recall probabilities and propagating that prior through time via Ebbinghaus results in a *different* curve than Ebbinghaus’ exponential decay curve. This surprising result can be seen as a consequence of [Jensen’s inequality](https://en.wikipedia.org/wiki/Jensen%27s_inequality), which says that \\(E[f(p)] ≥ f(E[p])\\) when \\(f\\) is convex, and that the opposite is true if it is concave. In our case, \\(f(p) = p^δ\\), for `δ = t / halflife`, and Jensen requires that the accurate mean recall probability is greater than the approximation for times greater than the half-life, and less than otherwise. We see precisely this for both models, as illustrated in this plot of just their differences:
+
+```py
+plt.figure()
+ts = np.linspace(1, 14)
+
+plt.axhline(y=0, linewidth=3, color='0.33')
+plt.plot(ts, predictRecall(modelA, ts) - 2**(-ts / hlA), label='Model A')
+plt.plot(ts, predictRecall(modelB, ts) - 2**(-ts / hlB), label='Model B')
+plt.gcf().subplots_adjust(left=0.15)
+plt.legend(loc=0)
+plt.xlabel('Time (days)')
+plt.ylabel('Difference')
+plt.title('Expected recall probability - approximation')
+plt.savefig('figures/forgetting-curve-diff.svg')
+plt.savefig('figures/forgetting-curve-diff.png', dpi=300)
+plt.show()
+```
+
+![figures/forgetting-curve-diff.png](figures/forgetting-curve-diff.png)
+
+I think this speaks to the surprising nature of random variables and the benefits of handling them rigorously, as Ebisu does.
 
 ## Implementation thoughts
 

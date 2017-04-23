@@ -3175,6 +3175,8 @@ print(<span class="hljs-string">"Beta fit AFTER posterior:"</span>, betafitBefor
       unittest.TestLoader().loadTestsFromModule(TestEbisu()))</code></pre>
 <p>That <code>if __name__ == '__main__'</code> is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., <code>python3 -m nose</code> (which is wrapped in a Yarn script: if you look in <code>package.json</code> you’ll see that <code>yarn html</code> will run the eqivalent of <code>node md2code.js &amp;&amp; python3 -m "nose"</code>: this Markdown file is untangled into Python source files first, and then nose is invoked).</p>
 <h3 id="demo-code">Demo code</h3>
+<p>The code snippets here are intended to demonstrate some Ebisu functionality.</p>
+<p>The first snippet produces the half-life plots shown above, and included below, scroll down.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-keyword">import</span> scipy.stats <span class="hljs-keyword">as</span> stats
 <span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
 <span class="hljs-keyword">import</span> matplotlib.pyplot <span class="hljs-keyword">as</span> plt
@@ -3182,15 +3184,7 @@ print(<span class="hljs-string">"Beta fit AFTER posterior:"</span>, betafitBefor
 plt.style.use(<span class="hljs-string">'ggplot'</span>)
 plt.rcParams[<span class="hljs-string">'svg.fonttype'</span>] = <span class="hljs-string">'none'</span>
 
-betaa = <span class="hljs-number">4.</span> / <span class="hljs-number">3</span>
-betab = <span class="hljs-number">4.</span> / <span class="hljs-number">3</span>
-
-betaa = <span class="hljs-number">12.</span>
-betab = <span class="hljs-number">12.</span>
-
 t0 = <span class="hljs-number">7.</span>
-
-v2s = <span class="hljs-keyword">lambda</span> var: np.sqrt(var) / <span class="hljs-number">10</span>
 
 ts = np.arange(<span class="hljs-number">1</span>, <span class="hljs-number">31.</span>)
 ps = np.linspace(<span class="hljs-number">0</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">200</span>)
@@ -3234,38 +3228,100 @@ plt.ylabel(<span class="hljs-string">'Half-life (days)'</span>)
 plt.savefig(<span class="hljs-string">'figures/halflife.svg'</span>)
 plt.savefig(<span class="hljs-string">'figures/halflife.png'</span>, dpi=<span class="hljs-number">300</span>)
 plt.show()</code></pre>
-<p><img src="figures/models.png" alt="figures/models.png"> <img src="figures/halflife.png" alt="figures/halflife.png"></p>
-<pre class="py"><code class="hljs python">plt.figure()
+<p><img src="figures/models.png" alt="figures/models.png"></p>
+<p><img src="figures/halflife.png" alt="figures/halflife.png"></p>
+<hr>
+<p>This second snippet addresses a potential approximation which isn’t too accurate but might be useful in some situations. The function <code>predictRecall</code> (🍏 above) evaluates the log-gamma function four times and an <code>exp</code> once. One may ask, why not use the half-life returned by <code>priorToHalflife</code> and Ebbinghaus’ forgetting curve, thereby approximating the current recall probability for a fact as <code>2 ** (-tnow / priorToHalflife(model))</code>? While this is likely more computationally efficient (after computing the half-life up-front), it is also less precise:</p>
+<pre class="py"><code class="hljs python">v2s = <span class="hljs-keyword">lambda</span> var: np.sqrt(var) / <span class="hljs-number">10</span>
+ts = np.linspace(<span class="hljs-number">1</span>, <span class="hljs-number">41</span>)
+
 modelA = updateRecall((<span class="hljs-number">3.</span>, <span class="hljs-number">3.</span>, <span class="hljs-number">7.</span>), <span class="hljs-number">1</span>, <span class="hljs-number">15.</span>)
 modelB = updateRecall((<span class="hljs-number">12.</span>, <span class="hljs-number">12.</span>, <span class="hljs-number">7.</span>), <span class="hljs-number">1</span>, <span class="hljs-number">15.</span>)
 hlA = priorToHalflife(modelA)
 hlB = priorToHalflife(modelB)
-plt.errorbar(
-    ts,
-    predictRecall(modelA, ts),
-    v2s(predictRecallVar(modelA, ts)),
-    fmt=<span class="hljs-string">'.-'</span>,
-    label=<span class="hljs-string">'Model A'</span>,
-    color=<span class="hljs-string">'C0'</span>)
-plt.plot(ts, <span class="hljs-number">2</span>**(-ts / hlA), <span class="hljs-string">'--'</span>, label=<span class="hljs-string">'approx A'</span>, color=<span class="hljs-string">'C0'</span>)
-plt.errorbar(
-    ts,
-    predictRecall(modelB, ts),
-    v2s(predictRecallVar(modelB, ts)),
-    fmt=<span class="hljs-string">'.-'</span>,
-    label=<span class="hljs-string">'Model B'</span>,
-    color=<span class="hljs-string">'C1'</span>)
-plt.plot(ts, <span class="hljs-number">2</span>**(-ts / hlB), <span class="hljs-string">'--'</span>, label=<span class="hljs-string">'approx B'</span>, color=<span class="hljs-string">'C1'</span>)
+
+plt.figure()
+[
+    plt.errorbar(
+        ts,
+        predictRecall(model, ts),
+        v2s(predictRecallVar(model, ts)),
+        fmt=<span class="hljs-string">'.-'</span>,
+        label=<span class="hljs-string">'Model '</span> + label,
+        color=color)
+    <span class="hljs-keyword">for</span> model, color, label <span class="hljs-keyword">in</span> [(modelA, <span class="hljs-string">'C0'</span>, <span class="hljs-string">'A'</span>), (modelB, <span class="hljs-string">'C1'</span>, <span class="hljs-string">'B'</span>)]
+]
+[
+    plt.plot(
+        ts, <span class="hljs-number">2</span>**(-ts / halflife), <span class="hljs-string">'--'</span>, label=<span class="hljs-string">'approx '</span> + label, color=color)
+    <span class="hljs-keyword">for</span> halflife, color, label <span class="hljs-keyword">in</span> [(hlA, <span class="hljs-string">'C0'</span>, <span class="hljs-string">'A'</span>), (hlB, <span class="hljs-string">'C1'</span>, <span class="hljs-string">'B'</span>)]
+]
+<span class="hljs-comment"># plt.yscale('log')</span>
 plt.legend(loc=<span class="hljs-number">0</span>)
 plt.ylim([<span class="hljs-number">0</span>, <span class="hljs-number">1</span>])
-plt.grid(<span class="hljs-keyword">True</span>)
 plt.xlabel(<span class="hljs-string">'Time (days)'</span>)
 plt.ylabel(<span class="hljs-string">'Recall probability'</span>)
-plt.title(<span class="hljs-string">'Predicted forgetting curves (A: α=β=3, B: α=β=12)'</span>)
+plt.title(<span class="hljs-string">'Predicted forgetting curves (halflife A={:0.0f}, B={:0.0f})'</span>.format(
+    hlA, hlB))
 plt.savefig(<span class="hljs-string">'figures/forgetting-curve.svg'</span>)
 plt.savefig(<span class="hljs-string">'figures/forgetting-curve.png'</span>, dpi=<span class="hljs-number">300</span>)
 plt.show()</code></pre>
 <p><img src="figures/forgetting-curve.png" alt="figures/forgetting-curve.png"></p>
+<p>This plot shows <code>predictRecall</code>’s fully analytical solution for two separate models over time as well as this approximation: model A has half-life of eleven days while model B has half-life of 7.9 days. We see that the approximation diverges a bit from the true solution.</p>
+<p>This also indicates that placing a prior on recall probabilities and propagating that prior through time via Ebbinghaus results in a <em>different</em> curve than Ebbinghaus’ exponential decay curve. This surprising result can be seen as a consequence of <a href="https://en.wikipedia.org/wiki/Jensen%27s_inequality">Jensen’s inequality</a>, which says that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.752ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7643.1 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-171-Title">
+<title id="MathJax-SVG-171-Title">E[f(p)] ≥ f(E[p])</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
+ <use xlink:href="#MJMATHI-66" x="1043" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="1593" y="0"></use>
+ <use xlink:href="#MJMATHI-70" x="1983" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="2486" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="2876" y="0"></use>
+ <use xlink:href="#MJMAIN-2265" x="3432" y="0"></use>
+ <use xlink:href="#MJMATHI-66" x="4488" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="5039" y="0"></use>
+ <use xlink:href="#MJMATHI-45" x="5428" y="0"></use>
+ <use xlink:href="#MJMAIN-5B" x="6193" y="0"></use>
+ <use xlink:href="#MJMATHI-70" x="6471" y="0"></use>
+ <use xlink:href="#MJMAIN-5D" x="6975" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="7253" y="0"></use>
+</g>
+</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.279ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 550.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-172-Title">
+<title id="MathJax-SVG-172-Title">f</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-66" x="0" y="0"></use>
+</g>
+</svg></span> is convex, and that the opposite is true if it is concave. In our case, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.487ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 4084.9 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-173-Title">
+<title id="MathJax-SVG-173-Title">f(p) = p^δ</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-66" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="550" y="0"></use>
+ <use xlink:href="#MJMATHI-70" x="940" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="1443" y="0"></use>
+ <use xlink:href="#MJMAIN-3D" x="2110" y="0"></use>
+<g transform="translate(3167,0)">
+ <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="513"></use>
+</g>
+</g>
+</svg></span>, for <code>δ = t / halflife</code>, and Jensen requires that the accurate mean recall probability is greater than the approximation for times greater than the half-life, and less than otherwise. We see precisely this for both models, as illustrated in this plot of just their differences:</p>
+<pre class="py"><code class="hljs python">plt.figure()
+ts = np.linspace(<span class="hljs-number">1</span>, <span class="hljs-number">14</span>)
+
+plt.axhline(y=<span class="hljs-number">0</span>, linewidth=<span class="hljs-number">3</span>, color=<span class="hljs-string">'0.33'</span>)
+plt.plot(ts, predictRecall(modelA, ts) - <span class="hljs-number">2</span>**(-ts / hlA), label=<span class="hljs-string">'Model A'</span>)
+plt.plot(ts, predictRecall(modelB, ts) - <span class="hljs-number">2</span>**(-ts / hlB), label=<span class="hljs-string">'Model B'</span>)
+plt.gcf().subplots_adjust(left=<span class="hljs-number">0.15</span>)
+plt.legend(loc=<span class="hljs-number">0</span>)
+plt.xlabel(<span class="hljs-string">'Time (days)'</span>)
+plt.ylabel(<span class="hljs-string">'Difference'</span>)
+plt.title(<span class="hljs-string">'Expected recall probability - approximation'</span>)
+plt.savefig(<span class="hljs-string">'figures/forgetting-curve-diff.svg'</span>)
+plt.savefig(<span class="hljs-string">'figures/forgetting-curve-diff.png'</span>, dpi=<span class="hljs-number">300</span>)
+plt.show()</code></pre>
+<p><img src="figures/forgetting-curve-diff.png" alt="figures/forgetting-curve-diff.png"></p>
+<p>I think this speaks to the surprising nature of random variables and the benefits of handling them rigorously, as Ebisu does.</p>
 <h2 id="implementation-thoughts">Implementation thoughts</h2>
 <p>Lua, Erlang, Elixir, Red, F#, OCaml, Reason, PureScript, JS, TypeScript, Rust, …</p>
 <p>Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …</p>

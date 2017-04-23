@@ -894,7 +894,7 @@ plt.show()
 
 ![figures/forgetting-curve-diff.png](figures/forgetting-curve-diff.png)
 
-I think this speaks to the surprising nature of random variables and the benefits of handling them rigorously, as Ebisu does.
+I think this speaks to the surprising nature of random variables and the benefits of handling them rigorously, as Ebisu seeks to do.
 
 ## Implementation thoughts
 

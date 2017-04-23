@@ -39,10 +39,18 @@ Finally, the [Source Code](#source-code) section presents the literate source of
 
 ## TL;DR
 
-Install the Python library with `pip3 install ebisu` (or `pip install ebisu` if you only have Python3 🤠—just joking, it works on Python 2 also).
+Install the Python library with `pip3 install ebisu` (or `pip install ebisu` if you only have Python3 🤠—just joking, it works on Python2 also).
 
-Coming soon: API docs. In the meantime, please see this [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb).
+For a conversational introduction to the API in the context of a mocked quiz app, see this [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb).
 
+The API revolves around using and transforming a model of a prior distribution on a fact’s recall probability after a specific amount of time has elapsed since it was studied. Create a default prior model for use with all newly learned facts via `ebisu.defaultModel`. Then, the critical two functions provided are:
+
+- `predictRecall(prior: tuple, tnow: float) -> float`, where `prior` is the object (a tuple) modeling the prior on this fact’s recall probability, and `tnow` is the time elapsed since this fact’s last review. The fact’s expected recall probability is returned.
+- `updateRecall(prior: tuple, result: bool, tnow: float) -> tuple` produces a new prior model given the result of a quiz (true if successful, false if unsuccessful) and the time between this quiz and the previous one on the same fact.
+
+So your quiz app will store a `prior` model for each fact. Run `predictRecall` on all the facts being learned to see which is most in danger of being forgotten: it’ll be the fact with the smallest returned value. Then after you quiz on that fact, use `updateRecall` and update that fact’s prior model. Repeat this indefinitely.
+
+(In order to work seamlessly with Python2, this library does not use [PEP 484](https://www.python.org/dev/peps/pep-0484/) type hints.)
 
 ## How it works
 
@@ -418,6 +426,8 @@ Finally we have a couple more helper functions in the main `ebisu` namespace. `m
 
 I’ve thought about taking `priorToHalflife` (🏀 below) out of the main `ebisu` namespace because it’s not used by the core algorithm, but rather is for visualization purposes. Given a `model` (as above, a 3-tuple representing a Beta distribution prior on a fact’s recall probability at a specific time after its last review), it runs `predictRecall` over and over in a potentially-time-consuming bracketed search to find the *half-life*, that is, the time between reviews at which the recall probability is 50% (customizable via the `percentile` argument). This bracketed search, Scipy’s sophisticated [Brent’s algorithm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.brentq.html), requires a min and max values to search over and the defaults of `mint=1e-3` and `maxt=100` might not suffice for all cases.
 
+The least important function from a usage point of view is also the most important function for someone getting started with Ebisu: I call it `defaultModel` (🍗 below) and it simply creates a “model” object (a 3-tuple) out of the arguments it’s given. It’s included in the `ebisu` namespace to help developers who totally lack confidence in picking parameters: the only information it absolutely needs is an expected half-life, e.g., four hours or twenty-four hours or however long you expect a newly-learned fact takes to decay to 50% recall.
+
 ```py
 # export ebisu/ebisu.py #
 def meanVarToBeta(mean, var):
@@ -433,9 +443,24 @@ def priorToHalflife(prior, percentile=0.5, maxt=100, mint=1e-3):
   """Find the half-life corresponding to a time-based prior on recall. 🏀"""
   from scipy.optimize import brentq
   return brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
+
+def defaultModel(t, alpha=4.0, beta=None):
+  """Convert recall probability prior's raw parameters into a model object. 🍗
+
+  `t` is your guess as to the half-life of any given fact, in units that you
+  must be consistent with throughout your use of Ebisu.
+
+  `alpha` and `beta` are the parameters of the Beta distribution that describe
+  your beliefs about the recall probability of a fact `t` time units after that
+  fact has been studied/reviewed/quizzed. If they are the same, `t` is a true
+  half-life, and this is a recommended way to create a default model for all
+  newly-learned facts. If `beta` is omitted, it is taken to be the same as
+  `alpha`.
+  """
+  return (alpha, beta or alpha, t)
 ```
 
-With the exception of `priorToHalflife` and `predictRecallVar`, all the above functions are considered core Ebisu functions and any implementation should provide them:
+With the exception of `defaultModel`, `priorToHalflife`, `predictRecallVar`, all the above functions are considered core Ebisu functions and any implementation should provide them:
 - `predictRecall` and
 - `updateRecall`,
 - aided by helper functions

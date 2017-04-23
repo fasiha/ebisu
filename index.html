@@ -165,7 +165,7 @@
 <p><img src="figures/models.png" alt="figures/models.png"></p>
 <p>Under either of these models of recall probability, we can ask Ebisu what the expected half-life is after the student is quizzed on this fact a day, a week, or a month after their last review, and whether they passed or failed the quiz:</p>
 <p><img src="figures/halflife.png" alt="figures/halflife.png"></p>
-<p>If the student correctly answers the quiz, Ebisu expects the new half-life to be greater than a week. If the student answers correctly after just a day, the half-life rises a little bit, since we expected the student to remember this fact that soon after reviewing it. If the student surprises us by <em>failing</em> the quiz just a day after they last reviewed it, the projected half-life drops. The more tentative “α=β=3” model aggressively adjusts the half-life, while the more assured “α=β=12” model is more conservative in its update. (The vertical bars indicate Ebisu’s confidence about the new half-life. The code for these two charts is <a href="#demo-code">below</a>. Finally, each fact has an α and β associated with it and I explain what they mean mathematically in the next section.)</p>
+<p>If the student correctly answers the quiz, Ebisu expects the new half-life to be greater than a week. If the student answers correctly after just a day, the half-life rises a little bit, since we expected the student to remember this fact that soon after reviewing it. If the student surprises us by <em>failing</em> the quiz just a day after they last reviewed it, the projected half-life drops. The more tentative “α=β=3” model aggressively adjusts the half-life, while the more assured “α=β=12” model is more conservative in its update. (Each fact has an α and β associated with it and I explain what they mean mathematically in the next section. Also, the code for these two charts is <a href="#demo-code">below</a>.)</p>
 <p>Similarly, if the student fails the quiz after a whole month of not reviewing it, this isn’t a surprise—the half-life drops a bit from the initial half-life of a week. If she does surprise us, passing the quiz after a month of not studying it, then Ebisu boosts its expectated half-life—by a lot for the “α=β=3” model, less for the “α=β=12” one.</p>
 <blockquote>
 <p>Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how facts are related the way Duolingo can with its sentences. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.</p>
@@ -2295,7 +2295,13 @@ plt.show()</code></pre>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="513"></use>
 </g>
 </g>
-</svg></span>. This might be a helpful value and is computed by <code>predictRecallVar</code> (🍋 below). We evaluate both summands in the log-domain and use a simplification of <code>logsumexp</code> to evaluate the subtraction—this trick uses the following identity to avoid subtracting potentially very large floats: <code>exp(x) - exp(y) = exp(m) * (exp(a-m) - exp(b-m))</code> where <code>m = max(x, y)</code> and where <code>x</code> and <code>y</code> are logs of the two summands. This is basically <code>logsumexp</code> without the final <code>log</code>, so this trick is just “<code>sumexp</code>”.</p>
+</svg></span>. This might be a helpful value and is computed by <code>predictRecallVar</code> (🍋 below). In order to avoid risking catastrophic cancellation by subtracting two potentially large floats (it’d be nice to prove that this will never happen given our <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.423ex" height="2.176ex" style="vertical-align: -0.838ex;" viewBox="0 -576.1 1043.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-143-Title">
+<title id="MathJax-SVG-143-Title">γ_n</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="733" y="-357"></use>
+</g>
+</svg></span>’s but I haven’t yet done so), we use a simplification of <code>logsumexp</code> to evaluate the subtraction—this trick uses the following identity to avoid subtracting potentially very large floats: <code>exp(x) - exp(y) = exp(m) * (exp(a-m) - exp(b-m))</code> where <code>m = max(x, y)</code> and where <code>x</code> and <code>y</code> are logs of the two summands. This is basically <code>logsumexp</code> without the final <code>log</code>, so this trick is called <code>subtractexp</code> (⚾️) below.</p>
 <p>These two functions have the same signature: they consume</p>
 <ul>
 <li>a <code>model</code>: represents the Beta prior on recall probability at one specific time since the fact’s last review, and</li>
@@ -2303,7 +2309,7 @@ plt.show()</code></pre>
 </ul>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/ebisu.py #</span>
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecall</span><span class="hljs-params">(prior, tnow)</span>:</span>
-  <span class="hljs-string">"""Expected recall probability now, given a prior distribution on it 🍏
+  <span class="hljs-string">"""Expected recall probability now, given a prior distribution on it. 🍏
 
   `prior` is a tuple representing the prior distribution on recall probability
   after a specific unit of time has elapsed since this fact's last review.
@@ -2327,15 +2333,25 @@ plt.show()</code></pre>
           gammaln(alpha) - gammaln(alpha + beta)))
 
 
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">subtractexp</span><span class="hljs-params">(x, y)</span>:</span>
+  <span class="hljs-string">"""Evaluates exp(x) - exp(y) a bit more accurately than that. ⚾️
+
+  This can avoid cancellation in case `x` and `y` are both large and close,
+  similar to scipy.misc.logsumexp except without the last log.
+  """</span>
+  <span class="hljs-keyword">from</span> numpy <span class="hljs-keyword">import</span> exp, maximum
+  maxval = maximum(x, y)
+  <span class="hljs-keyword">return</span> exp(maxval) * (exp(x - maxval) - exp(y - maxval))
+
+
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">predictRecallVar</span><span class="hljs-params">(prior, tnow)</span>:</span>
-  <span class="hljs-string">"""Variance of recall probability now 🍋
+  <span class="hljs-string">"""Variance of recall probability now. 🍋
 
   This function returns the variance of the distribution whose mean is given by
   `ebisu.predictRecall`. See it's documentation for details.
 
   Returns a float.
   """</span>
-  <span class="hljs-keyword">from</span> numpy <span class="hljs-keyword">import</span> exp
   <span class="hljs-keyword">from</span> scipy.special <span class="hljs-keyword">import</span> gammaln
   alpha, beta, t = prior
   dt = tnow / t
@@ -2345,8 +2361,7 @@ plt.show()</code></pre>
   md = <span class="hljs-number">2</span> * (s[<span class="hljs-number">1</span>] - s[<span class="hljs-number">0</span>])
   md2 = s[<span class="hljs-number">2</span>] - s[<span class="hljs-number">0</span>]
 
-  maxval = max(md, md2)
-  <span class="hljs-keyword">return</span> exp(maxval) * (exp(md2 - maxval) - exp(md - maxval))</code></pre>
+  <span class="hljs-keyword">return</span> subtractexp(md2, md)</code></pre>
 <p>Next is the implementation of <code>updateRecall</code> (🍌), which accepts</p>
 <ul>
 <li>a <code>model</code> (as above, represents the Beta prior on recall probability at one specific time since the fact’s last review),</li>
@@ -2356,8 +2371,8 @@ plt.show()</code></pre>
 <p>and returns a <em>new</em> model, representing an updated Beta prior on recall probability, this time after <code>tnow</code> time has elapsed since a fact was quizzed.</p>
 <p><strong>In case of successful quiz</strong> <code>updateRecall</code> analytically computes the true posterior’s</p>
 <ul>
-<li>mean (expectation) <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.679ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 2445.3 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-143-Title">
-<title id="MathJax-SVG-143-Title">γ_2 / γ_1</title>
+<li>mean (expectation) <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.679ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 2445.3 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-144-Title">
+<title id="MathJax-SVG-144-Title">γ_2 / γ_1</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
@@ -2368,8 +2383,8 @@ plt.show()</code></pre>
 </g>
 </g>
 </svg></span>, which can be evaluated completely in the log domain, and</li>
-<li>variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="21.86ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 9411.7 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-144-Title">
-<title id="MathJax-SVG-144-Title">γ_3 / γ_1 - (E[p|x=1])^2</title>
+<li>variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="21.86ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 9411.7 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-145-Title">
+<title id="MathJax-SVG-145-Title">γ_3 / γ_1 - (E[p|x=1])^2</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-33" x="733" y="-357"></use>
@@ -2393,10 +2408,10 @@ plt.show()</code></pre>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="513"></use>
 </g>
 </g>
-</svg></span>, which as the previous variance we evaluate in the log domain and convert back to real numbers before subtracting,
+</svg></span>, which as the previous variance we evaluate in the log domain and use <code>subtractexp</code> (⚾️ above) to avoid cancellation errors,
 <ul>
-<li>where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.232ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 14738.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-145-Title">
-<title id="MathJax-SVG-145-Title">γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)</title>
+<li>where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.232ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 14738.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-146-Title">
+<title id="MathJax-SVG-146-Title">γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="733" y="-357"></use>
@@ -2426,8 +2441,8 @@ plt.show()</code></pre>
 </ul>
 <p><strong>In case of unsuccessful quiz</strong> these values are</p>
 <ul>
-<li>mean <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="19.496ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 8394 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-146-Title">
-<title id="MathJax-SVG-146-Title">(γ_2 - γ_1) / (γ_1 - γ_0)</title>
+<li>mean <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="19.496ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 8394 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-147-Title">
+<title id="MathJax-SVG-147-Title">(γ_2 - γ_1) / (γ_1 - γ_0)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-28" x="0" y="0"></use>
 <g transform="translate(389,0)">
@@ -2454,8 +2469,8 @@ plt.show()</code></pre>
  <use xlink:href="#MJMAIN-29" x="8004" y="0"></use>
 </g>
 </svg></span>, which we rewrite to remain in the log domain and use a ratio of two <code>expm1</code>s, which accurately evaluates <code>exp(x) - 1</code>—recall that subtraction with large floating-point numbers is more risky than division; and</li>
-<li>variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="49.081ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 21132.1 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-147-Title">
-<title id="MathJax-SVG-147-Title">(γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2) / (γ_1 - γ_0)^2</title>
+<li>variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="49.081ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 21132.1 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-148-Title">
+<title id="MathJax-SVG-148-Title">(γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2) / (γ_1 - γ_0)^2</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-28" x="0" y="0"></use>
 <g transform="translate(389,0)">
@@ -2520,18 +2535,18 @@ plt.show()</code></pre>
 </svg></span>. This we evaluate with a sequence of <em>four</em> <code>logsumexp</code>s to minimize risk of floating-point precision loss.</li>
 </ul>
 <blockquote>
-<p>Recall that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.488ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 640.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-148-Title">
-<title id="MathJax-SVG-148-Title">α</title>
+<p>Recall that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.488ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 640.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-149-Title">
+<title id="MathJax-SVG-149-Title">α</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
 </g>
-</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.332ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 573.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-149-Title">
-<title id="MathJax-SVG-149-Title">β</title>
+</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.332ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 573.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-150-Title">
+<title id="MathJax-SVG-150-Title">β</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
 </g>
-</svg></span> come from the model representing the prior, while <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-150-Title">
-<title id="MathJax-SVG-150-Title">δ = t / t_{now}</title>
+</svg></span> come from the model representing the prior, while <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-151-Title">
+<title id="MathJax-SVG-151-Title">δ = t / t_{now}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
@@ -2546,13 +2561,13 @@ plt.show()</code></pre>
 </g>
 </g>
 </g>
-</svg></span> depends on both <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-151-Title">
-<title id="MathJax-SVG-151-Title">t</title>
+</svg></span> depends on both <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-152-Title">
+<title id="MathJax-SVG-152-Title">t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
 </g>
-</svg></span> (from the model) and the actual time since the previous quiz <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.032ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 1736.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-152-Title">
-<title id="MathJax-SVG-152-Title">t_{now}</title>
+</svg></span> (from the model) and the actual time since the previous quiz <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.032ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 1736.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-153-Title">
+<title id="MathJax-SVG-153-Title">t_{now}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
 <g transform="translate(361,-150)">
@@ -2563,9 +2578,10 @@ plt.show()</code></pre>
 </g>
 </svg></span>.</p>
 </blockquote>
+<p>After the mean and variance are evaluated, these are converted to a Beta distribution. We’ll talk about that after this code block.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/ebisu.py #</span>
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">updateRecall</span><span class="hljs-params">(prior, result, tnow)</span>:</span>
-  <span class="hljs-string">"""Update a prior on recall probability with a quiz result and time 🍌
+  <span class="hljs-string">"""Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
   representing a prior distribution on recall probability at some specific time
@@ -2591,16 +2607,15 @@ plt.show()</code></pre>
     same = gammaln(alpha + beta + dt) - gammaln(alpha + dt)
     muln = gammaln(alpha + <span class="hljs-number">2</span> * dt) - gammaln(alpha + beta + <span class="hljs-number">2</span> * dt) + same
     mu = exp(muln)
-    var = exp(same + gammaln(alpha + <span class="hljs-number">3</span> * dt) -
-              gammaln(alpha + beta + <span class="hljs-number">3</span> * dt)) - exp(<span class="hljs-number">2</span> * muln)
+    var = subtractexp(
+        same + gammaln(alpha + <span class="hljs-number">3</span> * dt) - gammaln(alpha + beta + <span class="hljs-number">3</span> * dt),
+        <span class="hljs-number">2</span> * muln)
   <span class="hljs-keyword">else</span>:
     <span class="hljs-comment"># Mathematica code is same as above, but replace one `p` with `(1-p)`</span>
     <span class="hljs-comment"># marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`</span>
     <span class="hljs-comment"># mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`</span>
     <span class="hljs-comment"># var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`</span>
     <span class="hljs-comment"># Then simplify and combine</span>
-
-    <span class="hljs-comment"># Caveat <span class="hljs-doctag">TODO:</span> if alpha+beta &gt; 1e-14 and alpha+beta+3*dt &lt; 17, we could just evaluate `gamma` directly, rather than gammaln+expm1+logsumexp. Is it worth it?</span>
 
     <span class="hljs-keyword">from</span> scipy.misc <span class="hljs-keyword">import</span> logsumexp
     <span class="hljs-keyword">from</span> numpy <span class="hljs-keyword">import</span> expm1
@@ -2626,10 +2641,12 @@ plt.show()</code></pre>
     var = exp(n[<span class="hljs-number">0</span>] - d[<span class="hljs-number">0</span>])
 
   newAlpha, newBeta = meanVarToBeta(mu, var)
-  <span class="hljs-keyword">return</span> newAlpha, newBeta, tnow
-
-
+  <span class="hljs-keyword">return</span> newAlpha, newBeta, tnow</code></pre>
+<p>Finally we have a couple more helper functions in the main <code>ebisu</code> namespace. <code>meanVarToBeta</code> (🏈 below) uses simple algebra to <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">fit a Beta distribution</a> to a mean and variance—it’s used in <code>updateRecall</code>.</p>
+<p>I’ve thought about taking <code>priorToHalflife</code> (🏀 below) out of the main <code>ebisu</code> namespace because it’s not used by the core algorithm, but rather is for visualization purposes. Given a <code>model</code> (as above, a 3-tuple representing a Beta distribution prior on a fact’s recall probability at a specific time after its last review), it runs <code>predictRecall</code> over and over in a potentially-time-consuming bracketed search to find the <em>half-life</em>, that is, the time between reviews at which the recall probability is 50% (customizable via the <code>percentile</code> argument). This bracketed search, Scipy’s sophisticated <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.brentq.html">Brent’s algorithm</a>, requires a min and max values to search over and the defaults of <code>mint=1e-3</code> and <code>maxt=100</code> might not suffice for all cases.</p>
+<pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/ebisu.py #</span>
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">meanVarToBeta</span><span class="hljs-params">(mean, var)</span>:</span>
+  <span class="hljs-string">"""Fit a Beta distribution to a mean and variance. 🏈"""</span>
   <span class="hljs-comment"># [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters</span>
   tmp = mean * (<span class="hljs-number">1</span> - mean) / var - <span class="hljs-number">1</span>
   alpha = mean * tmp
@@ -2638,20 +2655,20 @@ plt.show()</code></pre>
 
 
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">priorToHalflife</span><span class="hljs-params">(prior, percentile=<span class="hljs-number">0.5</span>, maxt=<span class="hljs-number">100</span>, mint=<span class="hljs-number">1e-3</span>)</span>:</span>
+  <span class="hljs-string">"""Find the half-life corresponding to a time-based prior on recall. 🏀"""</span>
   <span class="hljs-keyword">from</span> scipy.optimize <span class="hljs-keyword">import</span> brentq
-  h = brentq(<span class="hljs-keyword">lambda</span> now: predictRecall(prior, now) - percentile, mint, maxt)
-  <span class="hljs-comment"># `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.</span>
-  <span class="hljs-comment"># To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that.</span>
-  <span class="hljs-comment"># This 'variance' number should not be taken seriously, but it can be used for notional plotting.</span>
-  v = predictRecallVar(prior, h)
-
-  <span class="hljs-keyword">from</span> scipy.stats <span class="hljs-keyword">import</span> beta <span class="hljs-keyword">as</span> fbeta
-  lo, hi = fbeta.interval(<span class="hljs-number">.68</span>, *meanVarToBeta(percentile, v))
-
-  h2 = brentq(<span class="hljs-keyword">lambda</span> now: predictRecall(prior, now) - lo, mint, maxt)
-  h3 = brentq(<span class="hljs-keyword">lambda</span> now: predictRecall(prior, now) - hi, mint, maxt)
-
-  <span class="hljs-keyword">return</span> h, ((abs(h2 - h) + abs(h3 - h)) / <span class="hljs-number">2</span>)**<span class="hljs-number">2</span></code></pre>
+  <span class="hljs-keyword">return</span> brentq(<span class="hljs-keyword">lambda</span> now: predictRecall(prior, now) - percentile, mint, maxt)</code></pre>
+<p>With the exception of <code>priorToHalflife</code> and <code>predictRecallVar</code>, all the above functions are considered core Ebisu functions and any implementation should provide them:</p>
+<ul>
+<li><code>predictRecall</code> and</li>
+<li><code>updateRecall</code>,</li>
+<li>aided by helper functions
+<ul>
+<li><code>meanVarToBeta</code> and</li>
+<li><code>subtractexp</code>.</li>
+</ul></li>
+</ul>
+<p>The functions in the following section are either for illustrative or debugging purposes.</p>
 <h3 id="alternate-ways-of-evaluating-the-same-results-as-above">Alternate ways of evaluating the same results as above</h3>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/alternate.py #</span>
 <span class="hljs-keyword">from</span> .ebisu <span class="hljs-keyword">import</span> meanVarToBeta</code></pre>
@@ -2896,6 +2913,7 @@ ts = np.arange(<span class="hljs-number">1</span>, <span class="hljs-number">31.
 ps = np.linspace(<span class="hljs-number">0</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">200</span>)
 ablist = [<span class="hljs-number">3</span>, <span class="hljs-number">12</span>]
 
+plt.close(<span class="hljs-string">'all'</span>)
 plt.figure()
 [
     plt.plot(
@@ -2915,16 +2933,17 @@ plt.show()
 plt.figure()
 ax = plt.subplot(<span class="hljs-number">111</span>)
 plt.axhline(y=t0, linewidth=<span class="hljs-number">1</span>, color=<span class="hljs-string">'0.5'</span>)
-[plt.errorbar(ts,
-          np.array(list(map(<span class="hljs-keyword">lambda</span> t: priorToHalflife(updateRecall((a, a, t0), xobs, t))[<span class="hljs-number">0</span>],
-                            ts))),
-          v2s(np.array(list(map(<span class="hljs-keyword">lambda</span> t: priorToHalflife(updateRecall((a, a, t0), xobs, t))[<span class="hljs-number">1</span>],
-                            ts)))),
-          marker=<span class="hljs-string">'x'</span> <span class="hljs-keyword">if</span> xobs == <span class="hljs-number">1</span> <span class="hljs-keyword">else</span> <span class="hljs-string">'o'</span>,
-          color=<span class="hljs-string">'C{}'</span>.format(aidx),
-          label=<span class="hljs-string">'α=β={}, {}'</span>.format(a, <span class="hljs-string">'pass'</span> <span class="hljs-keyword">if</span> xobs==<span class="hljs-number">1</span> <span class="hljs-keyword">else</span> <span class="hljs-string">'fail'</span>))
- <span class="hljs-keyword">for</span> (aidx, a) <span class="hljs-keyword">in</span> enumerate(ablist)
- <span class="hljs-keyword">for</span> xobs <span class="hljs-keyword">in</span> [<span class="hljs-number">1</span>, <span class="hljs-number">0</span>]]
+[
+    plt.plot(
+        ts,
+        list(
+            map(<span class="hljs-keyword">lambda</span> t: priorToHalflife(updateRecall((a, a, t0), xobs, t)),
+                ts)),
+        marker=<span class="hljs-string">'x'</span> <span class="hljs-keyword">if</span> xobs == <span class="hljs-number">1</span> <span class="hljs-keyword">else</span> <span class="hljs-string">'o'</span>,
+        color=<span class="hljs-string">'C{}'</span>.format(aidx),
+        label=<span class="hljs-string">'α=β={}, {}'</span>.format(a, <span class="hljs-string">'pass'</span> <span class="hljs-keyword">if</span> xobs == <span class="hljs-number">1</span> <span class="hljs-keyword">else</span> <span class="hljs-string">'fail'</span>))
+    <span class="hljs-keyword">for</span> (aidx, a) <span class="hljs-keyword">in</span> enumerate(ablist) <span class="hljs-keyword">for</span> xobs <span class="hljs-keyword">in</span> [<span class="hljs-number">1</span>, <span class="hljs-number">0</span>]
+]
 plt.legend(loc=<span class="hljs-number">0</span>)
 plt.title(<span class="hljs-string">'New half-life (previously {:0.0f} days)'</span>.format(t0))
 plt.xlabel(<span class="hljs-string">'Time of test (days after previous test)'</span>)
@@ -2945,7 +2964,7 @@ plt.errorbar(
     fmt=<span class="hljs-string">'.-'</span>,
     label=<span class="hljs-string">'Model A'</span>,
     color=<span class="hljs-string">'C0'</span>)
-plt.plot(ts, <span class="hljs-number">2</span>**(-ts / hlA[<span class="hljs-number">0</span>]), <span class="hljs-string">'--'</span>, label=<span class="hljs-string">'approx A'</span>, color=<span class="hljs-string">'C0'</span>)
+plt.plot(ts, <span class="hljs-number">2</span>**(-ts / hlA), <span class="hljs-string">'--'</span>, label=<span class="hljs-string">'approx A'</span>, color=<span class="hljs-string">'C0'</span>)
 plt.errorbar(
     ts,
     predictRecall(modelB, ts),
@@ -2953,7 +2972,7 @@ plt.errorbar(
     fmt=<span class="hljs-string">'.-'</span>,
     label=<span class="hljs-string">'Model B'</span>,
     color=<span class="hljs-string">'C1'</span>)
-plt.plot(ts, <span class="hljs-number">2</span>**(-ts / hlB[<span class="hljs-number">0</span>]), <span class="hljs-string">'--'</span>, label=<span class="hljs-string">'approx B'</span>, color=<span class="hljs-string">'C1'</span>)
+plt.plot(ts, <span class="hljs-number">2</span>**(-ts / hlB), <span class="hljs-string">'--'</span>, label=<span class="hljs-string">'approx B'</span>, color=<span class="hljs-string">'C1'</span>)
 plt.legend(loc=<span class="hljs-number">0</span>)
 plt.ylim([<span class="hljs-number">0</span>, <span class="hljs-number">1</span>])
 plt.grid(<span class="hljs-keyword">True</span>)

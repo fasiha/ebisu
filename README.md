@@ -75,7 +75,7 @@ Under either of these models of recall probability, we can ask Ebisu what the ex
 
 ![figures/halflife.png](figures/halflife.png)
 
-If the student correctly answers the quiz, Ebisu expects the new half-life to be greater than a week. If the student answers correctly after just a day, the half-life rises a little bit, since we expected the student to remember this fact that soon after reviewing it. If the student surprises us by *failing* the quiz just a day after they last reviewed it, the projected half-life drops. The more tentative “α=β=3” model aggressively adjusts the half-life, while the more assured “α=β=12” model is more conservative in its update. (The vertical bars indicate Ebisu’s confidence about the new half-life. The code for these two charts is [below](#demo-code). Finally, each fact has an α and β associated with it and I explain what they mean mathematically in the next section.)
+If the student correctly answers the quiz, Ebisu expects the new half-life to be greater than a week. If the student answers correctly after just a day, the half-life rises a little bit, since we expected the student to remember this fact that soon after reviewing it. If the student surprises us by *failing* the quiz just a day after they last reviewed it, the projected half-life drops. The more tentative “α=β=3” model aggressively adjusts the half-life, while the more assured “α=β=12” model is more conservative in its update. (Each fact has an α and β associated with it and I explain what they mean mathematically in the next section. Also, the code for these two charts is [below](#demo-code).)
 
 Similarly, if the student fails the quiz after a whole month of not reviewing it, this isn’t a surprise—the half-life drops a bit from the initial half-life of a week. If she does surprise us, passing the quiz after a month of not studying it, then Ebisu boosts its expectated half-life—by a lot for the “α=β=3” model, less for the “α=β=12” one.
 
@@ -264,7 +264,7 @@ Let’s present our Python implementation of the core Ebisu functions, `predictR
 
 In the [math section](#mean-and-variance-of-the-recall-probability-right-now) above we derived the mean recall probability at time \\(t_{now} = t · δ\\) given a model \\(α, β, t\\): \\(E[p_t^δ] = Γ(α + β) · Γ(α) / (Γ(α + δ) · Γ(α + β + δ))\\). There are no sums-of-gammas here, so this is readily computed using log-gamma routine (`gammaln` in Scipy) to avoid overflowing and precision-loss in `predictRecall` (🍏 below).
 
-We also derived the variance, \\(Var[p_t^δ] = E[p_t^{2 δ}] - (E[p_t^δ])^2\\). This might be a helpful value and is computed by `predictRecallVar` (🍋 below). We evaluate both summands in the log-domain and use a simplification of `logsumexp` to evaluate the subtraction—this trick uses the following identity to avoid subtracting potentially very large floats: `exp(x) - exp(y) = exp(m) * (exp(a-m) - exp(b-m))` where `m = max(x, y)` and where `x` and `y` are logs of the two summands. This is basically `logsumexp` without the final `log`, so this trick is just “`sumexp`”.
+We also derived the variance, \\(Var[p_t^δ] = E[p_t^{2 δ}] - (E[p_t^δ])^2\\). This might be a helpful value and is computed by `predictRecallVar` (🍋 below). In order to avoid risking catastrophic cancellation by subtracting two potentially large floats (it’d be nice to prove that this will never happen given our \\(γ_n\\)’s but I haven’t yet done so), we use a simplification of `logsumexp` to evaluate the subtraction—this trick uses the following identity to avoid subtracting potentially very large floats: `exp(x) - exp(y) = exp(m) * (exp(a-m) - exp(b-m))` where `m = max(x, y)` and where `x` and `y` are logs of the two summands. This is basically `logsumexp` without the final `log`, so this trick is called `subtractexp` (⚾️) below.
 
 These two functions have the same signature: they consume
 - a `model`: represents the Beta prior on recall probability at one specific time since the fact’s last review, and
@@ -273,7 +273,7 @@ These two functions have the same signature: they consume
 ```py
 # export ebisu/ebisu.py #
 def predictRecall(prior, tnow):
-  """Expected recall probability now, given a prior distribution on it 🍏
+  """Expected recall probability now, given a prior distribution on it. 🍏
 
   `prior` is a tuple representing the prior distribution on recall probability
   after a specific unit of time has elapsed since this fact's last review.
@@ -297,15 +297,25 @@ def predictRecall(prior, tnow):
           gammaln(alpha) - gammaln(alpha + beta)))
 
 
+def subtractexp(x, y):
+  """Evaluates exp(x) - exp(y) a bit more accurately than that. ⚾️
+
+  This can avoid cancellation in case `x` and `y` are both large and close,
+  similar to scipy.misc.logsumexp except without the last log.
+  """
+  from numpy import exp, maximum
+  maxval = maximum(x, y)
+  return exp(maxval) * (exp(x - maxval) - exp(y - maxval))
+
+
 def predictRecallVar(prior, tnow):
-  """Variance of recall probability now 🍋
+  """Variance of recall probability now. 🍋
 
   This function returns the variance of the distribution whose mean is given by
   `ebisu.predictRecall`. See it's documentation for details.
 
   Returns a float.
   """
-  from numpy import exp
   from scipy.special import gammaln
   alpha, beta, t = prior
   dt = tnow / t
@@ -315,8 +325,7 @@ def predictRecallVar(prior, tnow):
   md = 2 * (s[1] - s[0])
   md2 = s[2] - s[0]
 
-  maxval = max(md, md2)
-  return exp(maxval) * (exp(md2 - maxval) - exp(md - maxval))
+  return subtractexp(md2, md)
 ```
 
 Next is the implementation of `updateRecall` (🍌), which accepts
@@ -328,7 +337,7 @@ and returns a *new* model, representing an updated Beta prior on recall probabil
 
 **In case of successful quiz** `updateRecall` analytically computes the true posterior’s
 - mean (expectation) \\(γ_2 / γ_1\\), which can be evaluated completely in the log domain, and
-- variance \\(γ_3 / γ_1 - (E[p|x=1])^2\\), which as the previous variance we evaluate in the log domain and convert back to real numbers before subtracting,
+- variance \\(γ_3 / γ_1 - (E[p|x=1])^2\\), which as the previous variance we evaluate in the log domain and use `subtractexp` (⚾️ above) to avoid cancellation errors,
     - where \\(γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)\\).
 
 **In case of unsuccessful quiz** these values are
@@ -337,10 +346,12 @@ and returns a *new* model, representing an updated Beta prior on recall probabil
 
 > Recall that \\(α\\) and \\(β\\) come from the model representing the prior, while \\(δ = t / t_{now}\\) depends on both \\(t\\) (from the model) and the actual time since the previous quiz \\(t_{now}\\).
 
+After the mean and variance are evaluated, these are converted to a Beta distribution. We’ll talk about that after this code block.
+
 ```py
 # export ebisu/ebisu.py #
 def updateRecall(prior, result, tnow):
-  """Update a prior on recall probability with a quiz result and time 🍌
+  """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
   representing a prior distribution on recall probability at some specific time
@@ -366,16 +377,15 @@ def updateRecall(prior, result, tnow):
     same = gammaln(alpha + beta + dt) - gammaln(alpha + dt)
     muln = gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt) + same
     mu = exp(muln)
-    var = exp(same + gammaln(alpha + 3 * dt) -
-              gammaln(alpha + beta + 3 * dt)) - exp(2 * muln)
+    var = subtractexp(
+        same + gammaln(alpha + 3 * dt) - gammaln(alpha + beta + 3 * dt),
+        2 * muln)
   else:
     # Mathematica code is same as above, but replace one `p` with `(1-p)`
     # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
     # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
     # var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
     # Then simplify and combine
-
-    # Caveat TODO: if alpha+beta > 1e-14 and alpha+beta+3*dt < 17, we could just evaluate `gamma` directly, rather than gammaln+expm1+logsumexp. Is it worth it?
 
     from scipy.misc import logsumexp
     from numpy import expm1
@@ -402,9 +412,16 @@ def updateRecall(prior, result, tnow):
 
   newAlpha, newBeta = meanVarToBeta(mu, var)
   return newAlpha, newBeta, tnow
+```
 
+Finally we have a couple more helper functions in the main `ebisu` namespace. `meanVarToBeta` (🏈 below) uses simple algebra to [fit a Beta distribution](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) to a mean and variance—it’s used in `updateRecall`.
 
+I’ve thought about taking `priorToHalflife` (🏀 below) out of the main `ebisu` namespace because it’s not used by the core algorithm, but rather is for visualization purposes. Given a `model` (as above, a 3-tuple representing a Beta distribution prior on a fact’s recall probability at a specific time after its last review), it runs `predictRecall` over and over in a potentially-time-consuming bracketed search to find the *half-life*, that is, the time between reviews at which the recall probability is 50% (customizable via the `percentile` argument). This bracketed search, Scipy’s sophisticated [Brent’s algorithm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.brentq.html), requires a min and max values to search over and the defaults of `mint=1e-3` and `maxt=100` might not suffice for all cases.
+
+```py
+# export ebisu/ebisu.py #
 def meanVarToBeta(mean, var):
+  """Fit a Beta distribution to a mean and variance. 🏈"""
   # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
   tmp = mean * (1 - mean) / var - 1
   alpha = mean * tmp
@@ -413,21 +430,19 @@ def meanVarToBeta(mean, var):
 
 
 def priorToHalflife(prior, percentile=0.5, maxt=100, mint=1e-3):
+  """Find the half-life corresponding to a time-based prior on recall. 🏀"""
   from scipy.optimize import brentq
-  h = brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
-  # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.
-  # To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that.
-  # This 'variance' number should not be taken seriously, but it can be used for notional plotting.
-  v = predictRecallVar(prior, h)
-
-  from scipy.stats import beta as fbeta
-  lo, hi = fbeta.interval(.68, *meanVarToBeta(percentile, v))
-
-  h2 = brentq(lambda now: predictRecall(prior, now) - lo, mint, maxt)
-  h3 = brentq(lambda now: predictRecall(prior, now) - hi, mint, maxt)
-
-  return h, ((abs(h2 - h) + abs(h3 - h)) / 2)**2
+  return brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
 ```
+
+With the exception of `priorToHalflife` and `predictRecallVar`, all the above functions are considered core Ebisu functions and any implementation should provide them:
+- `predictRecall` and
+- `updateRecall`,
+- aided by helper functions
+    - `meanVarToBeta` and
+    - `subtractexp`.
+
+The functions in the following section are either for illustrative or debugging purposes.
 
 ### Alternate ways of evaluating the same results as above
 ```py
@@ -690,6 +705,7 @@ ts = np.arange(1, 31.)
 ps = np.linspace(0, 1., 200)
 ablist = [3, 12]
 
+plt.close('all')
 plt.figure()
 [
     plt.plot(
@@ -709,16 +725,17 @@ plt.show()
 plt.figure()
 ax = plt.subplot(111)
 plt.axhline(y=t0, linewidth=1, color='0.5')
-[plt.errorbar(ts,
-          np.array(list(map(lambda t: priorToHalflife(updateRecall((a, a, t0), xobs, t))[0],
-                            ts))),
-          v2s(np.array(list(map(lambda t: priorToHalflife(updateRecall((a, a, t0), xobs, t))[1],
-                            ts)))),
-          marker='x' if xobs == 1 else 'o',
-          color='C{}'.format(aidx),
-          label='α=β={}, {}'.format(a, 'pass' if xobs==1 else 'fail'))
- for (aidx, a) in enumerate(ablist)
- for xobs in [1, 0]]
+[
+    plt.plot(
+        ts,
+        list(
+            map(lambda t: priorToHalflife(updateRecall((a, a, t0), xobs, t)),
+                ts)),
+        marker='x' if xobs == 1 else 'o',
+        color='C{}'.format(aidx),
+        label='α=β={}, {}'.format(a, 'pass' if xobs == 1 else 'fail'))
+    for (aidx, a) in enumerate(ablist) for xobs in [1, 0]
+]
 plt.legend(loc=0)
 plt.title('New half-life (previously {:0.0f} days)'.format(t0))
 plt.xlabel('Time of test (days after previous test)')
@@ -743,7 +760,7 @@ plt.errorbar(
     fmt='.-',
     label='Model A',
     color='C0')
-plt.plot(ts, 2**(-ts / hlA[0]), '--', label='approx A', color='C0')
+plt.plot(ts, 2**(-ts / hlA), '--', label='approx A', color='C0')
 plt.errorbar(
     ts,
     predictRecall(modelB, ts),
@@ -751,7 +768,7 @@ plt.errorbar(
     fmt='.-',
     label='Model B',
     color='C1')
-plt.plot(ts, 2**(-ts / hlB[0]), '--', label='approx B', color='C1')
+plt.plot(ts, 2**(-ts / hlB), '--', label='approx B', color='C1')
 plt.legend(loc=0)
 plt.ylim([0, 1])
 plt.grid(True)

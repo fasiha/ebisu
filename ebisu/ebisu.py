@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 def predictRecall(prior, tnow):
-  """Expected recall probability now, given a prior distribution on it 🍏
+  """Expected recall probability now, given a prior distribution on it. 🍏
 
   `prior` is a tuple representing the prior distribution on recall probability
   after a specific unit of time has elapsed since this fact's last review.
@@ -25,15 +25,25 @@ def predictRecall(prior, tnow):
           gammaln(alpha) - gammaln(alpha + beta)))
 
 
+def subtractexp(x, y):
+  """Evaluates exp(x) - exp(y) a bit more accurately than that. ⚾️
+
+  This can avoid cancellation in case `x` and `y` are both large and close,
+  similar to scipy.misc.logsumexp except without the last log.
+  """
+  from numpy import exp, maximum
+  maxval = maximum(x, y)
+  return exp(maxval) * (exp(x - maxval) - exp(y - maxval))
+
+
 def predictRecallVar(prior, tnow):
-  """Variance of recall probability now 🍋
+  """Variance of recall probability now. 🍋
 
   This function returns the variance of the distribution whose mean is given by
   `ebisu.predictRecall`. See it's documentation for details.
 
   Returns a float.
   """
-  from numpy import exp
   from scipy.special import gammaln
   alpha, beta, t = prior
   dt = tnow / t
@@ -43,10 +53,9 @@ def predictRecallVar(prior, tnow):
   md = 2 * (s[1] - s[0])
   md2 = s[2] - s[0]
 
-  maxval = max(md, md2)
-  return exp(maxval) * (exp(md2 - maxval) - exp(md - maxval))
+  return subtractexp(md2, md)
 def updateRecall(prior, result, tnow):
-  """Update a prior on recall probability with a quiz result and time 🍌
+  """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
   representing a prior distribution on recall probability at some specific time
@@ -72,16 +81,15 @@ def updateRecall(prior, result, tnow):
     same = gammaln(alpha + beta + dt) - gammaln(alpha + dt)
     muln = gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt) + same
     mu = exp(muln)
-    var = exp(same + gammaln(alpha + 3 * dt) -
-              gammaln(alpha + beta + 3 * dt)) - exp(2 * muln)
+    var = subtractexp(
+        same + gammaln(alpha + 3 * dt) - gammaln(alpha + beta + 3 * dt),
+        2 * muln)
   else:
     # Mathematica code is same as above, but replace one `p` with `(1-p)`
     # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
     # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
     # var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
     # Then simplify and combine
-
-    # Caveat TODO: if alpha+beta > 1e-14 and alpha+beta+3*dt < 17, we could just evaluate `gamma` directly, rather than gammaln+expm1+logsumexp. Is it worth it?
 
     from scipy.misc import logsumexp
     from numpy import expm1
@@ -108,9 +116,8 @@ def updateRecall(prior, result, tnow):
 
   newAlpha, newBeta = meanVarToBeta(mu, var)
   return newAlpha, newBeta, tnow
-
-
 def meanVarToBeta(mean, var):
+  """Fit a Beta distribution to a mean and variance. 🏈"""
   # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
   tmp = mean * (1 - mean) / var - 1
   alpha = mean * tmp
@@ -119,17 +126,6 @@ def meanVarToBeta(mean, var):
 
 
 def priorToHalflife(prior, percentile=0.5, maxt=100, mint=1e-3):
+  """Find the half-life corresponding to a time-based prior on recall. 🏀"""
   from scipy.optimize import brentq
-  h = brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
-  # `h` is the expected half-life, i.e., the time at which recall probability drops to 0.5.
-  # To get the variance about this half-life, we have to convert probability variance (around 0.5) to a time variance. This is a really dumb way to do that.
-  # This 'variance' number should not be taken seriously, but it can be used for notional plotting.
-  v = predictRecallVar(prior, h)
-
-  from scipy.stats import beta as fbeta
-  lo, hi = fbeta.interval(.68, *meanVarToBeta(percentile, v))
-
-  h2 = brentq(lambda now: predictRecall(prior, now) - lo, mint, maxt)
-  h3 = brentq(lambda now: predictRecall(prior, now) - hi, mint, maxt)
-
-  return h, ((abs(h2 - h) + abs(h3 - h)) / 2)**2
+  return brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)

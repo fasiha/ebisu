@@ -8,6 +8,31 @@
 - [PyPI package](https://pypi.python.org/pypi/ebisu/)
 - [Contact](https://fasiha.github.io/#contact)
 
+### Table of contents
+
+<!-- TOC depthFrom:2 depthTo:3 withLinks:1 updateOnSave:1 orderedList:0 -->
+
+- [Important links](#important-links)
+	- [Table of contents](#table-of-contents)
+- [Introduction](#introduction)
+- [TL;DR](#tldr)
+- [How it works](#how-it-works)
+- [The math](#the-math)
+	- [Bernoulli quizzes](#bernoulli-quizzes)
+	- [Moving Beta distributions through time](#moving-beta-distributions-through-time)
+	- [Mean and variance of the recall probability right now](#mean-and-variance-of-the-recall-probability-right-now)
+	- [Choice of initial model parameters](#choice-of-initial-model-parameters)
+	- [Updating the posterior with quiz results](#updating-the-posterior-with-quiz-results)
+- [Source code](#source-code)
+	- [Core library](#core-library)
+	- [Miscellaneous functions](#miscellaneous-functions)
+	- [Test code](#test-code)
+	- [Demo code](#demo-code)
+- [Requirements for building all aspects of this repo](#requirements-for-building-all-aspects-of-this-repo)
+- [Acknowledgements](#acknowledgements)
+
+<!-- /TOC -->
+
 ## Introduction
 
 Consider a student memorizing a set of facts.
@@ -190,7 +215,7 @@ So far we have found three analytical expressions. Suffice it to say that I test
 
 A quiz app can implement at least the expectation \\(E[p_t^δ]\\) above to identify the facts most at risk of being forgotten.
 
-### Initial choice for \\(α\\), \\(β\\), and \\(t\\)
+### Choice of initial model parameters
 Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple \\([α, β, t]\\) initially, for example when the student has first learned a fact. I propose setting \\(t\\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \\(t\\) to four hours or a day, respectively. Then, set \\(α = β ≥ 2\\): the \\(α = β\\) part will center the Beta distribution for \\(p_t\\) at 0.5, and then the actual value will constrain the variability of \\(p_t\\). Specifically, the \\(Beta(α, β)\\) distribution has
 - mean \\(α / (α + β)\\) or \\(0.5\\) if \\(α = β\\), and
 - variance \\(α · β / (α + β)^ 2 / (α + β + 1)\\) which simplifies to \\(1/(4 (2 α + 1))\\) when \\(α = β\\).
@@ -922,12 +947,6 @@ plt.show()
 
 I think this speaks to the surprising nature of random variables and the benefits of handling them rigorously, as Ebisu seeks to do.
 
-## Implementation thoughts
-
-Lua, Erlang, Elixir, Red, F#, OCaml, Reason, PureScript, JS, TypeScript, Rust, …
-
-Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
-
 ## Requirements for building all aspects of this repo
 
 - Python
@@ -936,6 +955,9 @@ Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 - [Pandoc](http://pandoc.org)
 - JavaScript
     - [Yarn](https://yarnpkg.com)
+        - Yarn installs packages that help untangle this Markdown document to source code, weave it into an HTML file, and parse LaTeX math equations.
+
+**Implementation ideas** Lua, Erlang, Elixir, Red, F#, OCaml, Reason, PureScript, JS, TypeScript, Rust, … Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 
 ## Acknowledgements
 
@@ -944,5 +966,3 @@ Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/3
 Many thanks also to Drew Benedetti for reviewing this manuscript.
 
 John Otander’s [Modest CSS](http://markdowncss.github.io/modest/) is used to style the Markdown output.
-
-

@@ -703,8 +703,9 @@ def klDivBeta(a, b, a2, b2):
       gammaln(right)) + np.dot(left - right, psi(left) - psi(sum(left)))
 
 
-def klDivBetaSymmetric(x, y):
-  return (klDivBeta(*x, *y) + klDivBeta(*y, *x)) / 2
+def kl(v, w):
+  return (klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])
+         ) / 2.
 
 
 class TestEbisu(unittest.TestCase):
@@ -736,25 +737,23 @@ class TestEbisu(unittest.TestCase):
           mc = updateRecallMonteCarlo((a, b, t0), x, t, N=1 * 100 * 1000)
           an = updateRecall((a, b, t0), x, t)
           self.assertLess(
-              klDivBetaSymmetric(an, mc),
-              1e-3,
-              msg=msg + ' an={}, mc={}'.format(an, mc))
+              kl(an, mc), 1e-3, msg=msg + ' an={}, mc={}'.format(an, mc))
 
           try:
             quad1 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=True)
           except OverflowError:
             quad1 = None
           if quad1 is not None:
-            self.assertLess(klDivBetaSymmetric(quad1, mc), 1e-3, msg=msg)
+            self.assertLess(kl(quad1, mc), 1e-3, msg=msg)
 
           try:
             quad2 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=False)
           except OverflowError:
             quad2 = None
           if quad2 is not None:
-            self.assertLess(klDivBetaSymmetric(quad2, mc), 1e-3, msg=msg)
+            self.assertLess(kl(quad2, mc), 1e-3, msg=msg)
 
-    inner(3.3, 4.4, 1., [0.1, 1., 5.5, 12.12])
+    inner(3.3, 4.4, 1., [0.1, 1., 9.5])
     inner(341.4, 3.4, 1., [0.1, 1., 5.5, 50.])
 
 
@@ -763,7 +762,7 @@ if __name__ == '__main__':
       unittest.TestLoader().loadTestsFromModule(TestEbisu()))
 ```
 
-That `if __name__ == '__main__'` is for running the unit test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., `python3 -m nose`
+That `if __name__ == '__main__'` is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., `python3 -m nose` (which is wrapped in a Yarn script: if you look in `package.json` you’ll see that `yarn html` will run the eqivalent of `node md2code.js && python3 -m "nose"`: this Markdown file is untangled into Python source files first, and then nose is invoked).
 
 ### Demo code
 

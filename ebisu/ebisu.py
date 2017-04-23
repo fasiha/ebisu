@@ -25,7 +25,7 @@ def predictRecall(prior, tnow):
           gammaln(alpha) - gammaln(alpha + beta)))
 
 
-def subtractexp(x, y):
+def _subtractexp(x, y):
   """Evaluates exp(x) - exp(y) a bit more accurately than that. ⚾️
 
   This can avoid cancellation in case `x` and `y` are both large and close,
@@ -53,7 +53,7 @@ def predictRecallVar(prior, tnow):
   md = 2 * (s[1] - s[0])
   md2 = s[2] - s[0]
 
-  return subtractexp(md2, md)
+  return _subtractexp(md2, md)
 def updateRecall(prior, result, tnow):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
@@ -81,7 +81,7 @@ def updateRecall(prior, result, tnow):
     same = gammaln(alpha + beta + dt) - gammaln(alpha + dt)
     muln = gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt) + same
     mu = exp(muln)
-    var = subtractexp(
+    var = _subtractexp(
         same + gammaln(alpha + 3 * dt) - gammaln(alpha + beta + 3 * dt),
         2 * muln)
   else:
@@ -114,9 +114,9 @@ def updateRecall(prior, result, tnow):
     n = lse([n1[0], n2[0], n3[0]], [n1[1], n2[1], -n3[1]])
     var = exp(n[0] - d[0])
 
-  newAlpha, newBeta = meanVarToBeta(mu, var)
+  newAlpha, newBeta = _meanVarToBeta(mu, var)
   return newAlpha, newBeta, tnow
-def meanVarToBeta(mean, var):
+def _meanVarToBeta(mean, var):
   """Fit a Beta distribution to a mean and variance. 🏈"""
   # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
   tmp = mean * (1 - mean) / var - 1

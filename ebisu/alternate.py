@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from .ebisu import meanVarToBeta
+from .ebisu import _meanVarToBeta
 import numpy as np
 
 
@@ -130,7 +130,7 @@ def updateRecallQuad(prior, result, tnow, analyticMarginal=True):
                         format(varEst[0], varEst[1]))
   var = varEst[0] / marginal
 
-  newAlpha, newBeta = meanVarToBeta(mu, var)
+  newAlpha, newBeta = _meanVarToBeta(mu, var)
   return newAlpha, newBeta, tnow
 
 
@@ -160,6 +160,6 @@ def updateRecallMonteCarlo(prior, result, tnow, N=10 * 1000):
   weightedVar = np.sum(weights *
                        (tnowPrior - weightedMean)**2) / np.sum(weights)
 
-  newAlpha, newBeta = meanVarToBeta(weightedMean, weightedVar)
+  newAlpha, newBeta = _meanVarToBeta(weightedMean, weightedVar)
 
   return newAlpha, newBeta, tnow

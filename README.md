@@ -76,6 +76,8 @@ Finally, the [Source Code](#source-code) section presents the literate source of
 
 **IPython Notebook crash course** For a conversational introduction to the API in the context of a mocked quiz app, see this [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb).
 
+**Further information** [Module docstrings](https://github.com/fasiha/ebisu/blob/gh-pages/doc/doc.md) in a pinch but full details plus literate source below, under [Source code](#source-code).
+
 ## How it works
 
 There are many scheduling schemes, e.g.,
@@ -296,7 +298,7 @@ Let’s present our Python implementation of the core Ebisu functions, `predictR
 
 In the [math section](#mean-and-variance-of-the-recall-probability-right-now) above we derived the mean recall probability at time \\(t_{now} = t · δ\\) given a model \\(α, β, t\\): \\(E[p_t^δ] = Γ(α + β) · Γ(α) / (Γ(α + δ) · Γ(α + β + δ))\\). There are no sums-of-gammas here, so this is readily computed using log-gamma routine (`gammaln` in Scipy) to avoid overflowing and precision-loss in `predictRecall` (🍏 below).
 
-We also derived the variance, \\(Var[p_t^δ] = E[p_t^{2 δ}] - (E[p_t^δ])^2\\). This might be a helpful value and is computed by `predictRecallVar` (🍋 below). In order to avoid risking catastrophic cancellation by subtracting two potentially large floats (it’d be nice to prove that this will never happen given our \\(γ_n\\)’s but I haven’t yet done so), we use a simplification of `logsumexp` to evaluate the subtraction—this trick uses the following identity to avoid subtracting potentially very large floats: `exp(x) - exp(y) = exp(m) * (exp(a-m) - exp(b-m))` where `m = max(x, y)` and where `x` and `y` are logs of the two summands. This is basically `logsumexp` without the final `log`, so this trick is called `subtractexp` (⚾️) below.
+We also derived the variance, \\(Var[p_t^δ] = E[p_t^{2 δ}] - (E[p_t^δ])^2\\). This might be a helpful value and is computed by `predictRecallVar` (🍋 below). In order to avoid risking catastrophic cancellation by subtracting two potentially large floats (it’d be nice to prove that this will never happen given our \\(γ_n\\)’s but I haven’t yet done so), we use a simplification of `logsumexp` to evaluate the subtraction—this trick uses the following identity to avoid subtracting potentially very large floats: `exp(x) - exp(y) = exp(m) * (exp(a-m) - exp(b-m))` where `m = max(x, y)` and where `x` and `y` are logs of the two summands. This is basically `logsumexp` without the final `log`, so this trick is called `_subtractexp` (⚾️) below.
 
 These two functions have the same signature: they consume
 - a `model`: represents the Beta prior on recall probability at one specific time since the fact’s last review, and
@@ -329,7 +331,7 @@ def predictRecall(prior, tnow):
           gammaln(alpha) - gammaln(alpha + beta)))
 
 
-def subtractexp(x, y):
+def _subtractexp(x, y):
   """Evaluates exp(x) - exp(y) a bit more accurately than that. ⚾️
 
   This can avoid cancellation in case `x` and `y` are both large and close,
@@ -357,7 +359,7 @@ def predictRecallVar(prior, tnow):
   md = 2 * (s[1] - s[0])
   md2 = s[2] - s[0]
 
-  return subtractexp(md2, md)
+  return _subtractexp(md2, md)
 ```
 
 Next is the implementation of `updateRecall` (🍌), which accepts
@@ -369,7 +371,7 @@ and returns a *new* model, representing an updated Beta prior on recall probabil
 
 **In case of successful quiz** `updateRecall` analytically computes the true posterior’s
 - mean (expectation) \\(γ_2 / γ_1\\), which can be evaluated completely in the log domain, and
-- variance \\(γ_3 / γ_1 - (E[p|x=1])^2\\), which as the previous variance we evaluate in the log domain and use `subtractexp` (⚾️ above) to avoid cancellation errors,
+- variance \\(γ_3 / γ_1 - (E[p|x=1])^2\\), which as the previous variance we evaluate in the log domain and use `_subtractexp` (⚾️ above) to avoid cancellation errors,
     - where \\(γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)\\).
 
 **In case of unsuccessful quiz** these values are
@@ -409,7 +411,7 @@ def updateRecall(prior, result, tnow):
     same = gammaln(alpha + beta + dt) - gammaln(alpha + dt)
     muln = gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt) + same
     mu = exp(muln)
-    var = subtractexp(
+    var = _subtractexp(
         same + gammaln(alpha + 3 * dt) - gammaln(alpha + beta + 3 * dt),
         2 * muln)
   else:
@@ -442,11 +444,11 @@ def updateRecall(prior, result, tnow):
     n = lse([n1[0], n2[0], n3[0]], [n1[1], n2[1], -n3[1]])
     var = exp(n[0] - d[0])
 
-  newAlpha, newBeta = meanVarToBeta(mu, var)
+  newAlpha, newBeta = _meanVarToBeta(mu, var)
   return newAlpha, newBeta, tnow
 ```
 
-Finally we have a couple more helper functions in the main `ebisu` namespace. `meanVarToBeta` (🏈 below) uses simple algebra to [fit a Beta distribution](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) to a mean and variance—it’s used in `updateRecall`.
+Finally we have a couple more helper functions in the main `ebisu` namespace. `_meanVarToBeta` (🏈 below) uses simple algebra to [fit a Beta distribution](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) to a mean and variance—it’s used in `updateRecall`.
 
 I’ve thought about taking `priorToHalflife` (🏀 below) out of the main `ebisu` namespace because it’s not used by the core algorithm, but rather is for visualization purposes. Given a `model` (as above, a 3-tuple representing a Beta distribution prior on a fact’s recall probability at a specific time after its last review), it runs `predictRecall` over and over in a potentially-time-consuming bracketed search to find the *half-life*, that is, the time between reviews at which the recall probability is 50% (customizable via the `percentile` argument). This bracketed search, Scipy’s sophisticated [Brent’s algorithm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.brentq.html), requires a min and max values to search over and the defaults of `mint=1e-3` and `maxt=100` might not suffice for all cases.
 
@@ -454,7 +456,7 @@ The least important function from a usage point of view is also the most importa
 
 ```py
 # export ebisu/ebisu.py #
-def meanVarToBeta(mean, var):
+def _meanVarToBeta(mean, var):
   """Fit a Beta distribution to a mean and variance. 🏈"""
   # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
   tmp = mean * (1 - mean) / var - 1
@@ -488,9 +490,9 @@ def defaultModel(t, alpha=4.0, beta=None):
 With the exception of `defaultModel`, `priorToHalflife`, `predictRecallVar`, all the above functions are considered core Ebisu functions and any implementation should provide them:
 - `predictRecall` and
 - `updateRecall`,
-- aided by helper functions
-    - `meanVarToBeta` and
-    - `subtractexp`.
+- aided by private helper functions
+    - `_meanVarToBeta` and
+    - `_subtractexp`.
 
 The functions in the following section are either for illustrative or debugging purposes.
 
@@ -499,7 +501,7 @@ I wrote a number of other functions that help provide insight or help debug the 
 
 ```py
 # export ebisu/alternate.py #
-from .ebisu import meanVarToBeta
+from .ebisu import _meanVarToBeta
 ```
 
 `predictRecallMode` and `predictRecallMedian` return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variance \\(p_t^δ\\) whose mean is returned by `predictRecall` (🍏 above). Recall that \\(δ = t / t_{now}\\).
@@ -653,7 +655,7 @@ def updateRecallQuad(prior, result, tnow, analyticMarginal=True):
                         format(varEst[0], varEst[1]))
   var = varEst[0] / marginal
 
-  newAlpha, newBeta = meanVarToBeta(mu, var)
+  newAlpha, newBeta = _meanVarToBeta(mu, var)
   return newAlpha, newBeta, tnow
 
 
@@ -683,7 +685,7 @@ def updateRecallMonteCarlo(prior, result, tnow, N=10 * 1000):
   weightedVar = np.sum(weights *
                        (tnowPrior - weightedMean)**2) / np.sum(weights)
 
-  newAlpha, newBeta = meanVarToBeta(weightedMean, weightedVar)
+  newAlpha, newBeta = _meanVarToBeta(weightedMean, weightedVar)
 
   return newAlpha, newBeta, tnow
 ```
@@ -696,7 +698,7 @@ Before diving into unit tests, I promised [above](#updating-the-posterior-with-q
 
 ```py
 def betafitBeforeLikelihood(a, b, t1, x, t2):
-  a2, b2 = meanVarToBeta(
+  a2, b2 = _meanVarToBeta(
       predictRecall((a, b, t1), t2), predictRecallVar((a, b, t1), t2))
   return a2 + x, b2 + 1 - x, t2
 

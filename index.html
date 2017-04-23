@@ -154,6 +154,7 @@
 <p><strong>Predict a fact’s current recall probability</strong> <code>ebisu.predictRecall(prior: tuple, tnow: float) -&gt; float</code> where <code>prior</code> is this fact’s model, <code>tnow</code> is the current time elapsed since this fact’s most recent review, and the returned value is a probability between 0 and 1.</p>
 <p><strong>Update a fact’s model with quiz results</strong> <code>ebisu.updateRecall(prior: tuple, result: bool, tnow: float) -&gt; tuple</code> where <code>prior</code> and <code>tnow</code> are as above, and where <code>result</code> is true if the student successfully answered the quiz, false otherwise. The returned value is this fact’s new prior model—the old one can be discarded.</p>
 <p><strong>IPython Notebook crash course</strong> For a conversational introduction to the API in the context of a mocked quiz app, see this <a href="https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb">IPython Notebook crash course</a>.</p>
+<p><strong>Further information</strong> <a href="https://github.com/fasiha/ebisu/blob/gh-pages/doc/doc.md">Module docstrings</a> in a pinch but full details plus literate source below, under <a href="#source-code">Source code</a>.</p>
 <h2 id="how-it-works">How it works</h2>
 <p>There are many scheduling schemes, e.g.,</p>
 <ul>
@@ -2322,7 +2323,7 @@ plt.show()</code></pre>
  <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="733" y="-357"></use>
 </g>
-</svg></span>’s but I haven’t yet done so), we use a simplification of <code>logsumexp</code> to evaluate the subtraction—this trick uses the following identity to avoid subtracting potentially very large floats: <code>exp(x) - exp(y) = exp(m) * (exp(a-m) - exp(b-m))</code> where <code>m = max(x, y)</code> and where <code>x</code> and <code>y</code> are logs of the two summands. This is basically <code>logsumexp</code> without the final <code>log</code>, so this trick is called <code>subtractexp</code> (⚾️) below.</p>
+</svg></span>’s but I haven’t yet done so), we use a simplification of <code>logsumexp</code> to evaluate the subtraction—this trick uses the following identity to avoid subtracting potentially very large floats: <code>exp(x) - exp(y) = exp(m) * (exp(a-m) - exp(b-m))</code> where <code>m = max(x, y)</code> and where <code>x</code> and <code>y</code> are logs of the two summands. This is basically <code>logsumexp</code> without the final <code>log</code>, so this trick is called <code>_subtractexp</code> (⚾️) below.</p>
 <p>These two functions have the same signature: they consume</p>
 <ul>
 <li>a <code>model</code>: represents the Beta prior on recall probability at one specific time since the fact’s last review, and</li>
@@ -2354,7 +2355,7 @@ plt.show()</code></pre>
           gammaln(alpha) - gammaln(alpha + beta)))
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">subtractexp</span><span class="hljs-params">(x, y)</span>:</span>
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_subtractexp</span><span class="hljs-params">(x, y)</span>:</span>
   <span class="hljs-string">"""Evaluates exp(x) - exp(y) a bit more accurately than that. ⚾️
 
   This can avoid cancellation in case `x` and `y` are both large and close,
@@ -2382,7 +2383,7 @@ plt.show()</code></pre>
   md = <span class="hljs-number">2</span> * (s[<span class="hljs-number">1</span>] - s[<span class="hljs-number">0</span>])
   md2 = s[<span class="hljs-number">2</span>] - s[<span class="hljs-number">0</span>]
 
-  <span class="hljs-keyword">return</span> subtractexp(md2, md)</code></pre>
+  <span class="hljs-keyword">return</span> _subtractexp(md2, md)</code></pre>
 <p>Next is the implementation of <code>updateRecall</code> (🍌), which accepts</p>
 <ul>
 <li>a <code>model</code> (as above, represents the Beta prior on recall probability at one specific time since the fact’s last review),</li>
@@ -2429,7 +2430,7 @@ plt.show()</code></pre>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="513"></use>
 </g>
 </g>
-</svg></span>, which as the previous variance we evaluate in the log domain and use <code>subtractexp</code> (⚾️ above) to avoid cancellation errors,
+</svg></span>, which as the previous variance we evaluate in the log domain and use <code>_subtractexp</code> (⚾️ above) to avoid cancellation errors,
 <ul>
 <li>where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.232ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 14738.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-143-Title">
 <title id="MathJax-SVG-143-Title">γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)</title>
@@ -2628,7 +2629,7 @@ plt.show()</code></pre>
     same = gammaln(alpha + beta + dt) - gammaln(alpha + dt)
     muln = gammaln(alpha + <span class="hljs-number">2</span> * dt) - gammaln(alpha + beta + <span class="hljs-number">2</span> * dt) + same
     mu = exp(muln)
-    var = subtractexp(
+    var = _subtractexp(
         same + gammaln(alpha + <span class="hljs-number">3</span> * dt) - gammaln(alpha + beta + <span class="hljs-number">3</span> * dt),
         <span class="hljs-number">2</span> * muln)
   <span class="hljs-keyword">else</span>:
@@ -2661,13 +2662,13 @@ plt.show()</code></pre>
     n = lse([n1[<span class="hljs-number">0</span>], n2[<span class="hljs-number">0</span>], n3[<span class="hljs-number">0</span>]], [n1[<span class="hljs-number">1</span>], n2[<span class="hljs-number">1</span>], -n3[<span class="hljs-number">1</span>]])
     var = exp(n[<span class="hljs-number">0</span>] - d[<span class="hljs-number">0</span>])
 
-  newAlpha, newBeta = meanVarToBeta(mu, var)
+  newAlpha, newBeta = _meanVarToBeta(mu, var)
   <span class="hljs-keyword">return</span> newAlpha, newBeta, tnow</code></pre>
-<p>Finally we have a couple more helper functions in the main <code>ebisu</code> namespace. <code>meanVarToBeta</code> (🏈 below) uses simple algebra to <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">fit a Beta distribution</a> to a mean and variance—it’s used in <code>updateRecall</code>.</p>
+<p>Finally we have a couple more helper functions in the main <code>ebisu</code> namespace. <code>_meanVarToBeta</code> (🏈 below) uses simple algebra to <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">fit a Beta distribution</a> to a mean and variance—it’s used in <code>updateRecall</code>.</p>
 <p>I’ve thought about taking <code>priorToHalflife</code> (🏀 below) out of the main <code>ebisu</code> namespace because it’s not used by the core algorithm, but rather is for visualization purposes. Given a <code>model</code> (as above, a 3-tuple representing a Beta distribution prior on a fact’s recall probability at a specific time after its last review), it runs <code>predictRecall</code> over and over in a potentially-time-consuming bracketed search to find the <em>half-life</em>, that is, the time between reviews at which the recall probability is 50% (customizable via the <code>percentile</code> argument). This bracketed search, Scipy’s sophisticated <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.brentq.html">Brent’s algorithm</a>, requires a min and max values to search over and the defaults of <code>mint=1e-3</code> and <code>maxt=100</code> might not suffice for all cases.</p>
 <p>The least important function from a usage point of view is also the most important function for someone getting started with Ebisu: I call it <code>defaultModel</code> (🍗 below) and it simply creates a “model” object (a 3-tuple) out of the arguments it’s given. It’s included in the <code>ebisu</code> namespace to help developers who totally lack confidence in picking parameters: the only information it absolutely needs is an expected half-life, e.g., four hours or twenty-four hours or however long you expect a newly-learned fact takes to decay to 50% recall.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/ebisu.py #</span>
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">meanVarToBeta</span><span class="hljs-params">(mean, var)</span>:</span>
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_meanVarToBeta</span><span class="hljs-params">(mean, var)</span>:</span>
   <span class="hljs-string">"""Fit a Beta distribution to a mean and variance. 🏈"""</span>
   <span class="hljs-comment"># [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters</span>
   tmp = mean * (<span class="hljs-number">1</span> - mean) / var - <span class="hljs-number">1</span>
@@ -2700,17 +2701,17 @@ plt.show()</code></pre>
 <ul>
 <li><code>predictRecall</code> and</li>
 <li><code>updateRecall</code>,</li>
-<li>aided by helper functions
+<li>aided by private helper functions
 <ul>
-<li><code>meanVarToBeta</code> and</li>
-<li><code>subtractexp</code>.</li>
+<li><code>_meanVarToBeta</code> and</li>
+<li><code>_subtractexp</code>.</li>
 </ul></li>
 </ul>
 <p>The functions in the following section are either for illustrative or debugging purposes.</p>
 <h3 id="miscellaneous-functions">Miscellaneous functions</h3>
 <p>I wrote a number of other functions that help provide insight or help debug the above functions in the main <code>ebisu</code> workspace but are not necessary for an actual implementation. These are in the <code>ebisu.alternate</code> submodule and not nearly as much time has been spent on polish or optimization as the above core functions.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/alternate.py #</span>
-<span class="hljs-keyword">from</span> .ebisu <span class="hljs-keyword">import</span> meanVarToBeta</code></pre>
+<span class="hljs-keyword">from</span> .ebisu <span class="hljs-keyword">import</span> _meanVarToBeta</code></pre>
 <p><code>predictRecallMode</code> and <code>predictRecallMedian</code> return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-151-Title">
 <title id="MathJax-SVG-151-Title">p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -3034,7 +3035,7 @@ plt.show()</code></pre>
                         format(varEst[<span class="hljs-number">0</span>], varEst[<span class="hljs-number">1</span>]))
   var = varEst[<span class="hljs-number">0</span>] / marginal
 
-  newAlpha, newBeta = meanVarToBeta(mu, var)
+  newAlpha, newBeta = _meanVarToBeta(mu, var)
   <span class="hljs-keyword">return</span> newAlpha, newBeta, tnow
 
 
@@ -3064,7 +3065,7 @@ plt.show()</code></pre>
   weightedVar = np.sum(weights *
                        (tnowPrior - weightedMean)**<span class="hljs-number">2</span>) / np.sum(weights)
 
-  newAlpha, newBeta = meanVarToBeta(weightedMean, weightedVar)
+  newAlpha, newBeta = _meanVarToBeta(weightedMean, weightedVar)
 
   <span class="hljs-keyword">return</span> newAlpha, newBeta, tnow</code></pre>
 <p>That’s it—that’s all the code in the <code>ebisu</code> module!</p>
@@ -3078,7 +3079,7 @@ plt.show()</code></pre>
 </g>
 </svg></span> and performing a straightforward conjugate update. Assume you can trust <code>updateRecall</code> for now, which fits a Beta to the full <em>posterior</em>. The following shows the difference between the two models: the numerical differences start in the first digit after the decimal point.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">betafitBeforeLikelihood</span><span class="hljs-params">(a, b, t1, x, t2)</span>:</span>
-  a2, b2 = meanVarToBeta(
+  a2, b2 = _meanVarToBeta(
       predictRecall((a, b, t1), t2), predictRecallVar((a, b, t1), t2))
   <span class="hljs-keyword">return</span> a2 + x, b2 + <span class="hljs-number">1</span> - x, t2
 

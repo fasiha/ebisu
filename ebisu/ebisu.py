@@ -129,3 +129,19 @@ def priorToHalflife(prior, percentile=0.5, maxt=100, mint=1e-3):
   """Find the half-life corresponding to a time-based prior on recall. 🏀"""
   from scipy.optimize import brentq
   return brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
+
+
+def defaultModel(t, alpha=4.0, beta=None):
+  """Convert recall probability prior's raw parameters into a model object. 🍗
+
+  `t` is your guess as to the half-life of any given fact, in units that you
+  must be consistent with throughout your use of Ebisu.
+
+  `alpha` and `beta` are the parameters of the Beta distribution that describe
+  your beliefs about the recall probability of a fact `t` time units after that
+  fact has been studied/reviewed/quizzed. If they are the same, `t` is a true
+  half-life, and this is a recommended way to create a default model for all
+  newly-learned facts. If `beta` is omitted, it is taken to be the same as
+  `alpha`.
+  """
+  return (alpha, beta or alpha, t)

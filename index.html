@@ -2667,6 +2667,7 @@ plt.show()</code></pre>
   <span class="hljs-keyword">from</span> scipy.optimize <span class="hljs-keyword">import</span> brentq
   <span class="hljs-keyword">return</span> brentq(<span class="hljs-keyword">lambda</span> now: predictRecall(prior, now) - percentile, mint, maxt)
 
+
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">defaultModel</span><span class="hljs-params">(t, alpha=<span class="hljs-number">4.0</span>, beta=None)</span>:</span>
   <span class="hljs-string">"""Convert recall probability prior's raw parameters into a model object. 🍗
 

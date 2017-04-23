@@ -444,6 +444,7 @@ def priorToHalflife(prior, percentile=0.5, maxt=100, mint=1e-3):
   from scipy.optimize import brentq
   return brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
 
+
 def defaultModel(t, alpha=4.0, beta=None):
   """Convert recall probability prior's raw parameters into a model object. 🍗
 
@@ -943,3 +944,5 @@ Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/3
 Many thanks also to Drew Benedetti for reviewing this manuscript.
 
 John Otander’s [Modest CSS](http://markdowncss.github.io/modest/) is used to style the Markdown output.
+
+

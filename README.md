@@ -27,7 +27,9 @@
 	- [Core library](#core-library)
 	- [Miscellaneous functions](#miscellaneous-functions)
 	- [Test code](#test-code)
-	- [Demo code](#demo-code)
+- [Demo codes](#demo-codes)
+	- [Visualizing half-lives](#visualizing-half-lives)
+	- [Why we work with random variables](#why-we-work-with-random-variables)
 - [Requirements for building all aspects of this repo](#requirements-for-building-all-aspects-of-this-repo)
 - [Acknowledgements](#acknowledgements)
 
@@ -812,9 +814,11 @@ if __name__ == '__main__':
 
 That `if __name__ == '__main__'` is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., `python3 -m nose` (which is wrapped in a Yarn script: if you look in `package.json` you’ll see that `yarn html` will run the eqivalent of `node md2code.js && python3 -m "nose"`: this Markdown file is untangled into Python source files first, and then nose is invoked).
 
-### Demo code
+## Demo codes
 
 The code snippets here are intended to demonstrate some Ebisu functionality.
+
+### Visualizing half-lives
 
 The first snippet produces the half-life plots shown above, and included below, scroll down.
 
@@ -876,7 +880,7 @@ plt.show()
 
 ![figures/halflife.png](figures/halflife.png)
 
----
+### Why we work with random variables
 
 This second snippet addresses a potential approximation which isn’t too accurate but might be useful in some situations. The function `predictRecall` (🍏 above) evaluates the log-gamma function four times and an `exp` once. One may ask, why not use the half-life returned by `priorToHalflife` and Ebbinghaus’ forgetting curve, thereby approximating the current recall probability for a fact as `2 ** (-tnow / priorToHalflife(model))`? While this is likely more computationally efficient (after computing the half-life up-front), it is also less precise:
 
@@ -963,3 +967,4 @@ Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/3
 Many thanks also to Drew Benedetti for reviewing this manuscript.
 
 John Otander’s [Modest CSS](http://markdowncss.github.io/modest/) is used to style the Markdown output.
+

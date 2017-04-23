@@ -113,7 +113,11 @@
 <li><a href="#core-library">Core library</a></li>
 <li><a href="#miscellaneous-functions">Miscellaneous functions</a></li>
 <li><a href="#test-code">Test code</a></li>
-<li><a href="#demo-code">Demo code</a></li>
+</ul></li>
+<li><a href="#demo-codes">Demo codes</a>
+<ul>
+<li><a href="#visualizing-half-lives">Visualizing half-lives</a></li>
+<li><a href="#why-we-work-with-random-variables">Why we work with random variables</a></li>
 </ul></li>
 <li><a href="#requirements-for-building-all-aspects-of-this-repo">Requirements for building all aspects of this repo</a></li>
 <li><a href="#acknowledgements">Acknowledgements</a></li>
@@ -3208,8 +3212,9 @@ print(<span class="hljs-string">"Beta fit AFTER posterior:"</span>, betafitBefor
   unittest.TextTestRunner().run(
       unittest.TestLoader().loadTestsFromModule(TestEbisu()))</code></pre>
 <p>That <code>if __name__ == '__main__'</code> is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., <code>python3 -m nose</code> (which is wrapped in a Yarn script: if you look in <code>package.json</code> you’ll see that <code>yarn html</code> will run the eqivalent of <code>node md2code.js &amp;&amp; python3 -m "nose"</code>: this Markdown file is untangled into Python source files first, and then nose is invoked).</p>
-<h3 id="demo-code">Demo code</h3>
+<h2 id="demo-codes">Demo codes</h2>
 <p>The code snippets here are intended to demonstrate some Ebisu functionality.</p>
+<h3 id="visualizing-half-lives">Visualizing half-lives</h3>
 <p>The first snippet produces the half-life plots shown above, and included below, scroll down.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-keyword">import</span> scipy.stats <span class="hljs-keyword">as</span> stats
 <span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
@@ -3264,7 +3269,7 @@ plt.savefig(<span class="hljs-string">'figures/halflife.png'</span>, dpi=<span c
 plt.show()</code></pre>
 <p><img src="figures/models.png" alt="figures/models.png"></p>
 <p><img src="figures/halflife.png" alt="figures/halflife.png"></p>
-<hr>
+<h3 id="why-we-work-with-random-variables">Why we work with random variables</h3>
 <p>This second snippet addresses a potential approximation which isn’t too accurate but might be useful in some situations. The function <code>predictRecall</code> (🍏 above) evaluates the log-gamma function four times and an <code>exp</code> once. One may ask, why not use the half-life returned by <code>priorToHalflife</code> and Ebbinghaus’ forgetting curve, thereby approximating the current recall probability for a fact as <code>2 ** (-tnow / priorToHalflife(model))</code>? While this is likely more computationally efficient (after computing the half-life up-front), it is also less precise:</p>
 <pre class="py"><code class="hljs python">v2s = <span class="hljs-keyword">lambda</span> var: np.sqrt(var) / <span class="hljs-number">10</span>
 ts = np.linspace(<span class="hljs-number">1</span>, <span class="hljs-number">41</span>)

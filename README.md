@@ -15,7 +15,7 @@
 - [Important links](#important-links)
 	- [Table of contents](#table-of-contents)
 - [Introduction](#introduction)
-- [TL;DR](#tldr)
+- [Quickstart](#quickstart)
 - [How it works](#how-it-works)
 - [The math](#the-math)
 	- [Bernoulli quizzes](#bernoulli-quizzes)
@@ -52,7 +52,7 @@ This document is a literate source: it contains a detailed mathematical descript
 - JavaScript, or a compiled-to-JavaScript language, for browsers, and
 - PostgreSQL.
 
-The next section, the [TL;DR](#tldr), is a quick guide to setup and usage. See this if you know you want to use Ebisu in your app.
+The next section is a [Quickstart](#quickstart) guide to setup and usage. See this if you know you want to use Ebisu in your app.
 
 Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other scheduling algorithms and describe, non-technically, why you should use it.
 
@@ -62,20 +62,17 @@ Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm
 
 Finally, the [Source Code](#source-code) section presents the literate source of the library.
 
-## TL;DR
+## Quickstart
 
-Install the Python library with `pip3 install ebisu` (or `pip install ebisu` if you only have Python3 🤠—just joking, it works on Python2 also).
+**Install** `pip3 install ebisu` (or `pip install ebisu` if you only have Python3 🤠—just joking, it works on Python2 also).
 
-For a conversational introduction to the API in the context of a mocked quiz app, see this [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb).
+**Data model** For each fact in your quiz app, you store a model representing a prior distribution. This is a 3-tuple: `(alpha, beta, t)` and you can create a default model for all newly learned facts with `ebisu.defaultModel`. (As detailed in the [Choice of initial model parameters](#choice-of-initial-model-parameters) section, `alpha` and `beta` define a Beta distribution on this fact’s recall probability `t` time units after it’s most recent review.)
 
-The API revolves around using and transforming a model of a prior distribution on a fact’s recall probability after a specific amount of time has elapsed since it was studied. Create a default prior model for use with all newly learned facts via `ebisu.defaultModel`. Then, the critical two functions provided are:
+**Predict a fact’s current recall probability** `ebisu.predictRecall(prior: tuple, tnow: float) -> float` where `prior` is this fact’s model, `tnow` is the current time elapsed since this fact’s most recent review, and the returned value is a probability between 0 and 1.
 
-- `predictRecall(prior: tuple, tnow: float) -> float`, where `prior` is the object (a tuple) modeling the prior on this fact’s recall probability, and `tnow` is the time elapsed since this fact’s last review. The fact’s expected recall probability is returned.
-- `updateRecall(prior: tuple, result: bool, tnow: float) -> tuple` produces a new prior model given the result of a quiz (true if successful, false if unsuccessful) and the time between this quiz and the previous one on the same fact.
+**Update a fact’s model with quiz results** `ebisu.updateRecall(prior: tuple, result: bool, tnow: float) -> tuple` where `prior` and `tnow` are as above, and where `result` is true if the student successfully answered the quiz, false otherwise. The returned value is this fact’s new prior model—the old one can be discarded.
 
-So your quiz app will store a `prior` model for each fact. Run `predictRecall` on all the facts being learned to see which is most in danger of being forgotten: it’ll be the fact with the smallest returned value. Then after you quiz on that fact, use `updateRecall` and update that fact’s prior model. Repeat this indefinitely.
-
-(In order to work seamlessly with Python2, this library does not use [PEP 484](https://www.python.org/dev/peps/pep-0484/) type hints.)
+**IPython Notebook crash course** For a conversational introduction to the API in the context of a mocked quiz app, see this [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb).
 
 ## How it works
 

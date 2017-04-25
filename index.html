@@ -3132,6 +3132,7 @@ print(<span class="hljs-string">"Beta fit AFTER posterior:"</span>, betafitBefor
 </g>
 </svg></span> and both outcomes of quiz results (true and false) are tested to ensure they all produce the same answers. Sometimes, quadrature integration fails to find a solution, in which case it is not compared to the Monte Carlo and analytical versions.</p>
 <p>Often the unit tests fails because the tolerances are a little tight, and the random number generator seed is variable, which leads to errors exceeding thresholds. I actually prefer to see these occasional test failures because it gives me confidence that the thresholds are where I want them to be (if I set the thresholds too loose, and I somehow accidentally greatly improved accuracy, I might never know). However, I realize it can be annoying for automated tests or continuous integration systems, so I am open to fixing a seed and fixing the error threshold for it.</p>
+<p>One note: the unit tests udpate a global database of <code>testpoints</code> being tested, which can be dumped to a JSON file for comparison against other implementations.</p>
 <pre class="py"><code class="hljs python"><span class="hljs-comment"># export ebisu/tests/test_ebisu.py</span>
 <span class="hljs-keyword">import</span> unittest
 
@@ -3160,6 +3161,9 @@ print(<span class="hljs-string">"Beta fit AFTER posterior:"</span>, betafitBefor
          ) / <span class="hljs-number">2.</span>
 
 
+testpoints = []
+
+
 <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">TestEbisu</span><span class="hljs-params">(unittest.TestCase)</span>:</span>
 
   <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">test_kl</span><span class="hljs-params">(self)</span>:</span>
@@ -3170,12 +3174,14 @@ print(<span class="hljs-string">"Beta fit AFTER posterior:"</span>, betafitBefor
   <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">test_prior</span><span class="hljs-params">(self)</span>:</span>
 
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">inner</span><span class="hljs-params">(a, b, t0)</span>:</span>
+      <span class="hljs-keyword">global</span> testpoints
       <span class="hljs-keyword">for</span> t <span class="hljs-keyword">in</span> map(<span class="hljs-keyword">lambda</span> dt: dt * t0, [<span class="hljs-number">0.1</span>, <span class="hljs-number">.99</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">1.01</span>, <span class="hljs-number">5.5</span>]):
         mc = predictRecallMonteCarlo((a, b, t0), t, N=<span class="hljs-number">100</span> * <span class="hljs-number">1000</span>)
         mean = predictRecall((a, b, t0), t)
         var = predictRecallVar((a, b, t0), t)
         self.assertLess(relerr(mean, mc[<span class="hljs-string">'mean'</span>]), <span class="hljs-number">5e-2</span>)
         self.assertLess(relerr(var, mc[<span class="hljs-string">'var'</span>]), <span class="hljs-number">5e-2</span>)
+        testpoints += [[<span class="hljs-string">'predict'</span>, [a, b, t0], [t], dict(mean=mean, var=var)]]
 
     inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>)
     inner(<span class="hljs-number">34.4</span>, <span class="hljs-number">34.4</span>, <span class="hljs-number">1.</span>)
@@ -3183,8 +3189,9 @@ print(<span class="hljs-string">"Beta fit AFTER posterior:"</span>, betafitBefor
   <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">test_posterior</span><span class="hljs-params">(self)</span>:</span>
 
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">inner</span><span class="hljs-params">(a, b, t0, dts)</span>:</span>
+      <span class="hljs-keyword">global</span> testpoints
       <span class="hljs-keyword">for</span> t <span class="hljs-keyword">in</span> map(<span class="hljs-keyword">lambda</span> dt: dt * t0, dts):
-        <span class="hljs-keyword">for</span> x <span class="hljs-keyword">in</span> [<span class="hljs-number">0.</span>, <span class="hljs-number">1.</span>]:
+        <span class="hljs-keyword">for</span> x <span class="hljs-keyword">in</span> [<span class="hljs-keyword">False</span>, <span class="hljs-keyword">True</span>]:
           msg = <span class="hljs-string">'a={},b={},t0={},x={},t={}'</span>.format(a, b, t0, x, t)
           mc = updateRecallMonteCarlo((a, b, t0), x, t, N=<span class="hljs-number">1</span> * <span class="hljs-number">100</span> * <span class="hljs-number">1000</span>)
           an = updateRecall((a, b, t0), x, t)
@@ -3205,14 +3212,20 @@ print(<span class="hljs-string">"Beta fit AFTER posterior:"</span>, betafitBefor
           <span class="hljs-keyword">if</span> quad2 <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> <span class="hljs-keyword">None</span>:
             self.assertLess(kl(quad2, mc), <span class="hljs-number">1e-3</span>, msg=msg)
 
+          testpoints += [[<span class="hljs-string">'update'</span>, [a, b, t0], [x, t], dict(post=an)]]
+
     inner(<span class="hljs-number">3.3</span>, <span class="hljs-number">4.4</span>, <span class="hljs-number">1.</span>, [<span class="hljs-number">0.1</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">9.5</span>])
     inner(<span class="hljs-number">341.4</span>, <span class="hljs-number">3.4</span>, <span class="hljs-number">1.</span>, [<span class="hljs-number">0.1</span>, <span class="hljs-number">1.</span>, <span class="hljs-number">5.5</span>, <span class="hljs-number">50.</span>])
 
 
 <span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">'__main__'</span>:
   unittest.TextTestRunner().run(
-      unittest.TestLoader().loadTestsFromModule(TestEbisu()))</code></pre>
-<p>That <code>if __name__ == '__main__'</code> is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., <code>python3 -m nose</code> (which is wrapped in a Yarn script: if you look in <code>package.json</code> you’ll see that <code>yarn html</code> will run the eqivalent of <code>node md2code.js &amp;&amp; python3 -m "nose"</code>: this Markdown file is untangled into Python source files first, and then nose is invoked).</p>
+      unittest.TestLoader().loadTestsFromModule(TestEbisu()))
+
+  <span class="hljs-keyword">with</span> open(<span class="hljs-string">"test.json"</span>, <span class="hljs-string">"w"</span>) <span class="hljs-keyword">as</span> out:
+    <span class="hljs-keyword">import</span> json
+    out.write(json.dumps(testpoints))</code></pre>
+<p>That <code>if __name__ == '__main__'</code> is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., <code>python3 -m nose</code> (which is wrapped in a Yarn script: if you look in <code>package.json</code> you’ll see that <code>yarn test</code> will run the eqivalent of <code>node md2code.js &amp;&amp; python3 -m "nose"</code>: this Markdown file is untangled into Python source files first, and then nose is invoked).</p>
 <h2 id="demo-codes">Demo codes</h2>
 <p>The code snippets here are intended to demonstrate some Ebisu functionality.</p>
 <h3 id="visualizing-half-lives">Visualizing half-lives</h3>

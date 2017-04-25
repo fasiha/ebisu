@@ -731,6 +731,8 @@ For both sets of functions, a range of \\(δ = t_{now} / t\\) and both outcomes 
 
 Often the unit tests fails because the tolerances are a little tight, and the random number generator seed is variable, which leads to errors exceeding thresholds. I actually prefer to see these occasional test failures because it gives me confidence that the thresholds are where I want them to be (if I set the thresholds too loose, and I somehow accidentally greatly improved accuracy, I might never know). However, I realize it can be annoying for automated tests or continuous integration systems, so I am open to fixing a seed and fixing the error threshold for it.
 
+One note: the unit tests udpate a global database of `testpoints` being tested, which can be dumped to a JSON file for comparison against other implementations.
+
 ```py
 # export ebisu/tests/test_ebisu.py
 import unittest
@@ -760,6 +762,9 @@ def kl(v, w):
          ) / 2.
 
 
+testpoints = []
+
+
 class TestEbisu(unittest.TestCase):
 
   def test_kl(self):
@@ -770,12 +775,14 @@ class TestEbisu(unittest.TestCase):
   def test_prior(self):
 
     def inner(a, b, t0):
+      global testpoints
       for t in map(lambda dt: dt * t0, [0.1, .99, 1., 1.01, 5.5]):
         mc = predictRecallMonteCarlo((a, b, t0), t, N=100 * 1000)
         mean = predictRecall((a, b, t0), t)
         var = predictRecallVar((a, b, t0), t)
         self.assertLess(relerr(mean, mc['mean']), 5e-2)
         self.assertLess(relerr(var, mc['var']), 5e-2)
+        testpoints += [['predict', [a, b, t0], [t], dict(mean=mean, var=var)]]
 
     inner(3.3, 4.4, 1.)
     inner(34.4, 34.4, 1.)
@@ -783,8 +790,9 @@ class TestEbisu(unittest.TestCase):
   def test_posterior(self):
 
     def inner(a, b, t0, dts):
+      global testpoints
       for t in map(lambda dt: dt * t0, dts):
-        for x in [0., 1.]:
+        for x in [False, True]:
           msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
           mc = updateRecallMonteCarlo((a, b, t0), x, t, N=1 * 100 * 1000)
           an = updateRecall((a, b, t0), x, t)
@@ -805,6 +813,8 @@ class TestEbisu(unittest.TestCase):
           if quad2 is not None:
             self.assertLess(kl(quad2, mc), 1e-3, msg=msg)
 
+          testpoints += [['update', [a, b, t0], [x, t], dict(post=an)]]
+
     inner(3.3, 4.4, 1., [0.1, 1., 9.5])
     inner(341.4, 3.4, 1., [0.1, 1., 5.5, 50.])
 
@@ -812,9 +822,13 @@ class TestEbisu(unittest.TestCase):
 if __name__ == '__main__':
   unittest.TextTestRunner().run(
       unittest.TestLoader().loadTestsFromModule(TestEbisu()))
+
+  with open("test.json", "w") as out:
+    import json
+    out.write(json.dumps(testpoints))
 ```
 
-That `if __name__ == '__main__'` is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., `python3 -m nose` (which is wrapped in a Yarn script: if you look in `package.json` you’ll see that `yarn html` will run the eqivalent of `node md2code.js && python3 -m "nose"`: this Markdown file is untangled into Python source files first, and then nose is invoked).
+That `if __name__ == '__main__'` is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., `python3 -m nose` (which is wrapped in a Yarn script: if you look in `package.json` you’ll see that `yarn test` will run the eqivalent of `node md2code.js && python3 -m "nose"`: this Markdown file is untangled into Python source files first, and then nose is invoked).
 
 ## Demo codes
 

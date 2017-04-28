@@ -50,9 +50,7 @@ Behind these two simple functions, Ebisu is using a simple yet powerful model of
 
 With this system, quiz applications can hopefully move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today—an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed. Apps can also provide an infinite stream of quizzes (nightmare!) for students that are cramming: Ebisu intelligently updates its estimate of memory even when over-reviewing.
 
-This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as a Python implementation (requires Scipy and Numpy). I plan on porting the algorithm to at least:
-- JavaScript, or a compiled-to-JavaScript language, for browsers, and
-- PostgreSQL.
+This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as a Python implementation (requires Scipy and Numpy). A separate JavaScript implementation, [Ebisu.js](https://fasiha.github.io/ebisu.js/), exists, and I plan on porting the algorithm to at least PostgreSQL also.
 
 The next section is a [Quickstart](#quickstart) guide to setup and usage. See this if you know you want to use Ebisu in your app.
 
@@ -77,6 +75,8 @@ Finally, the [Source Code](#source-code) section presents the literate source of
 **IPython Notebook crash course** For a conversational introduction to the API in the context of a mocked quiz app, see this [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb).
 
 **Further information** [Module docstrings](https://github.com/fasiha/ebisu/blob/gh-pages/doc/doc.md) in a pinch but full details plus literate source below, under [Source code](#source-code).
+
+**Alternative implementations** [Ebisu.js](https://fasiha.github.io/ebisu.js/) is a JavaScript port for browser and Node.js.
 
 ## How it works
 

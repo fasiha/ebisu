@@ -46,21 +46,23 @@ Ebisu is a public-domain library that answers these two questions. It is intende
 - `predictRecall` gives the current recall probability for a given fact.
 - `updateRecall` adjusts the belief about future recall probability given a quiz result.
 
-Behind these two simple functions, Ebisu is using a simple yet powerful model of forgetting founded on Bayesian statistics.
+Behind these two simple functions, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics.
 
-With this system, quiz applications can hopefully move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today—an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed. Apps can also provide an infinite stream of quizzes (nightmare!) for students that are cramming: Ebisu intelligently updates its estimate of memory even when over-reviewing.
+With this system, quiz applications can hopefully move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today—an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed.
 
-This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as a Python implementation (requires Scipy and Numpy). A separate JavaScript implementation, [Ebisu.js](https://fasiha.github.io/ebisu.js/), exists, and I plan on porting the algorithm to at least PostgreSQL also.
+Furthermore, Ebisu enables apps to provide an infinite stream of quizzes (nightmare!) for students that are cramming. That is, Ebisu intelligently handles over-reviewing as well as under-reviewing.
+
+This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as source code for a Python implementation (requires Scipy and Numpy). A separate JavaScript implementation, [Ebisu.js](https://fasiha.github.io/ebisu.js/), exists, and I plan on porting the algorithm to at least PostgreSQL also.
 
 The next section is a [Quickstart](#quickstart) guide to setup and usage. See this if you know you want to use Ebisu in your app.
 
 Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other scheduling algorithms and describe, non-technically, why you should use it.
 
-Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. if you like Beta-distributed random variables, conjugate priors, and marginalization, this is for you. If not, you’ll find the formulas to implement `predictRecall` and `updateRecall`.
+Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like Beta-distributed random variables, conjugate priors, and marginalization, this is for you. You’ll also find the key formulas that implement `predictRecall` and `updateRecall` here.
 
-> Nerdy details in a nutshell: Ebisu posits a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it requires only a few [gamma function](http://mathworld.wolfram.com/GammaFunction.html) evaluations to predict the current recall probability. A *quiz* is modeled as a [Bernoulli trial]([Bernoulli experiment](https://en.wikipedia.org/wiki/Bernoulli_distribution)), whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta distribution by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the gamma function.
+> Nerdy details in a nutshell: Ebisu begins by positing a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it requires only a few [gamma function](http://mathworld.wolfram.com/GammaFunction.html) evaluations to predict the current recall probability. Next, a *quiz* is modeled as a [Bernoulli trial]([Bernoulli experiment](https://en.wikipedia.org/wiki/Bernoulli_distribution)), whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta distribution by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the gamma function.
 
-Finally, the [Source Code](#source-code) section presents the literate source of the library.
+Finally, the [Source Code](#source-code) section presents the literate source of the library, including several tests to validate the math.
 
 ## Quickstart
 

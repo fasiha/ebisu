@@ -52,7 +52,7 @@ With this system, quiz applications can hopefully move away from “daily review
 
 Furthermore, Ebisu enables apps to provide an infinite stream of quizzes (nightmare!) for students that are cramming. That is, Ebisu intelligently handles over-reviewing as well as under-reviewing.
 
-This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as source code for a Python implementation (requires Scipy and Numpy). A separate JavaScript implementation, [Ebisu.js](https://fasiha.github.io/ebisu.js/), exists, and I plan on porting the algorithm to at least PostgreSQL also.
+This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as source code for a Python implementation (requires Scipy and Numpy). Separat implementations in [JavaScript, Ebisu.js,](https://fasiha.github.io/ebisu.js/) and [Java, ebisu-java,](https://github.com/fasiha/ebisu-java) exist.
 
 The next section is a [Quickstart](#quickstart) guide to setup and usage. See this if you know you want to use Ebisu in your app.
 
@@ -78,7 +78,7 @@ Finally, the [Source Code](#source-code) section presents the literate source of
 
 **Further information** [Module docstrings](https://github.com/fasiha/ebisu/blob/gh-pages/doc/doc.md) in a pinch but full details plus literate source below, under [Source code](#source-code).
 
-**Alternative implementations** [Ebisu.js](https://fasiha.github.io/ebisu.js/) is a JavaScript port for browser and Node.js.
+**Alternative implementations** [Ebisu.js](https://fasiha.github.io/ebisu.js/) is a JavaScript port for browser and Node.js. [ebisu-java](https://github.com/fasiha/ebisu-java) is for Java and JVM languages.
 
 ## How it works
 

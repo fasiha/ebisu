@@ -46,13 +46,13 @@ Ebisu is a public-domain library that answers these two questions. It is intende
 - `predictRecall` gives the current recall probability for a given fact.
 - `updateRecall` adjusts the belief about future recall probability given a quiz result.
 
-Behind these two simple functions, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics.
+Behind these two simple functions, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and exponential forgetting.
 
-With this system, quiz applications can hopefully move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today—an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed.
+With this system, quiz applications can move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today; an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed.
 
-Furthermore, Ebisu enables apps to provide an infinite stream of quizzes (nightmare!) for students that are cramming. That is, Ebisu intelligently handles over-reviewing as well as under-reviewing.
+Ebisu also enables apps to provide an infinite stream of quizzes for students who are cramming. Thus, Ebisu intelligently handles over-reviewing as well as under-reviewing.
 
-This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as source code for a Python implementation (requires Scipy and Numpy). Separat implementations in [JavaScript, Ebisu.js,](https://fasiha.github.io/ebisu.js/) and [Java, ebisu-java,](https://github.com/fasiha/ebisu-java) exist.
+This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as source code for a Python implementation (requires Scipy and Numpy). Separate implementations in [JavaScript (Ebisu.js)](https://fasiha.github.io/ebisu.js/) and [Java (ebisu-java)](https://github.com/fasiha/ebisu-java) exist.
 
 The next section is a [Quickstart](#quickstart) guide to setup and usage. See this if you know you want to use Ebisu in your app.
 
@@ -60,13 +60,13 @@ Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other sch
 
 Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like Beta-distributed random variables, conjugate priors, and marginalization, this is for you. You’ll also find the key formulas that implement `predictRecall` and `updateRecall` here.
 
-> Nerdy details in a nutshell: Ebisu begins by positing a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it requires only a few [gamma function](http://mathworld.wolfram.com/GammaFunction.html) evaluations to predict the current recall probability. Next, a *quiz* is modeled as a [Bernoulli trial]([Bernoulli experiment](https://en.wikipedia.org/wiki/Bernoulli_distribution)), whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta distribution by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the gamma function.
+> Nerdy details in a nutshell: Ebisu begins by positing a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it requires only a few [gamma function](http://mathworld.wolfram.com/GammaFunction.html) evaluations to predict the current recall probability. Next, a *quiz* is modeled as a [Bernoulli trial](https://en.wikipedia.org/wiki/Bernoulli_distribution) whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta distribution by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the gamma function.
 
 Finally, the [Source Code](#source-code) section presents the literate source of the library, including several tests to validate the math.
 
 ## Quickstart
 
-**Install** `pip3 install ebisu` (or `pip install ebisu` if you only have Python3 🤠—just joking, it works on Python2 also).
+**Install** `pip install ebisu` (both Python3 and Python2 ok 🤠).
 
 **Data model** For each fact in your quiz app, you store a model representing a prior distribution. This is a 3-tuple: `(alpha, beta, t)` and you can create a default model for all newly learned facts with `ebisu.defaultModel`. (As detailed in the [Choice of initial model parameters](#choice-of-initial-model-parameters) section, `alpha` and `beta` define a Beta distribution on this fact’s recall probability `t` time units after it’s most recent review.)
 
@@ -329,8 +329,8 @@ def predictRecall(prior, tnow):
   alpha, beta, t = prior
   dt = tnow / t
   return exp(
-      gammaln(alpha + dt) - gammaln(alpha + beta + dt) - (
-          gammaln(alpha) - gammaln(alpha + beta)))
+      gammaln(alpha + dt) - gammaln(alpha + beta + dt) -
+      (gammaln(alpha) - gammaln(alpha + beta)))
 
 
 def _subtractexp(x, y):
@@ -541,8 +541,8 @@ def predictRecallMode(prior, tnow):
 
     eps = 1e-3
     others = [
-        eps, mode - eps if mode > eps else mode / 2, mode + eps
-        if mode < 1 - eps else (1 + mode) / 2, 1 - eps
+        eps, mode - eps if mode > eps else mode / 2,
+        mode + eps if mode < 1 - eps else (1 + mode) / 2, 1 - eps
     ]
     otherPr = map(pr, others)
     if max(otherPr) <= modePr:
@@ -646,15 +646,17 @@ def updateRecallQuad(prior, result, tnow, analyticMarginal=True):
   muInt = lambda p: marginalInt(p) * p
   muEst = quad(muInt, 0, 1)
   if muEst[0] < muEst[1] * 10.:
-    raise OverflowError('Mean integral error too high: value={}, error={}'.
-                        format(muEst[0], muEst[1]))
+    raise OverflowError(
+        'Mean integral error too high: value={}, error={}'.format(
+            muEst[0], muEst[1]))
   mu = muEst[0] / marginal
 
   varInt = lambda p: marginalInt(p) * (p - mu)**2
   varEst = quad(varInt, 0, 1)
   if varEst[0] < varEst[1] * 10.:
-    raise OverflowError('Variance integral error too high: value={}, error={}'.
-                        format(varEst[0], varEst[1]))
+    raise OverflowError(
+        'Variance integral error too high: value={}, error={}'.format(
+            varEst[0], varEst[1]))
   var = varEst[0] / marginal
 
   newAlpha, newBeta = _meanVarToBeta(mu, var)
@@ -756,12 +758,13 @@ def klDivBeta(a, b, a2, b2):
   left = np.array([a, b])
   right = np.array([a2, b2])
   return gammaln(sum(left)) - gammaln(sum(right)) - sum(gammaln(left)) + sum(
-      gammaln(right)) + np.dot(left - right, psi(left) - psi(sum(left)))
+      gammaln(right)) + np.dot(left - right,
+                               psi(left) - psi(sum(left)))
 
 
 def kl(v, w):
-  return (klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])
-         ) / 2.
+  return (klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0],
+                                                        v[1])) / 2.
 
 
 testpoints = []
@@ -822,8 +825,8 @@ class TestEbisu(unittest.TestCase):
 
 
 if __name__ == '__main__':
-  unittest.TextTestRunner().run(
-      unittest.TestLoader().loadTestsFromModule(TestEbisu()))
+  unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(
+      TestEbisu()))
 
   with open("test.json", "w") as out:
     import json
@@ -883,7 +886,8 @@ plt.axhline(y=t0, linewidth=1, color='0.5')
         marker='x' if xobs == 1 else 'o',
         color='C{}'.format(aidx),
         label='α=β={}, {}'.format(a, 'pass' if xobs == 1 else 'fail'))
-    for (aidx, a) in enumerate(ablist) for xobs in [1, 0]
+    for (aidx, a) in enumerate(ablist)
+    for xobs in [1, 0]
 ]
 plt.legend(loc=0)
 plt.title('New half-life (previously {:0.0f} days)'.format(t0))
@@ -986,3 +990,4 @@ Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/3
 Many thanks also to Drew Benedetti for reviewing this manuscript.
 
 John Otander’s [Modest CSS](http://markdowncss.github.io/modest/) is used to style the Markdown output.
+

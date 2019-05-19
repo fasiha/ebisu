@@ -621,10 +621,12 @@ def updateRecallQuad(prior, result, tnow, analyticMarginal=True):
   dt = tnow / t
 
   if result == 1:
-    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1) * p
+    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta -
+                                                                         1) * p
   else:
     # difference from above: -------------------------------------------^vvvv
-    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1) * (1 - p)
+    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(
+        beta - 1) * (1 - p)
 
   if analyticMarginal:
     from scipy.special import beta as fbeta
@@ -705,8 +707,8 @@ def betafitBeforeLikelihood(a, b, t1, x, t2):
 
 
 print("Beta fit BEFORE posterior:", updateRecall((3.3, 4.4, 1.), 1., 2.))
-print("Beta fit AFTER posterior:", betafitBeforeLikelihood(
-    3.3, 4.4, 1., 1., 2.))
+print("Beta fit AFTER posterior:",
+      betafitBeforeLikelihood(3.3, 4.4, 1., 1., 2.))
 # Output:
 # Beta fit BEFORE posterior: (2.2138973610926804, 4.6678159395305334, 2.0)
 # Beta fit AFTER posterior: (2.3075328265376691, 4.8652384243261961, 2.0)
@@ -760,14 +762,24 @@ def klDivBeta(a, b, a2, b2):
 
 
 def kl(v, w):
-  return (klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0],
-                                                        v[1])) / 2.
+  return (klDivBeta(v[0], v[1], w[0], w[1]) +
+          klDivBeta(w[0], w[1], v[0], v[1])) / 2.
 
 
 testpoints = []
 
 
 class TestEbisu(unittest.TestCase):
+
+  def test_predictRecallMedian(self):
+    model0 = (4.0, 4.0, 1.0)
+    model1 = updateRecall(model0, False, 1.0)
+    model2 = updateRecall(model1, True, 0.01)
+    ts = np.linspace(0.01, 4.0, 81.0)
+    qs = (0.05, 0.25, 0.5, 0.75, 0.95)
+    for t in ts:
+      for q in qs:
+        self.assertGreater(predictRecallMedian(model2, t, q), 0)
 
   def test_kl(self):
     # See https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Quantities_of_information_.28entropy.29 for these numbers
@@ -830,7 +842,7 @@ if __name__ == '__main__':
     out.write(json.dumps(testpoints))
 ```
 
-That `if __name__ == '__main__'` is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., `python3 -m nose` (which is wrapped in a Yarn script: if you look in `package.json` you’ll see that `yarn test` will run the eqivalent of `node md2code.js && python3 -m "nose"`: this Markdown file is untangled into Python source files first, and then nose is invoked).
+That `if __name__ == '__main__'` is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., `python3 -m nose` (which is wrapped in an npm script: if you look in `package.json` you’ll see that `npm test` will run the eqivalent of `node md2code.js && python3 -m "nose"`: this Markdown file is untangled into Python source files first, and then nose is invoked).
 
 ## Demo codes
 
@@ -974,9 +986,6 @@ I think this speaks to the surprising nature of random variables and the benefit
     - nose for tests
 - [Pandoc](http://pandoc.org)
 - [pydoc-markdown](https://pypi.python.org/pypi/pydoc-markdown)
-- JavaScript
-    - [Yarn](https://yarnpkg.com)
-        - Yarn installs packages that help untangle this Markdown document to source code, weave it into an HTML file, and parse LaTeX math equations.
 
 **Implementation ideas** Lua, Erlang, Elixir, Red, F#, OCaml, Reason, PureScript, JS, TypeScript, Rust, … Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 
@@ -987,4 +996,8 @@ Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/3
 Many thanks also to Drew Benedetti for reviewing this manuscript.
 
 John Otander’s [Modest CSS](http://markdowncss.github.io/modest/) is used to style the Markdown output.
+
+
+
+
 

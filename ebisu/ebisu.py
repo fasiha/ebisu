@@ -21,8 +21,8 @@ def predictRecall(prior, tnow):
   alpha, beta, t = prior
   dt = tnow / t
   return exp(
-      gammaln(alpha + dt) - gammaln(alpha + beta + dt) - (
-          gammaln(alpha) - gammaln(alpha + beta)))
+      gammaln(alpha + dt) - gammaln(alpha + beta + dt) -
+      (gammaln(alpha) - gammaln(alpha + beta)))
 
 
 def _subtractexp(x, y):

@@ -26,8 +26,8 @@ def predictRecallMode(prior, tnow):
 
     eps = 1e-3
     others = [
-        eps, mode - eps if mode > eps else mode / 2, mode + eps
-        if mode < 1 - eps else (1 + mode) / 2, 1 - eps
+        eps, mode - eps if mode > eps else mode / 2,
+        mode + eps if mode < 1 - eps else (1 + mode) / 2, 1 - eps
     ]
     otherPr = map(pr, others)
     if max(otherPr) <= modePr:
@@ -94,10 +94,12 @@ def updateRecallQuad(prior, result, tnow, analyticMarginal=True):
   dt = tnow / t
 
   if result == 1:
-    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1) * p
+    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta -
+                                                                         1) * p
   else:
     # difference from above: -------------------------------------------^vvvv
-    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1) * (1 - p)
+    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(
+        beta - 1) * (1 - p)
 
   if analyticMarginal:
     from scipy.special import beta as fbeta
@@ -116,15 +118,17 @@ def updateRecallQuad(prior, result, tnow, analyticMarginal=True):
   muInt = lambda p: marginalInt(p) * p
   muEst = quad(muInt, 0, 1)
   if muEst[0] < muEst[1] * 10.:
-    raise OverflowError('Mean integral error too high: value={}, error={}'.
-                        format(muEst[0], muEst[1]))
+    raise OverflowError(
+        'Mean integral error too high: value={}, error={}'.format(
+            muEst[0], muEst[1]))
   mu = muEst[0] / marginal
 
   varInt = lambda p: marginalInt(p) * (p - mu)**2
   varEst = quad(varInt, 0, 1)
   if varEst[0] < varEst[1] * 10.:
-    raise OverflowError('Variance integral error too high: value={}, error={}'.
-                        format(varEst[0], varEst[1]))
+    raise OverflowError(
+        'Variance integral error too high: value={}, error={}'.format(
+            varEst[0], varEst[1]))
   var = varEst[0] / marginal
 
   newAlpha, newBeta = _meanVarToBeta(mu, var)

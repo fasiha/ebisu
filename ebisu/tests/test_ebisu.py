@@ -21,12 +21,13 @@ def klDivBeta(a, b, a2, b2):
   left = np.array([a, b])
   right = np.array([a2, b2])
   return gammaln(sum(left)) - gammaln(sum(right)) - sum(gammaln(left)) + sum(
-      gammaln(right)) + np.dot(left - right, psi(left) - psi(sum(left)))
+      gammaln(right)) + np.dot(left - right,
+                               psi(left) - psi(sum(left)))
 
 
 def kl(v, w):
-  return (klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])
-         ) / 2.
+  return (klDivBeta(v[0], v[1], w[0], w[1]) +
+          klDivBeta(w[0], w[1], v[0], v[1])) / 2.
 
 
 testpoints = []
@@ -97,8 +98,8 @@ class TestEbisu(unittest.TestCase):
 
 
 if __name__ == '__main__':
-  unittest.TextTestRunner().run(
-      unittest.TestLoader().loadTestsFromModule(TestEbisu()))
+  unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(
+      TestEbisu()))
 
   with open("test.json", "w") as out:
     import json

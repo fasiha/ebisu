@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 var fs = require('fs');
 var spawnSync = require('child_process').spawnSync;
@@ -6,11 +6,11 @@ var _ = require('lodash');
 
 var lines = fs.readFileSync('README.md', 'utf8').split('\n').map(s => s + '\n');
 var fencepos =
-    lines.map((s, i) => [s, i]).filter(([ s, i ]) => s.indexOf('```') === 0);
+    lines.map((s, i) => [s, i]).filter(([s, i]) => s.indexOf('```') === 0);
 
 var seen = new Set([]);
 var replacement = [];
-_.chunk(fencepos, 2).forEach(([ [ _, i ], [ __, j ] ]) => {
+_.chunk(fencepos, 2).forEach(([[_, i], [__, j]]) => {
   var language = lines[i].match(/```([^\s]+)/);
   language = language ? language[1] : language;
 
@@ -22,11 +22,12 @@ _.chunk(fencepos, 2).forEach(([ [ _, i ], [ __, j ] ]) => {
   var contents = lines.slice(contentStart, j).join('');
 
   if (language === 'py' || language === 'python') {
-    contents = spawnSync('yapf', [ "--style", '{based_on_style: chromium}' ], {
-                 input : contents,
-                 encoding : 'utf8'
-               }).stdout;
-    replacement.push({start : i, end : j, contentStart, contents});
+    contents =
+        spawnSync(
+            'yapf', ['--style', '{based_on_style: chromium, COLUMN_LIMIT:80}'],
+            {input: contents, encoding: 'utf8'})
+            .stdout;
+    replacement.push({start: i, end: j, contentStart, contents});
   }
 
   if (fname) {
@@ -34,7 +35,8 @@ _.chunk(fencepos, 2).forEach(([ [ _, i ], [ __, j ] ]) => {
       fs.appendFileSync(fname, contents);
     } else {
       if (language === 'py' || language === 'python') {
-        fs.writeFileSync(fname, '# -*- coding: utf-8 -*-\n\n'); // I need emoji!
+        fs.writeFileSync(
+            fname, '# -*- coding: utf-8 -*-\n\n');  // I need emoji!
         fs.appendFileSync(fname, contents);
       } else {
         fs.writeFileSync(fname, contents);

@@ -34,6 +34,16 @@ testpoints = []
 
 class TestEbisu(unittest.TestCase):
 
+  def test_predictRecallMedian(self):
+    model0 = (4.0, 4.0, 1.0)
+    model1 = updateRecall(model0, False, 1.0)
+    model2 = updateRecall(model1, True, 0.01)
+    ts = np.linspace(0.01, 4.0, 81.0)
+    qs = (0.05, 0.25, 0.5, 0.75, 0.95)
+    for t in ts:
+      for q in qs:
+        self.assertGreater(predictRecallMedian(model2, t, q), 0)
+
   def test_kl(self):
     # See https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Quantities_of_information_.28entropy.29 for these numbers
     self.assertAlmostEqual(klDivBeta(1., 1., 3., 3.), 0.598803, places=5)

@@ -48,18 +48,15 @@ def predictRecallMedian(prior, tnow, percentile=0.5):
   specifies the percentile rather than 50% (median).
   """
   # [1] `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
+  # and see "Alternate form assuming a, b, p, and t are positive".
   from scipy.optimize import brentq
-  from scipy.special import beta as fbeta
-  from scipy.special import hyp2f1
+  from scipy.special import betainc
   alpha, beta, t = prior
   dt = tnow / t
 
   # See [1]. If the mode doesn't exist (or can't be found), find the median (or
   # `percentile`) using a root-finder and the cumulative distribution function.
-  cdfPercentile = lambda p: (p**(alpha/dt) *
-                             hyp2f1(alpha, 1 - beta, 1 + alpha, p**(1/dt)) /
-                             alpha /
-                             fbeta(alpha,beta)) - percentile
+  cdfPercentile = lambda p: betainc(alpha, beta, p**(1 / dt)) - percentile
   return brentq(cdfPercentile, 0, 1)
 
 

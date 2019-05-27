@@ -37,6 +37,7 @@ def updateViaGb1(prior: Tuple[float, float, float], result: bool, tnow: float):
   delta = tnow / t
   if result:
     gb1 = (1.0 / delta, 1.0, alpha + delta, beta, tnow)
+    mom = gb1Moments(*gb1[:-1])
   else:
     mom = np.array(failureMoments(prior, result, tnow, num=2))
 
@@ -50,28 +51,54 @@ def updateViaGb1(prior: Tuple[float, float, float], result: bool, tnow: float):
     # print("optimization cost", res.cost)
     newBeta, newDelta = res.x
     gb1 = (1 / newDelta, 1, alpha, newBeta, tnow)
+
+  moved2 = moveBeta(gb1ToBeta(gb1))
   return dict(
       simple=gb1ToBeta(gb1),
       moved=gb1ToBeta(moveGb1(gb1, prior[2])),
-      moved2=moveBeta(gb1ToBeta(gb1)))
+      moved2=moved2,
+      moved3=moveBeta2(gb1ToBeta(gb1)),
+      moveBetasOnly=moveBeta(ebisu.updateRecall(prior, result, tnow)),
+      postToBeta=posteriorMomToBeta(mom, moved2, tnow),
+  )
+
+
+def betaMoments(a, b, num=2):
+  mom = [a / (a + b)]
+  for k in range(2, num + 1):
+    mom.append(mom[-1] * (a + k - 1) / (a + b + k - 1))
+  return mom
+
+
+def posteriorMomToBeta(mom, approxModel, tnow):
+
+  def f(ah):
+    newAlpha, newH = ah
+    this = np.array(gb1Moments(newH / tnow, 1., newAlpha, newAlpha))
+    return this - mom
+
+  from scipy.optimize import least_squares
+  res = least_squares(f, (approxModel[0], approxModel[2]))
+  return [res.x[0], res.x[0], res.x[1]]
 
 
 def moveGb1(gb1: Tuple[float, float, float, float, float], priorT):
   """Given a GB1 model (4 parameters and time), find the closest GB1 distribution where alpha=beta
   
   This will be at the halflife. Can produce terrible results when stressed. Why?"""
-  mom1, mom2 = gb1Moments(*gb1[:-1])
+  mom = np.array(gb1Moments(*gb1[:-1], num=4))
 
   def f(aa):
-    newA, newAlpha = aa
-    this1, this2 = gb1Moments(newA, 1., newAlpha, newAlpha)
-    return np.array([this1 - mom1, this2 - mom2])
+    newA, newAlpha = np.exp(aa[0]), np.exp(aa[1])
+    this = np.array(gb1Moments(newA, 1., newAlpha, newAlpha, num=4))
+    return this - mom
 
   from scipy.optimize import least_squares
-  res = least_squares(f, [gb1[0], (gb1[2] + gb1[3]) / 2], bounds=((0, 1.01), (np.inf, np.inf)))
+  res = least_squares(f, [np.log(gb1[0]), np.log((gb1[2] + gb1[3]) / 2)])
   # print("optimization cost", res.cost)
-  print('movegb1res', res.x, 'cost', res.cost)
-  return [res.x[0], gb1[1], res.x[1], res.x[1], gb1[4]]
+  print('movegb1res', np.exp(res.x), 'cost', res.cost)
+  expx = np.exp(res.x)
+  return [expx[0], gb1[1], expx[1], expx[1], gb1[4]]
 
 
 def estimate_half_life(model, quantile=0.5):
@@ -117,6 +144,16 @@ def estimate_half_life(model, quantile=0.5):
   return t1
 
 
+def moveBeta2(model: Tuple[float, float, float]):
+  th = estimate_half_life(model, 0.5)
+  a, b, t = model
+  d = th / t
+  m1, m2 = gb1Moments(1 / d, 1., a, b)
+  var = m2 - m1**2
+  alpha1, beta1 = ebisu.alternate._meanVarToBeta(m1, var)
+  return (alpha1, beta1, th)
+
+
 def moveBeta(model: Tuple[float, float, float]):
   """Given a Beta model (2 parameters and time), find the closest Beta model at the halflife
   
@@ -124,37 +161,48 @@ def moveBeta(model: Tuple[float, float, float]):
   th = estimate_half_life(model, 0.5)
   m = ebisu.predictRecall(model, th)
   v = ebisu.predictRecallVar(model, th)
-  alpha1, beta1 = ebisu._meanVarToBeta(m, v)
+  alpha1, beta1 = ebisu.alternate._meanVarToBeta(m, v)
   return (alpha1, beta1, th)
 
 
 if __name__ == '__main__':
+  import pylab as plt
+  plt.style.use('ggplot')
   model = (4., 30., 1.)
-  model = (40., 6., 1.)
-  model = (4., 6., 1.)
-  result = True
-  result = False
-  tnow = 30.
+
+  # model = (40., 6., 1.)
+  # model = (4., 6., 1.)
+
 
   def simulation(model, result, tnow):
     gold = ebisu.updateRecall(model, result, tnow)
 
     newModel = updateViaGb1(model, result, tnow)
     print(newModel)
-    t = np.linspace(.1, 25, 200)
+    t = np.linspace(.1, 100 * 1, 50 * 1)
 
     def trace(model):
       return np.vectorize(lambda t: ebisu.predictRecall(model, t))(t)
 
-    import pylab as plt
-    plt.style.use('ggplot')
+    def yerr(model):
+      return np.vstack([
+          np.vectorize(lambda t: ebisu.alternate.predictRecallMedian(model, t, 0.25))(t),
+          np.vectorize(lambda t: ebisu.alternate.predictRecallMedian(model, t, 0.75))(t),
+      ])
+
+    def both(model):
+      y = trace(model)
+      return dict(y=y, yerr=np.abs(yerr(model) - y))
+
     plt.ion()
     plt.figure()
-    plt.semilogy(t, trace(model), linewidth=5, label='prior')
-    plt.semilogy(t, trace(gold), linewidth=4, label='post')
-    plt.semilogy(t, trace(newModel['simple']), '--', linewidth=3, label='via GB1')
-    plt.semilogy(t, trace(newModel['moved']), linewidth=2, label='via GB1@HL')
-    plt.semilogy(t, trace(newModel['moved2']), '--', linewidth=1, label='Beta@HL')
+    plt.semilogy(t, trace(model), linewidth=6, label='prior')
+    # plt.semilogy(t, trace(gold), linewidth=5, label='orig')
+    plt.semilogy(t, trace(newModel['simple']), '--', linewidth=4, label='via GB1')
+    # plt.semilogy(t, trace(newModel['moved']), linewidth=3, label='via GB1@HL')
+    plt.semilogy(t, trace(newModel['moved2']), '--', linewidth=2, label='Beta@HL')
+    plt.semilogy(t, trace(newModel['postToBeta']), linewidth=1, label='post2beta')
+    # plt.semilogy(t, trace(newModel['moveBetasOnly']), '-', linewidth=2, label='orig@HL')
     plt.legend()
     plt.title('Quiz={}, T={}'.format(result, tnow))
 
@@ -169,6 +217,59 @@ if __name__ == '__main__':
 
   simulation(model, True, .01)
   simulation(model, False, .01)
+
+  def predictAnalysis():
+    models = []
+    hlmodels = []
+    for i in range(1000):
+      a = np.random.rand() * 10 + 2
+      b = np.random.rand() * 10 + 2
+      t = np.random.rand() * 20
+      model = [a, b, t]
+      hlmodel = moveBeta(model)
+      models.append(model)
+      hlmodels.append(hlmodel)
+    t = np.linspace(.1, 500, 1000)
+    t0 = t[50]
+    ps = [ebisu.predictRecall(model, t0) for model in hlmodels]
+    arg = np.argsort(ps)
+    pviat = [model[2] / t0 for model in hlmodels]
+    arg2 = np.argsort(pviat)
+    plt.figure()
+    plt.scatter(ps, pviat, np.array([m[0] for m in hlmodels]))
+
+    from mpl_toolkits.mplot3d import Axes3D
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(ps, pviat, np.array([m[0] for m in hlmodels]))
+    ax.set_xlabel('Precall')
+    ax.set_ylabel('t/tnow')
+    ax.set_zlabel('alpha')
+
+    deltav = np.logspace(-2, 2)
+    deltav = np.linspace(.01, 10)
+    alphav = np.linspace(1.2, 40)
+    dmesh, amesh = np.meshgrid(deltav, alphav)
+    from scipy.special import gammaln
+    pmesh = gammaln(
+        2 * amesh) - gammaln(amesh) + gammaln(amesh + dmesh) - gammaln(2 * amesh + dmesh)
+
+    def myimshow(x, y, data):
+
+      def extents(f):
+        delta = f[1] - f[0]
+        return [f[0] - delta / 2, f[-1] + delta / 2]
+
+      ax = plt.imshow(
+          data, aspect='auto', interpolation='none', extent=extents(x) + extents(y), origin='lower')
+
+    plt.figure()
+    myimshow(deltav, alphav, pmesh)
+    plt.xlabel('delta')
+    plt.ylabel('alpha')
+    plt.colorbar()
+
+
 """
 For `model = (4., 6., 1.)`, 
 - the "via GB1" model, which doesn't move the prior halflife (much) and
@@ -176,4 +277,7 @@ For `model = (4., 6., 1.)`,
 both agree very well for severe over/under-review, pass/fail quizzes.
 
 Similarly for `model = (40, 6, 1)` and `(4., 30., 1.)`.
+
+Well, I don't like how the telescoping behaves for `(4., 30., 1.)`. True
+and False at T=0.01 both are not great far past the new halflife.
 """

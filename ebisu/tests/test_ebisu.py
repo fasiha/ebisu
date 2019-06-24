@@ -51,6 +51,7 @@ class TestEbisu(unittest.TestCase):
     self.assertAlmostEqual(klDivBeta(3., 3., 1., 1.), 0.267864, places=5)
 
   def test_prior(self):
+    "test predictRecall vs predictRecallMonteCarlo"
 
     def inner(a, b, t0):
       global testpoints
@@ -64,6 +65,7 @@ class TestEbisu(unittest.TestCase):
     inner(34.4, 34.4, 1.)
 
   def test_posterior(self):
+    "Test updateRecall via updateRecallMonteCarlo"
 
     def inner(a, b, t0, dts):
       global testpoints
@@ -80,6 +82,7 @@ class TestEbisu(unittest.TestCase):
     inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
 
   def test_update_then_predict(self):
+    "Ensure #1 is fixed: prediction after update is monotonic"
     future = np.linspace(.01, 1000, 101)
 
     def inner(a, b, t0, dts):
@@ -90,6 +93,19 @@ class TestEbisu(unittest.TestCase):
           predicted = np.vectorize(lambda tnow: predictRecall(newModel, tnow))(future)
           self.assertTrue(
               np.all(np.diff(predicted) < 0), msg=msg + ' predicted={}'.format(predicted))
+
+    inner(3.3, 4.4, 1., [0.1, 1., 9.5])
+    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+
+  def test_halflife(self):
+    "Exercise modelToPercentileDecay"
+    percentiles = np.linspace(.01, .99, 101)
+
+    def inner(a, b, t0, dts):
+      for t in map(lambda dt: dt * t0, dts):
+        msg = 'a={},b={},t0={},t={}'.format(a, b, t0, t)
+        ts = np.vectorize(lambda p: modelToPercentileDecay((a, b, t), p))(percentiles)
+        self.assertTrue(np.all(np.diff(ts) < 0), msg=msg + ' ts={}'.format(ts))
 
     inner(3.3, 4.4, 1., [0.1, 1., 9.5])
     inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])

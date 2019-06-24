@@ -410,13 +410,13 @@ def gb1Moments(a, b, p, q, num=2, returnLog=True):
 
 Finally we have a couple more helper functions in the main `ebisu` namespace.
 
-It is often useful to find out how much time has to elapse for memory to decay to a given recall probability. The time for memory to decay to 50% recall probability is the half-life. A quiz app might store the time when each quiz’s recall probability reaches 50%, 5%, 0.05%, …, as a computationally-efficient approximation to the exact recall probability. I am grateful to Robert Kern for contributing the `priorToPercentileDecay` function (🏀 below).
+It is often useful to find out how much time has to elapse for memory to decay to a given recall probability. The time for memory to decay to 50% recall probability is the half-life. A quiz app might store the time when each quiz’s recall probability reaches 50%, 5%, 0.05%, …, as a computationally-efficient approximation to the exact recall probability. I am grateful to Robert Kern for contributing the `modelToPercentileDecay` function (🏀 below).
 
 The least important function from a usage point of view is also the most important function for someone getting started with Ebisu: I call it `defaultModel` (🍗 below) and it simply creates a “model” object (a 3-tuple) out of the arguments it’s given. It’s included in the `ebisu` namespace to help developers who totally lack confidence in picking parameters: the only information it absolutely needs is an expected half-life, e.g., four hours or twenty-four hours or however long you expect a newly-learned fact takes to decay to 50% recall.
 
 ```py
 # export ebisu/ebisu.py #
-def priorToPercentileDecay(prior, percentile=0.5):
+def modelToPercentileDecay(model, percentile=0.5):
   """When will memory decay to a given percentile? 🏀
   
   Use a root-finding routine in log-delta space to find the delta that
@@ -428,6 +428,7 @@ def priorToPercentileDecay(prior, percentile=0.5):
   """
   from scipy.special import betaln
   from scipy.optimize import root_scalar
+  import numpy as np
   alpha, beta, t0 = model
   logBab = betaln(alpha, beta)
   logPercentile = np.log(percentile)
@@ -481,7 +482,7 @@ def defaultModel(t, alpha=3.0, beta=None):
 I would expect all the functions above to be present in all implementations of Ebisu:
 - `predictRecall`, aided by a public helper function `cacheIndependent`,
 - `updateRecall`, aided by private helper functions `gb1ToBeta`, `failureMoments`, and `gb1Moments`,
-- `priorToPercentileDecay`, and
+- `modelToPercentileDecay`, and
 - `defaultModel`.
 
 The functions in the following section are either for illustrative or debugging purposes.
@@ -702,6 +703,7 @@ class TestEbisu(unittest.TestCase):
     self.assertAlmostEqual(klDivBeta(3., 3., 1., 1.), 0.267864, places=5)
 
   def test_prior(self):
+    "test predictRecall vs predictRecallMonteCarlo"
 
     def inner(a, b, t0):
       global testpoints
@@ -715,6 +717,7 @@ class TestEbisu(unittest.TestCase):
     inner(34.4, 34.4, 1.)
 
   def test_posterior(self):
+    "Test updateRecall via updateRecallMonteCarlo"
 
     def inner(a, b, t0, dts):
       global testpoints
@@ -731,6 +734,7 @@ class TestEbisu(unittest.TestCase):
     inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
 
   def test_update_then_predict(self):
+    "Ensure #1 is fixed: prediction after update is monotonic"
     future = np.linspace(.01, 1000, 101)
 
     def inner(a, b, t0, dts):
@@ -741,6 +745,19 @@ class TestEbisu(unittest.TestCase):
           predicted = np.vectorize(lambda tnow: predictRecall(newModel, tnow))(future)
           self.assertTrue(
               np.all(np.diff(predicted) < 0), msg=msg + ' predicted={}'.format(predicted))
+
+    inner(3.3, 4.4, 1., [0.1, 1., 9.5])
+    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+
+  def test_halflife(self):
+    "Exercise modelToPercentileDecay"
+    percentiles = np.linspace(.01, .99, 101)
+
+    def inner(a, b, t0, dts):
+      for t in map(lambda dt: dt * t0, dts):
+        msg = 'a={},b={},t0={},t={}'.format(a, b, t0, t)
+        ts = np.vectorize(lambda p: modelToPercentileDecay((a, b, t), p))(percentiles)
+        self.assertTrue(np.all(np.diff(ts) < 0), msg=msg + ' ts={}'.format(ts))
 
     inner(3.3, 4.4, 1., [0.1, 1., 9.5])
     inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
@@ -926,6 +943,13 @@ Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/3
 Many thanks also to Drew Benedetti for reviewing this manuscript.
 
 John Otander’s [Modest CSS](http://markdowncss.github.io/modest/) is used to style the Markdown output.
+
+
+
+
+
+
+
 
 
 

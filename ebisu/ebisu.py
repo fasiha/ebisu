@@ -110,7 +110,7 @@ def gb1Moments(a, b, p, q, num=2, returnLog=True):
   logb = np.log(b)
   ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
   return ret if returnLog else [np.exp(x) for x in ret]
-def priorToPercentileDecay(prior, percentile=0.5):
+def modelToPercentileDecay(model, percentile=0.5):
   """When will memory decay to a given percentile? 🏀
   
   Use a root-finding routine in log-delta space to find the delta that
@@ -122,6 +122,7 @@ def priorToPercentileDecay(prior, percentile=0.5):
   """
   from scipy.special import betaln
   from scipy.optimize import root_scalar
+  import numpy as np
   alpha, beta, t0 = model
   logBab = betaln(alpha, beta)
   logPercentile = np.log(percentile)

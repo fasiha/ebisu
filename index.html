@@ -1339,7 +1339,7 @@
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
 </g>
-</svg></span>, convert these to the <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">closest Beta distribution</a> and straightforwardly update with the Bernoulli likelihood as mentioned <a href="#bernoulli-quizzes">above</a>. However, we will show that it is more accurate to do the likelihood update analytically, and delay fitting to a Beta until the last minute.</p>
+</svg></span>, convert these to the <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">closest Beta distribution</a> and straightforwardly update with the Bernoulli likelihood as mentioned <a href="#bernoulli-quizzes">above</a>. However, we can do much better.</p>
 <p>By application of Bayes rule, the posterior is <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="44.161ex" height="7.343ex" style="vertical-align: -3.505ex;" viewBox="0 -1652.5 19013.7 3161.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-95-Title">
 <title id="MathJax-SVG-95-Title">Posterior(p|x) = \frac{Prior(p) · Lik(x|p)}{\int_0^1 Prior(p) · Lik(x|p) \, dp}.</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -2306,7 +2306,7 @@ from . import alternate</code></pre>
 </g>
 </svg></span>. I could have gone all object-oriented here but I chose to leave all these functions as stand-alone functions that consume and transform this 3-tuple because (1) I’m not an OOP devotee, and (2) I wanted to maximize the transparency of of this implementation so it can readily be ported to non-OOP, non-Pythonic languages.</p>
 <blockquote>
-<p><strong>Important</strong> Note how none of these functions deal with <em>timestamps</em>. All time is captured in “time since last review”, and your external application has to store timestamps (as illustrated in the <a href="https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb">Ebisu Jupyter Notebook</a>). This is a deliberate choice! Ebisu wants to know as <em>little</em> about your facts as possible.</p>
+<p><strong>Important</strong> Note how none of these functions deal with <em>timestamps</em>. All time is captured in “time since last review”, and your external application has to assign units and store timestamps (as illustrated in the <a href="https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb">Ebisu Jupyter Notebook</a>). This is a deliberate choice! Ebisu wants to know as <em>little</em> about your facts as possible.</p>
 </blockquote>
 <p>In the <a href="#mean-and-variance-of-the-recall-probability-right-now">math section</a> above we derived the mean recall probability at time <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.698ex" height="2.676ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -863.1 4606.1 1152.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-147-Title">
 <title id="MathJax-SVG-147-Title">t_{now} = t · δ</title>
@@ -2332,7 +2332,7 @@ from . import alternate</code></pre>
  <use xlink:href="#MJMATHI-74" x="2097" y="0"></use>
 </g>
 </svg></span>: <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="49.686ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 21392.5 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-149-Title">
-<title id="MathJax-SVG-149-Title">E[p_t^δ] = Γ(α + β) · Γ(α) / (Γ(α + δ) · Γ(α + β + δ))</title>
+<title id="MathJax-SVG-149-Title">E[p_t^δ] = Γ(α + β) · Γ(α + δ) / (Γ(α) · Γ(α + β + δ))</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
@@ -2353,14 +2353,14 @@ from . import alternate</code></pre>
  <use xlink:href="#MJMAIN-393" x="8130" y="0"></use>
  <use xlink:href="#MJMAIN-28" x="8756" y="0"></use>
  <use xlink:href="#MJMATHI-3B1" x="9145" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="9786" y="0"></use>
- <use xlink:href="#MJMAIN-2F" x="10175" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="10676" y="0"></use>
- <use xlink:href="#MJMAIN-393" x="11065" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="11691" y="0"></use>
- <use xlink:href="#MJMATHI-3B1" x="12080" y="0"></use>
- <use xlink:href="#MJMAIN-2B" x="12943" y="0"></use>
- <use xlink:href="#MJMATHI-3B4" x="13944" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="10008" y="0"></use>
+ <use xlink:href="#MJMATHI-3B4" x="11009" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="11453" y="0"></use>
+ <use xlink:href="#MJMAIN-2F" x="11843" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="12343" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="12733" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="13358" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="13748" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="14388" y="0"></use>
  <use xlink:href="#MJMAIN-22C5" x="15000" y="0"></use>
  <use xlink:href="#MJMAIN-393" x="15501" y="0"></use>
@@ -2374,60 +2374,38 @@ from . import alternate</code></pre>
  <use xlink:href="#MJMAIN-29" x="21003" y="0"></use>
 </g>
 </svg></span>. There are no sums-of-gammas here, so this is readily computed using log-gamma routine (<code>gammaln</code> in Scipy) to avoid overflowing and precision-loss in <code>predictRecall</code> (🍏 below).</p>
-<p>We also derived the variance, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="27.517ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 11847.7 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-150-Title">
-<title id="MathJax-SVG-150-Title">Var[p_t^δ] = E[p_t^{2 δ}] - (E[p_t^δ])^2</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-56" x="0" y="0"></use>
- <use xlink:href="#MJMATHI-61" x="769" y="0"></use>
- <use xlink:href="#MJMATHI-72" x="1299" y="0"></use>
- <use xlink:href="#MJMAIN-5B" x="1750" y="0"></use>
-<g transform="translate(2029,0)">
- <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
-</g>
- <use xlink:href="#MJMAIN-5D" x="2946" y="0"></use>
- <use xlink:href="#MJMAIN-3D" x="3503" y="0"></use>
- <use xlink:href="#MJMATHI-45" x="4559" y="0"></use>
- <use xlink:href="#MJMAIN-5B" x="5323" y="0"></use>
-<g transform="translate(5602,0)">
- <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
-<g transform="translate(503,352)">
- <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="500" y="0"></use>
-</g>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
-</g>
- <use xlink:href="#MJMAIN-5D" x="6874" y="0"></use>
- <use xlink:href="#MJMAIN-2212" x="7374" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="8375" y="0"></use>
- <use xlink:href="#MJMATHI-45" x="8765" y="0"></use>
- <use xlink:href="#MJMAIN-5B" x="9529" y="0"></use>
-<g transform="translate(9808,0)">
- <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
-</g>
- <use xlink:href="#MJMAIN-5D" x="10725" y="0"></use>
-<g transform="translate(11004,0)">
- <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="513"></use>
-</g>
-</g>
-</svg></span>. This might be a helpful value and is computed by <code>predictRecallVar</code> (🍋 below). In order to avoid risking catastrophic cancellation by subtracting two potentially large floats (it’d be nice to prove that this will never happen given our <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.423ex" height="2.176ex" style="vertical-align: -0.838ex;" viewBox="0 -576.1 1043.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-151-Title">
-<title id="MathJax-SVG-151-Title">γ_n</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="733" y="-357"></use>
-</g>
-</svg></span>’s but I haven’t yet done so), we use a simplification of <code>logsumexp</code> to evaluate the subtraction—this trick uses the following identity to avoid subtracting potentially very large floats: <code>exp(x) - exp(y) = exp(m) * (exp(a-m) - exp(b-m))</code> where <code>m = max(x, y)</code> and where <code>x</code> and <code>y</code> are logs of the two summands. This is basically <code>logsumexp</code> without the final <code>log</code>, so this trick is called <code>_subtractexp</code> (⚾️) below.</p>
-<p>These two functions have the same signature: they consume</p>
+<p>Two computational speedups are allowed for:</p>
 <ul>
-<li>a <code>model</code>: represents the Beta prior on recall probability at one specific time since the fact’s last review, and</li>
-<li>a <code>tnow</code>, the time elapsed since the last time this fact was quizzed.</li>
+<li>we can skip the final <code>exp</code> that converts from the log-domain to the linear domain as long as we don’t need an actual probability (i.e., a number between 0 and 1). The output of the function will then be a “pseudo-probability” and can be compared to other “pseudo-probabilities” are returned by the function. Taking advantage of this can, for a representative case I have here, reduce the runtime from 5.69 µs (± 158 ns) to 4.01 µs (± 215 ns), a 1.4× speedup.</li>
+<li><span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="16.496ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7102.4 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-150-Title">
+<title id="MathJax-SVG-150-Title">Γ(α + β) - Γ(α)</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMAIN-393" x="0" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="625" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="1015" y="0"></use>
+ <use xlink:href="#MJMAIN-2B" x="1877" y="0"></use>
+ <use xlink:href="#MJMATHI-3B2" x="2878" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="3444" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="4056" y="0"></use>
+ <use xlink:href="#MJMAIN-393" x="5057" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="5682" y="0"></use>
+ <use xlink:href="#MJMATHI-3B1" x="6072" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="6712" y="0"></use>
+</g>
+</svg></span> is independent of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.032ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 1736.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-151-Title">
+<title id="MathJax-SVG-151-Title">t_{now}</title>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
+<g transform="translate(361,-150)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6F" x="600" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
+</g>
+</g>
+</svg></span> and can be precomputed, for example, when the prior is first established. If this value is passed in, the runtime further reduces to 2.47 µs (± 162 ns), giving a total speedup of 2.3×, with no loss of accuracy. A helper function <code>cacheIndependent</code> is provided: 🥥 below.</li>
 </ul>
 <pre class="py"><code># export ebisu/ebisu.py #
-def predictRecall(prior, tnow):
+def predictRecall(prior, tnow, exact=False, independent=None):
   """Expected recall probability now, given a prior distribution on it. 🍏
 
   `prior` is a tuple representing the prior distribution on recall probability
@@ -2438,49 +2416,30 @@ def predictRecall(prior, tnow):
 
   `tnow` is the *actual* time elapsed since this fact's most recent review.
 
-  Returns the expectation of the recall probability `tnow` after last review, a
-  float between 0 and 1.
+  Optional keyword paramter `exact` makes the return value a probability, specifically, the expected recall probability `tnow` after the last review: a number between 0 and 1. If `exact` is false (the default), some calculations are skipped and the return value won't be a probability, but can still be compared against other values returned by this function. That is, if `predictRecall(prior1, tnow1, exact=True) &lt; predictRecall(prior2, tnow2, exact=True)`, then it is guaranteed that `predictRecall(prior1, tnow1, exact=False) &lt; predictRecall(prior2, tnow2, exact=False)`. The default is set to false for computational reasons.
 
-  See documentation for derivation.
+  Optional keyword parameter `independent` is a precalculated number that is only dependent on `prior` and independent of `tnow`, allowing some computational speedup if cached ahead of time. It can be obtained with `ebisu.cacheIndependent`.
+
+  See README for derivation.
   """
   from scipy.special import gammaln
   from numpy import exp
   alpha, beta, t = prior
+  if not independent:
+    independent = gammaln(alpha + beta) - gammaln(alpha)
   dt = tnow / t
-  return exp(
-      gammaln(alpha + dt) - gammaln(alpha + beta + dt) -
-      (gammaln(alpha) - gammaln(alpha + beta)))
+  ret = gammaln(alpha + dt) - gammaln(alpha + beta + dt) + independent
+  return exp(ret) if exact else ret
 
 
-def _subtractexp(x, y):
-  """Evaluates exp(x) - exp(y) a bit more accurately than that. ⚾️
+def cacheIndependent(prior):
+  """Precompute a value to speed up `predictRecall`. 🥥
 
-  This can avoid cancellation in case `x` and `y` are both large and close,
-  similar to scipy.misc.logsumexp except without the last log.
-  """
-  from numpy import exp, maximum
-  maxval = maximum(x, y)
-  return exp(maxval) * (exp(x - maxval) - exp(y - maxval))
-
-
-def predictRecallVar(prior, tnow):
-  """Variance of recall probability now. 🍋
-
-  This function returns the variance of the distribution whose mean is given by
-  `ebisu.predictRecall`. See it's documentation for details.
-
-  Returns a float.
+  Send the output of this function to `predictRecall`'s `independent` keyword argument.
   """
   from scipy.special import gammaln
   alpha, beta, t = prior
-  dt = tnow / t
-  s = [
-      gammaln(alpha + n * dt) - gammaln(alpha + beta + n * dt) for n in range(3)
-  ]
-  md = 2 * (s[1] - s[0])
-  md2 = s[2] - s[0]
-
-  return _subtractexp(md2, md)</code></pre>
+  return gammaln(alpha + beta) - gammaln(alpha)</code></pre>
 <p>Next is the implementation of <code>updateRecall</code> (🍌), which accepts</p>
 <ul>
 <li>a <code>model</code> (as above, represents the Beta prior on recall probability at one specific time since the fact’s last review),</li>
@@ -2488,216 +2447,13 @@ def predictRecallVar(prior, tnow):
 <li><code>tnow</code>, the actual time since last quiz that this quiz was administered.</li>
 </ul>
 <p>and returns a <em>new</em> model, representing an updated Beta prior on recall probability, this time after <code>tnow</code> time has elapsed since a fact was quizzed.</p>
-<p><strong>In case of successful quiz</strong> <code>updateRecall</code> analytically computes the true posterior’s</p>
+<p><strong>In case of successful quiz</strong> <code>updateRecall</code> analytically computes the true posterior, which is GB1-distributed, and then exactly transforms these into a Beta distribution to yield the new model.</p>
+<p><strong>In case of unsuccessful quiz</strong>, <code>updateRecall</code> numerically fits a GB1 to the true posterior by matching the two distributions’ moments (via non-linear least squares). This approximate GB1 distribution is then exactly transformed back to a Beta distribution to yield the new model. Three helper functions are used:</p>
 <ul>
-<li>mean (expectation) <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.679ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 2445.3 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-152-Title">
-<title id="MathJax-SVG-152-Title">γ_2 / γ_1</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
- <use xlink:href="#MJMAIN-2F" x="972" y="0"></use>
-<g transform="translate(1472,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
-</g>
-</g>
-</svg></span>, which can be evaluated completely in the log domain, and</li>
-<li>variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="21.86ex" height="3.009ex" style="vertical-align: -0.838ex;" viewBox="0 -934.9 9411.7 1295.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-153-Title">
-<title id="MathJax-SVG-153-Title">γ_3 / γ_1 - (E[p|x=1])^2</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-33" x="733" y="-357"></use>
- <use xlink:href="#MJMAIN-2F" x="972" y="0"></use>
-<g transform="translate(1472,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-2212" x="2667" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="3668" y="0"></use>
- <use xlink:href="#MJMATHI-45" x="4057" y="0"></use>
- <use xlink:href="#MJMAIN-5B" x="4822" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="5100" y="0"></use>
- <use xlink:href="#MJMAIN-7C" x="5604" y="0"></use>
- <use xlink:href="#MJMATHI-78" x="5882" y="0"></use>
- <use xlink:href="#MJMAIN-3D" x="6733" y="0"></use>
- <use xlink:href="#MJMAIN-31" x="7789" y="0"></use>
- <use xlink:href="#MJMAIN-5D" x="8289" y="0"></use>
-<g transform="translate(8568,0)">
- <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="513"></use>
-</g>
-</g>
-</svg></span>, which as the previous variance we evaluate in the log domain and use <code>_subtractexp</code> (⚾️ above) to avoid cancellation errors,
-<ul>
-<li>where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="34.232ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 14738.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-154-Title">
-<title id="MathJax-SVG-154-Title">γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="733" y="-357"></use>
- <use xlink:href="#MJMAIN-3D" x="1320" y="0"></use>
- <use xlink:href="#MJMAIN-393" x="2377" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="3002" y="0"></use>
- <use xlink:href="#MJMATHI-3B1" x="3392" y="0"></use>
- <use xlink:href="#MJMAIN-2B" x="4254" y="0"></use>
- <use xlink:href="#MJMATHI-6E" x="5255" y="0"></use>
- <use xlink:href="#MJMAIN-22C5" x="6078" y="0"></use>
- <use xlink:href="#MJMATHI-3B4" x="6579" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="7023" y="0"></use>
- <use xlink:href="#MJMAIN-2F" x="7413" y="0"></use>
- <use xlink:href="#MJMAIN-393" x="7913" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="8539" y="0"></use>
- <use xlink:href="#MJMATHI-3B1" x="8928" y="0"></use>
- <use xlink:href="#MJMAIN-2B" x="9791" y="0"></use>
- <use xlink:href="#MJMATHI-3B2" x="10792" y="0"></use>
- <use xlink:href="#MJMAIN-2B" x="11580" y="0"></use>
- <use xlink:href="#MJMATHI-6E" x="12581" y="0"></use>
- <use xlink:href="#MJMAIN-22C5" x="13404" y="0"></use>
- <use xlink:href="#MJMATHI-3B4" x="13904" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="14349" y="0"></use>
-</g>
-</svg></span>.</li>
-</ul></li>
+<li><code>gb1Moments</code>, which computes the moments of an arbitrary GB1 random variable,</li>
+<li><code>failureMoments</code>, which computes the moments of the posterior upon a failed quiz, and</li>
+<li><code>gb1ToBeta</code>, which translates a GB1 distribution on recall probability back in time to a pure Beta distribution.</li>
 </ul>
-<p><strong>In case of unsuccessful quiz</strong> these values are</p>
-<ul>
-<li>mean <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="19.496ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 8394 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-155-Title">
-<title id="MathJax-SVG-155-Title">(γ_2 - γ_1) / (γ_1 - γ_0)</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMAIN-28" x="0" y="0"></use>
-<g transform="translate(389,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-2212" x="1584" y="0"></use>
-<g transform="translate(2584,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-29" x="3557" y="0"></use>
- <use xlink:href="#MJMAIN-2F" x="3946" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="4447" y="0"></use>
-<g transform="translate(4836,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-2212" x="6031" y="0"></use>
-<g transform="translate(7032,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-29" x="8004" y="0"></use>
-</g>
-</svg></span>, which we rewrite to remain in the log domain and use a ratio of two <code>expm1</code>s, which accurately evaluates <code>exp(x) - 1</code>—recall that subtraction with large floating-point numbers is more risky than division; and</li>
-<li>variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="49.081ex" height="3.176ex" style="vertical-align: -1.005ex;" viewBox="0 -934.9 21132.1 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-156-Title">
-<title id="MathJax-SVG-156-Title">(γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2) / (γ_1 - γ_0)^2</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMAIN-28" x="0" y="0"></use>
-<g transform="translate(389,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-33" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-28" x="1361" y="0"></use>
-<g transform="translate(1751,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-2212" x="2946" y="0"></use>
-<g transform="translate(3946,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-29" x="4919" y="0"></use>
- <use xlink:href="#MJMAIN-2B" x="5530" y="0"></use>
-<g transform="translate(6531,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-28" x="7504" y="0"></use>
-<g transform="translate(7893,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-2B" x="9088" y="0"></use>
-<g transform="translate(10088,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-2212" x="11283" y="0"></use>
-<g transform="translate(12284,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-29" x="13256" y="0"></use>
- <use xlink:href="#MJMAIN-2212" x="13868" y="0"></use>
-<g transform="translate(14869,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="733" y="488"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-435"></use>
-</g>
- <use xlink:href="#MJMAIN-29" x="15841" y="0"></use>
- <use xlink:href="#MJMAIN-2F" x="16230" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="16731" y="0"></use>
-<g transform="translate(17120,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="733" y="-357"></use>
-</g>
- <use xlink:href="#MJMAIN-2212" x="18315" y="0"></use>
-<g transform="translate(19316,0)">
- <use xlink:href="#MJMATHI-3B3" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="733" y="-357"></use>
-</g>
-<g transform="translate(20288,0)">
- <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="550" y="513"></use>
-</g>
-</g>
-</svg></span>. This we evaluate with a sequence of <em>four</em> <code>logsumexp</code>s to minimize risk of floating-point precision loss.</li>
-</ul>
-<blockquote>
-<p>Recall that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.488ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 640.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-157-Title">
-<title id="MathJax-SVG-157-Title">α</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
-</g>
-</svg></span> and <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.332ex" height="2.509ex" style="vertical-align: -0.671ex; margin-right: -0.016ex;" viewBox="0 -791.3 573.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-158-Title">
-<title id="MathJax-SVG-158-Title">β</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
-</g>
-</svg></span> come from the model representing the prior, while <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-159-Title">
-<title id="MathJax-SVG-159-Title">δ = t / t_{now}</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
- <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
- <use xlink:href="#MJMATHI-74" x="1778" y="0"></use>
- <use xlink:href="#MJMAIN-2F" x="2140" y="0"></use>
-<g transform="translate(2640,0)">
- <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
-<g transform="translate(361,-150)">
- <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-6F" x="600" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
-</g>
-</g>
-</g>
-</svg></span> depends on both <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0.84ex" height="2.009ex" style="vertical-align: -0.338ex;" viewBox="0 -719.6 361.5 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-160-Title">
-<title id="MathJax-SVG-160-Title">t</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
-</g>
-</svg></span> (from the model) and the actual time since the previous quiz <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.032ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 1736.1 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-161-Title">
-<title id="MathJax-SVG-161-Title">t_{now}</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
-<g transform="translate(361,-150)">
- <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-6F" x="600" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-77" x="1086" y="0"></use>
-</g>
-</g>
-</svg></span>.</p>
-</blockquote>
-<p>After the mean and variance are evaluated, these are converted to a Beta distribution. We’ll talk about that after this code block.</p>
 <pre class="py"><code># export ebisu/ebisu.py #
 def updateRecall(prior, result, tnow):
   """Update a prior on recall probability with a quiz result and time. 🍌
@@ -2714,73 +2470,118 @@ def updateRecall(prior, result, tnow):
   Returns a new object (like `prior`) describing the posterior distribution of
   recall probability at `tnow`.
   """
-  from scipy.special import gammaln
-  from numpy import exp
-  alpha, beta, t = prior
+  (alpha, beta, t) = prior
   dt = tnow / t
   if result:
-    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
-    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`
-    # variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
-    # Simplify all three to get the following:
-    same = gammaln(alpha + beta + dt) - gammaln(alpha + dt)
-    muln = gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt) + same
-    mu = exp(muln)
-    var = _subtractexp(
-        same + gammaln(alpha + 3 * dt) - gammaln(alpha + beta + 3 * dt),
-        2 * muln)
+    gb1 = (1.0 / dt, 1.0, alpha + dt, beta, tnow)
   else:
-    # Mathematica code is same as above, but replace one `p` with `(1-p)`
-    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
-    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
-    # var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
-    # Then simplify and combine
+    import numpy as np
 
-    from scipy.misc import logsumexp
-    from numpy import expm1
+    mom = np.array(failureMoments(prior, result, tnow, num=2))
 
-    s = [
-        gammaln(alpha + n * dt) - gammaln(alpha + beta + n * dt)
-        for n in range(4)
-    ]
+    def f(bd):
+      b, d = bd
+      this = np.array(gb1Moments(1 / d, 1., alpha, b, num=2))
+      return this - mom
 
-    mu = expm1(s[2] - s[1]) / -expm1(s[0] - s[1])
+    from scipy.optimize import least_squares
+    res = least_squares(f, [beta, dt], bounds=((1.01, 0), (np.inf, np.inf)))
+    newBeta, newDelta = res.x
+    gb1 = (1 / newDelta, 1, alpha, newBeta, tnow)
 
-    def lse(a, b):
-      return list(logsumexp(a, b=b, return_sign=True))
+  return gb1ToBeta(gb1)
 
-    n1 = lse([s[1], s[0]], [1, -1])
-    n1[0] += s[3]
-    n2 = lse([s[0], s[1], s[2]], [1, 1, -1])
-    n2[0] += s[2]
-    n3 = [s[1] * 2, 1.]
-    d = lse([s[1], s[0]], [1, -1])
-    d[0] *= 2
-    n = lse([n1[0], n2[0], n3[0]], [n1[1], n2[1], -n3[1]])
-    var = exp(n[0] - d[0])
 
-  newAlpha, newBeta = _meanVarToBeta(mu, var)
-  return newAlpha, newBeta, tnow</code></pre>
-<p>Finally we have a couple more helper functions in the main <code>ebisu</code> namespace. <code>_meanVarToBeta</code> (🏈 below) uses simple algebra to <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters">fit a Beta distribution</a> to a mean and variance—it’s used in <code>updateRecall</code>.</p>
-<p>I’ve thought about taking <code>priorToHalflife</code> (🏀 below) out of the main <code>ebisu</code> namespace because it’s not used by the core algorithm, but rather is for visualization purposes. Given a <code>model</code> (as above, a 3-tuple representing a Beta distribution prior on a fact’s recall probability at a specific time after its last review), it runs <code>predictRecall</code> over and over in a potentially-time-consuming bracketed search to find the <em>half-life</em>, that is, the time between reviews at which the recall probability is 50% (customizable via the <code>percentile</code> argument). This bracketed search, Scipy’s sophisticated <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.brentq.html">Brent’s algorithm</a>, requires a min and max values to search over and the defaults of <code>mint=1e-3</code> and <code>maxt=100</code> might not suffice for all cases.</p>
+def gb1ToBeta(gb1):
+  """Convert a GB1 model (five parameters: four GB1 parameters, time) to a Beta model
+  
+  `gb1: Tuple[float, float, float, float, float]`
+  """
+  return (gb1[2], gb1[3], gb1[4] * gb1[0])
+
+
+def failureMoments(model, result, tnow, num=4, returnLog=True):
+  """Moments of the posterior on recall at time `tnow` upon quiz failure
+  
+  - `model: Tuple[float, float, float]`
+  - `result: bool`
+  - `tnow: float`
+  - `num: int`
+  - `returnLog: bool`
+  """
+  a, b, t0 = model
+  t = tnow / t0
+  from scipy.special import gammaln, logsumexp
+  from numpy import exp
+  s = [gammaln(a + n * t) - gammaln(a + b + n * t) for n in range(num + 2)]
+  marginal = logsumexp([s[0], s[1]], b=[1, -1])
+  ret = [(logsumexp([s[n], s[n + 1]], b=[1, -1]) - marginal) for n in range(1, num + 1)]
+  return ret if returnLog else [exp(x) for x in ret]
+
+
+def gb1Moments(a, b, p, q, num=2, returnLog=True):
+  """Raw moments of GB1, via Wikipedia
+  
+  `a: float, b: float, p: float, q: float, num: int, returnLog: bool`
+  """
+  from scipy.special import betaln
+  import numpy as np
+  bpq = betaln(p, q)
+  logb = np.log(b)
+  ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
+  return ret if returnLog else [np.exp(x) for x in ret]</code></pre>
+<p>Finally we have a couple more helper functions in the main <code>ebisu</code> namespace.</p>
+<p>It is often useful to find out how much time has to elapse for memory to decay to a given recall probability. The time for memory to decay to 50% recall probability is the half-life. A quiz app might store the time when each quiz’s recall probability reaches 50%, 5%, 0.05%, …, as a computationally-efficient approximation to the exact recall probability. I am grateful to Robert Kern for contributing the <code>modelToPercentileDecay</code> function (🏀 below).</p>
 <p>The least important function from a usage point of view is also the most important function for someone getting started with Ebisu: I call it <code>defaultModel</code> (🍗 below) and it simply creates a “model” object (a 3-tuple) out of the arguments it’s given. It’s included in the <code>ebisu</code> namespace to help developers who totally lack confidence in picking parameters: the only information it absolutely needs is an expected half-life, e.g., four hours or twenty-four hours or however long you expect a newly-learned fact takes to decay to 50% recall.</p>
 <pre class="py"><code># export ebisu/ebisu.py #
-def _meanVarToBeta(mean, var):
-  """Fit a Beta distribution to a mean and variance. 🏈"""
-  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters
-  tmp = mean * (1 - mean) / var - 1
-  alpha = mean * tmp
-  beta = (1 - mean) * tmp
-  return alpha, beta
+def modelToPercentileDecay(model, percentile=0.5):
+  """When will memory decay to a given percentile? 🏀
+  
+  Use a root-finding routine in log-delta space to find the delta that
+  will cause the GB1 distribution to have a mean of the requested quantile.
+  Because we are using well-behaved normalized deltas instead of times, and
+  owing to the monotonicity of the expectation with respect to delta, we can
+  quickly scan for a rough estimate of the scale of delta, then do a finishing
+  optimization to get the right value.
+  """
+  from scipy.special import betaln
+  from scipy.optimize import root_scalar
+  import numpy as np
+  alpha, beta, t0 = model
+  logBab = betaln(alpha, beta)
+  logPercentile = np.log(percentile)
+
+  def f(lndelta):
+    logMean = betaln(alpha + np.exp(lndelta), beta) - logBab
+    return logMean - logPercentile
+
+  # Scan for a bracket.
+  bracket_width = 6.0
+  blow = -bracket_width / 2.0
+  bhigh = bracket_width / 2.0
+  flow = f(blow)
+  fhigh = f(bhigh)
+  while flow &gt; 0 and fhigh &gt; 0:
+    # Move the bracket up.
+    blow = bhigh
+    flow = fhigh
+    bhigh += bracket_width
+    fhigh = f(bhigh)
+  while flow &lt; 0 and fhigh &lt; 0:
+    # Move the bracket down.
+    bhigh = blow
+    fhigh = flow
+    blow -= bracket_width
+    flow = f(blow)
+
+  assert flow &gt; 0 and fhigh &lt; 0
+
+  sol = root_scalar(f, bracket=[blow, bhigh])
+  t1 = np.exp(sol.root) * t0
+  return t1
 
 
-def priorToHalflife(prior, percentile=0.5, maxt=100, mint=1e-3):
-  """Find the half-life corresponding to a time-based prior on recall. 🏀"""
-  from scipy.optimize import brentq
-  return brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
-
-
-def defaultModel(t, alpha=4.0, beta=None):
+def defaultModel(t, alpha=3.0, beta=None):
   """Convert recall probability prior's raw parameters into a model object. 🍗
 
   `t` is your guess as to the half-life of any given fact, in units that you
@@ -2794,30 +2595,34 @@ def defaultModel(t, alpha=4.0, beta=None):
   `alpha`.
   """
   return (alpha, beta or alpha, t)</code></pre>
-<p>With the exception of <code>defaultModel</code>, <code>priorToHalflife</code>, <code>predictRecallVar</code>, all the above functions are considered core Ebisu functions and any implementation should provide them:</p>
+<p>I would expect all the functions above to be present in all implementations of Ebisu:</p>
 <ul>
-<li><code>predictRecall</code> and</li>
-<li><code>updateRecall</code>,</li>
-<li>aided by private helper functions
-<ul>
-<li><code>_meanVarToBeta</code> and</li>
-<li><code>_subtractexp</code>.</li>
-</ul></li>
+<li><code>predictRecall</code>, aided by a public helper function <code>cacheIndependent</code>,</li>
+<li><code>updateRecall</code>, aided by private helper functions <code>gb1ToBeta</code>, <code>failureMoments</code>, and <code>gb1Moments</code>,</li>
+<li><code>modelToPercentileDecay</code>, and</li>
+<li><code>defaultModel</code>.</li>
 </ul>
 <p>The functions in the following section are either for illustrative or debugging purposes.</p>
 <h3 id="miscellaneous-functions">Miscellaneous functions</h3>
 <p>I wrote a number of other functions that help provide insight or help debug the above functions in the main <code>ebisu</code> workspace but are not necessary for an actual implementation. These are in the <code>ebisu.alternate</code> submodule and not nearly as much time has been spent on polish or optimization as the above core functions.</p>
+<p>First, a helper function that fits a Beta random variable to a mean and variance.</p>
 <pre class="py"><code># export ebisu/alternate.py #
-from .ebisu import _meanVarToBeta</code></pre>
-<p><code>predictRecallMode</code> and <code>predictRecallMedian</code> return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-162-Title">
-<title id="MathJax-SVG-162-Title">p_t^δ</title>
+def _meanVarToBeta(mean, var):
+  """Fit a Beta distribution to a mean and variance. 🏈"""
+  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters
+  tmp = mean * (1 - mean) / var - 1
+  alpha = mean * tmp
+  beta = (1 - mean) * tmp
+  return alpha, beta</code></pre>
+<p><code>predictRecallMode</code> and <code>predictRecallMedian</code> return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-152-Title">
+<title id="MathJax-SVG-152-Title">p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
 </g>
-</svg></span> whose mean is returned by <code>predictRecall</code> (🍏 above). Recall that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-163-Title">
-<title id="MathJax-SVG-163-Title">δ = t / t_{now}</title>
+</svg></span> whose mean is returned by <code>predictRecall</code> (🍏 above). Recall that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-153-Title">
+<title id="MathJax-SVG-153-Title">δ = t / t_{now}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
@@ -2833,35 +2638,35 @@ from .ebisu import _meanVarToBeta</code></pre>
 </g>
 </g>
 </svg></span>.</p>
-<p>The mode has an analytical expression, and while it is more meaningful than the mean, the distribution can blow up to infinity at 0 or 1 when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-164-Title">
-<title id="MathJax-SVG-164-Title">δ</title>
+<p>The mode has an analytical expression, and while it is more meaningful than the mean, the distribution can blow up to infinity at 0 or 1 when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-154-Title">
+<title id="MathJax-SVG-154-Title">δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
 </g>
 </svg></span> is either much smaller or much larger than 1, in which case the analytical expression may yield nonsense, so a number of not-very-rigorous checks are in place to attempt to detect this.</p>
-<p>I could not find a closed-form expression for the median of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-165-Title">
-<title id="MathJax-SVG-165-Title">p_t^δ</title>
+<p>I could not find a closed-form expression for the median of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-155-Title">
+<title id="MathJax-SVG-155-Title">p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
 </g>
 </svg></span>, so I use a bracketed root search (Brent’s algorithm) on the cumulative distribution function (the CDF), for which Wolfram Alpha can yield an analytical expression. This can get numerically burdensome, which is unacceptable because one may need to predict the recall probability for thousands of facts. For these reasons, although I would have preferred to make <code>predictRecall</code> evaluate the mode or median, I made it return the mean.</p>
-<p><code>predictRecallMonteCarlo</code> is the simplest function. It evaluates the mean, variance, mode (via histogram), and median of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-166-Title">
-<title id="MathJax-SVG-166-Title">p_t^δ</title>
+<p><code>predictRecallMonteCarlo</code> is the simplest function. It evaluates the mean, variance, mode (via histogram), and median of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-156-Title">
+<title id="MathJax-SVG-156-Title">p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
 </g>
-</svg></span> by drawing samples from the Beta prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-167-Title">
-<title id="MathJax-SVG-167-Title">p_t</title>
+</svg></span> by drawing samples from the Beta prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-157-Title">
+<title id="MathJax-SVG-157-Title">p_t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-213"></use>
 </g>
-</svg></span> and raising them to the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-168-Title">
-<title id="MathJax-SVG-168-Title">δ</title>
+</svg></span> and raising them to the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-158-Title">
+<title id="MathJax-SVG-158-Title">δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
 </g>
@@ -2892,8 +2697,8 @@ def predictRecallMode(prior, tnow):
 
     eps = 1e-3
     others = [
-        eps, mode - eps if mode &gt; eps else mode / 2,
-        mode + eps if mode &lt; 1 - eps else (1 + mode) / 2, 1 - eps
+        eps, mode - eps if mode &gt; eps else mode / 2, mode + eps if mode &lt; 1 - eps else
+        (1 + mode) / 2, 1 - eps
     ]
     otherPr = map(pr, others)
     if max(otherPr) &lt;= modePr:
@@ -2920,6 +2725,7 @@ def predictRecallMedian(prior, tnow, percentile=0.5):
   dt = tnow / t
   return betaincinv(alpha, beta, percentile)**dt
 
+
 def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
   """Monte Carlo simulation of the immediate recall probability.
 
@@ -2940,198 +2746,9 @@ def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
       median=np.median(tnowPrior),
       mode=bincenters[freqs.argmax()],
       var=np.var(tnowPrior))</code></pre>
-<p>Next we have alternate approaches to <code>updateRecall</code> (🍌 above), namely, using quadrature integration (i.e., numerical integration) and Monte Carlo simulation.</p>
-<p><code>updateRecallQuad</code> uses quadrature integration to evaluate the expectation and variance of of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.198ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 1807.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-169-Title">
-<title id="MathJax-SVG-169-Title">p_t^δ | x</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
- <use xlink:href="#MJMAIN-7C" x="917" y="0"></use>
- <use xlink:href="#MJMATHI-78" x="1196" y="0"></use>
-</g>
-</svg></span>, both of which can be expressed as integrals—recall that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="25.134ex" height="3.676ex" style="vertical-align: -1.005ex;" viewBox="0 -1150.1 10821.7 1582.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-170-Title">
-<title id="MathJax-SVG-170-Title">E[f(p)] = \int_0^1 f(p) P(p) \, dp</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
- <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
- <use xlink:href="#MJMATHI-66" x="1043" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="1593" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="1983" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="2486" y="0"></use>
- <use xlink:href="#MJMAIN-5D" x="2876" y="0"></use>
- <use xlink:href="#MJMAIN-3D" x="3432" y="0"></use>
-<g transform="translate(4488,0)">
- <use xlink:href="#MJSZ1-222B" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="921" y="754"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="668" y="-484"></use>
-</g>
- <use xlink:href="#MJMATHI-66" x="5761" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="6311" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="6701" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="7204" y="0"></use>
- <use xlink:href="#MJMATHI-50" x="7594" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="8345" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="8735" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="9238" y="0"></use>
- <use xlink:href="#MJMATHI-64" x="9794" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="10318" y="0"></use>
-</g>
-</svg></span> for any function <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.257ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 1833 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-171-Title">
-<title id="MathJax-SVG-171-Title">f(p)</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-66" x="0" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="550" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="940" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="1443" y="0"></use>
-</g>
-</svg></span>, and where <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="4.724ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 2034 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-172-Title">
-<title id="MathJax-SVG-172-Title">P(p)</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="751" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="1141" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="1644" y="0"></use>
-</g>
-</svg></span> is the density function. Also recall from <a href="#updating-the-posterior-with-quiz-results">above</a> that the posterior has the form <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="44.161ex" height="7.343ex" style="vertical-align: -3.505ex;" viewBox="0 -1652.5 19013.7 3161.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-173-Title">
-<title id="MathJax-SVG-173-Title">Posterior(p|x) = \frac{Prior(p) · Lik(x|p)}{\int_0^1 Prior(p) · Lik(x|p) \, dp}.</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
- <use xlink:href="#MJMATHI-6F" x="751" y="0"></use>
- <use xlink:href="#MJMATHI-73" x="1237" y="0"></use>
- <use xlink:href="#MJMATHI-74" x="1706" y="0"></use>
- <use xlink:href="#MJMATHI-65" x="2068" y="0"></use>
- <use xlink:href="#MJMATHI-72" x="2534" y="0"></use>
- <use xlink:href="#MJMATHI-69" x="2986" y="0"></use>
- <use xlink:href="#MJMATHI-6F" x="3331" y="0"></use>
- <use xlink:href="#MJMATHI-72" x="3817" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="4268" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="4658" y="0"></use>
- <use xlink:href="#MJMAIN-7C" x="5161" y="0"></use>
- <use xlink:href="#MJMATHI-78" x="5440" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="6012" y="0"></use>
- <use xlink:href="#MJMAIN-3D" x="6679" y="0"></use>
-<g transform="translate(7458,0)">
-<g transform="translate(397,0)">
-<rect stroke="none" width="10759" height="60" x="0" y="220"></rect>
-<g transform="translate(1293,770)">
- <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
- <use xlink:href="#MJMATHI-72" x="751" y="0"></use>
- <use xlink:href="#MJMATHI-69" x="1203" y="0"></use>
- <use xlink:href="#MJMATHI-6F" x="1548" y="0"></use>
- <use xlink:href="#MJMATHI-72" x="2034" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="2485" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="2875" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="3378" y="0"></use>
- <use xlink:href="#MJMAIN-22C5" x="3990" y="0"></use>
- <use xlink:href="#MJMATHI-4C" x="4490" y="0"></use>
- <use xlink:href="#MJMATHI-69" x="5172" y="0"></use>
- <use xlink:href="#MJMATHI-6B" x="5517" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="6039" y="0"></use>
- <use xlink:href="#MJMATHI-78" x="6428" y="0"></use>
- <use xlink:href="#MJMAIN-7C" x="7001" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="7279" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="7783" y="0"></use>
-</g>
-<g transform="translate(60,-1025)">
- <use xlink:href="#MJSZ1-222B" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="921" y="754"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-30" x="668" y="-484"></use>
- <use xlink:href="#MJMATHI-50" x="1272" y="0"></use>
- <use xlink:href="#MJMATHI-72" x="2024" y="0"></use>
- <use xlink:href="#MJMATHI-69" x="2475" y="0"></use>
- <use xlink:href="#MJMATHI-6F" x="2821" y="0"></use>
- <use xlink:href="#MJMATHI-72" x="3306" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="3758" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="4147" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="4651" y="0"></use>
- <use xlink:href="#MJMAIN-22C5" x="5262" y="0"></use>
- <use xlink:href="#MJMATHI-4C" x="5763" y="0"></use>
- <use xlink:href="#MJMATHI-69" x="6444" y="0"></use>
- <use xlink:href="#MJMATHI-6B" x="6790" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="7311" y="0"></use>
- <use xlink:href="#MJMATHI-78" x="7701" y="0"></use>
- <use xlink:href="#MJMAIN-7C" x="8273" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="8552" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="9055" y="0"></use>
- <use xlink:href="#MJMATHI-64" x="9612" y="0"></use>
- <use xlink:href="#MJMATHI-70" x="10135" y="0"></use>
-</g>
-</g>
-</g>
- <use xlink:href="#MJMAIN-2E" x="18735" y="0"></use>
-</g>
-</svg></span> That denominator (the marginal of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.33ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 572.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-174-Title">
-<title id="MathJax-SVG-174-Title">x</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
-</g>
-</svg></span>) can be evaluated via quadrature, or by an analytical expression obtained from Wolfram Alpha (the unit tests below do both, overkill). However, the <em>prior</em> on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-175-Title">
-<title id="MathJax-SVG-175-Title">p_t^δ</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
-</g>
-</svg></span>, derived <a href="#moving-beta-distributions-through-time">above</a>, is used here as-is since it has been extensively tested using Monte Carlo (see <code>predictRecallMonteCarlo</code> above). Any of the three integrals can fail to converge to a sensible value, in which case an exception is thrown (and in that case, the unit test is skipped).</p>
-<p><code>updateRecallMonteCarlo</code> is deceptively simple. Like <code>predictRecallMonteCarlo</code> above, it draws samples from the Beta distribution in <code>model</code> and propagates them through Ebbinghaus’ forgetting curve to the time specified, but then it assigns weights to each sample—each weight is that sample’s probability according to the Bernoulli likelihood. This is equivalent to multiplying the prior with the likelihood—and we needn’t bother with the marginal because it’s just a normalizing factor which would scale all weights equally. The function then computes the <em>weighted</em> mean and variance (reference links in the source below) before straightforwardly converting these to a new Beta prior as done by <code>updateRecall</code>. (I am grateful to <a href="https://stats.stackexchange.com/q/273221/31187">mxwsn</a> for suggesting this elegant approach.)</p>
+<p>Next we have a Monte Carlo approache to <code>updateRecall</code> (🍌 above), the deceptively-simple <code>updateRecallMonteCarlo</code>. Like <code>predictRecallMonteCarlo</code> above, it draws samples from the Beta distribution in <code>model</code> and propagates them through Ebbinghaus’ forgetting curve to the time specified. To model the likelihood update from the quiz result, it assigns weights to each sample—each weight is that sample’s probability according to the Bernoulli likelihood. (This is equivalent to multiplying the prior with the likelihood—and we needn’t bother with the marginal because it’s just a normalizing factor which would scale all weights equally. I am grateful to <a href="https://stats.stackexchange.com/q/273221/31187">mxwsn</a> for suggesting this elegant approach.) Since our real GB1-based <code>updateRecall</code> above returns posteriors at potentially different times, <code>updateRecallMonteCarlo</code> optionally takes a <code>tback</code> time to rewind or forward-wind the Monte Carlo ensemble, again through Ebbinghaus’ exponential decay curve. Finally, the ensemble is collapsed to a weighted mean and variance and converted to a Beta distribution.</p>
 <pre class="py"><code># export ebisu/alternate.py #
-def updateRecallQuad(prior, result, tnow, analyticMarginal=True):
-  """Update recall probability with quiz result via quadrature integration.
-
-  Same arguments as `ebisu.updateRecall`, see that docstring for details.
-
-  An extra keyword argument: `analyticMarginal` if false will compute the
-  marginal (the denominator in Bayes rule) using quadrature as well. If true, an
-  analytical expression will be used.
-  """
-  from scipy.integrate import quad
-  alpha, beta, t = prior
-  dt = tnow / t
-
-  if result == 1:
-    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta -
-                                                                         1) * p
-  else:
-    # difference from above: -------------------------------------------^vvvv
-    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(
-        beta - 1) * (1 - p)
-
-  if analyticMarginal:
-    from scipy.special import beta as fbeta
-    if result == 1:
-      marginal = dt * fbeta(alpha + dt, beta)
-    else:
-      marginal = dt * (fbeta(alpha, beta) - fbeta(alpha + dt, beta))
-  else:
-    marginalEst = quad(marginalInt, 0, 1)
-    if marginalEst[0] &lt; marginalEst[1] * 10.:
-      raise OverflowError(
-          'Marginal integral error too high: value={}, error={}'.format(
-              marginalEst[0], marginalEst[1]))
-    marginal = marginalEst[0]
-
-  muInt = lambda p: marginalInt(p) * p
-  muEst = quad(muInt, 0, 1)
-  if muEst[0] &lt; muEst[1] * 10.:
-    raise OverflowError(
-        'Mean integral error too high: value={}, error={}'.format(
-            muEst[0], muEst[1]))
-  mu = muEst[0] / marginal
-
-  varInt = lambda p: marginalInt(p) * (p - mu)**2
-  varEst = quad(varInt, 0, 1)
-  if varEst[0] &lt; varEst[1] * 10.:
-    raise OverflowError(
-        'Variance integral error too high: value={}, error={}'.format(
-            varEst[0], varEst[1]))
-  var = varEst[0] / marginal
-
-  newAlpha, newBeta = _meanVarToBeta(mu, var)
-  return newAlpha, newBeta, tnow
-
-
-def updateRecallMonteCarlo(prior, result, tnow, N=10 * 1000):
+def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
   """Update recall probability with quiz result via Monte Carlo simulation.
 
   Same arguments as `ebisu.updateRecall`, see that docstring for details.
@@ -3151,37 +2768,19 @@ def updateRecallMonteCarlo(prior, result, tnow, N=10 * 1000):
   # This is the Bernoulli likelihood [bernoulliLikelihood]
   weights = (tnowPrior)**result * ((1 - tnowPrior)**(1 - result))
 
+  # Now propagate this posterior to the tback
+  tbackPrior = tnowPrior**(tback / tnow)
+
   # See [weightedMean]
-  weightedMean = np.sum(weights * tnowPrior) / np.sum(weights)
+  weightedMean = np.sum(weights * tbackPrior) / np.sum(weights)
   # See [weightedVar]
-  weightedVar = np.sum(weights *
-                       (tnowPrior - weightedMean)**2) / np.sum(weights)
+  weightedVar = np.sum(weights * (tbackPrior - weightedMean)**2) / np.sum(weights)
 
   newAlpha, newBeta = _meanVarToBeta(weightedMean, weightedVar)
 
-  return newAlpha, newBeta, tnow</code></pre>
+  return newAlpha, newBeta, tback</code></pre>
 <p>That’s it—that’s all the code in the <code>ebisu</code> module!</p>
 <h3 id="test-code">Test code</h3>
-<p>Before diving into unit tests, I promised <a href="#updating-the-posterior-with-quiz-results">above</a> to show the suboptimality of fitting a Beta to the prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-176-Title">
-<title id="MathJax-SVG-176-Title">p_t^δ</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
-</g>
-</svg></span> and performing a straightforward conjugate update. Assume you can trust <code>updateRecall</code> for now, which fits a Beta to the full <em>posterior</em>. The following shows the difference between the two models: the numerical differences start in the first digit after the decimal point.</p>
-<pre class="py"><code>def betafitBeforeLikelihood(a, b, t1, x, t2):
-  a2, b2 = _meanVarToBeta(
-      predictRecall((a, b, t1), t2), predictRecallVar((a, b, t1), t2))
-  return a2 + x, b2 + 1 - x, t2
-
-
-print("Beta fit BEFORE posterior:", updateRecall((3.3, 4.4, 1.), 1., 2.))
-print("Beta fit AFTER posterior:",
-      betafitBeforeLikelihood(3.3, 4.4, 1., 1., 2.))
-# Output:
-# Beta fit BEFORE posterior: (2.2138973610926804, 4.6678159395305334, 2.0)
-# Beta fit AFTER posterior: (2.3075328265376691, 4.8652384243261961, 2.0)</code></pre>
 <p>I use the built-in <code>unittest</code>, and I can run all the tests from Atom via Hydrogen/Jupyter but for historic reasons I don’t want Jupyter to deal with the <code>ebisu</code> namespace, just functions (since most of these functions and tests existed before the module’s layout was decided). So the following is in its own fenced code block that I don’t evaluate in Atom.</p>
 <pre class="py"><code># export ebisu/tests/test_ebisu.py
 from ebisu import *
@@ -3189,11 +2788,12 @@ from ebisu.alternate import *</code></pre>
 <p>In these unit tests, I compare</p>
 <ul>
 <li><code>predictRecall</code> and <code>predictRecallVar</code> against <code>predictRecallMonteCarlo</code>, and</li>
-<li><code>updateRecall</code> against <code>updateRecallQuad</code> (both with analytical and numerical marginal) and against <code>updateRecallMonteCarlo</code>.</li>
+<li><code>updateRecall</code> against <code>updateRecallMonteCarlo</code>.</li>
 </ul>
-<p>For the latter, since all the functions return a Beta distribution’s parameters, I compare the resulting distributions in terms of <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Quantities_of_information_.28entropy.29">Kullback–Leibler divergence</a> (actually, the symmetric distance version), which is a nice way to measure the difference between two probability distributions. There is also a little unit test for my implementation for the KL divergence on Beta distributions.</p>
-<p>For the former, I compare means and variances using relative error, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.231ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4404.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-177-Title">
-<title id="MathJax-SVG-177-Title">|x-y| / |y|</title>
+<p>I also want to make sure that <code>predictRecall</code> and <code>updateRecall</code> both produce sane values when extremely under- and over-reviewing, i.e., immediately after review as well as far into the future.</p>
+<p>For testing <code>updateRecall</code>, since all functions return a Beta distribution, I compare the resulting distributions in terms of <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Quantities_of_information_.28entropy.29">Kullback–Leibler divergence</a> (actually, the symmetric distance version), which is a nice way to measure the difference between two probability distributions. There is also a little unit test for my implementation for the KL divergence on Beta distributions.</p>
+<p>For testing <code>predictRecall</code>, I compare means using relative error, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.231ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4404.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-159-Title">
+<title id="MathJax-SVG-159-Title">|x-y| / |y|</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-7C" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-78" x="278" y="0"></use>
@@ -3205,9 +2805,9 @@ from ebisu.alternate import *</code></pre>
  <use xlink:href="#MJMATHI-79" x="3628" y="0"></use>
  <use xlink:href="#MJMAIN-7C" x="4126" y="0"></use>
 </g>
-</svg></span>, since they do not return distributions, only means/variances.</p>
-<p>For both sets of functions, a range of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-178-Title">
-<title id="MathJax-SVG-178-Title">δ = t_{now} / t</title>
+</svg></span>.</p>
+<p>For both sets of functions, a range of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-160-Title">
+<title id="MathJax-SVG-160-Title">δ = t_{now} / t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
@@ -3222,11 +2822,12 @@ from ebisu.alternate import *</code></pre>
  <use xlink:href="#MJMAIN-2F" x="3514" y="0"></use>
  <use xlink:href="#MJMATHI-74" x="4015" y="0"></use>
 </g>
-</svg></span> and both outcomes of quiz results (true and false) are tested to ensure they all produce the same answers. Sometimes, quadrature integration fails to find a solution, in which case it is not compared to the Monte Carlo and analytical versions.</p>
+</svg></span> and both outcomes of quiz results (true and false) are tested to ensure they all produce the same answers.</p>
 <p>Often the unit tests fails because the tolerances are a little tight, and the random number generator seed is variable, which leads to errors exceeding thresholds. I actually prefer to see these occasional test failures because it gives me confidence that the thresholds are where I want them to be (if I set the thresholds too loose, and I somehow accidentally greatly improved accuracy, I might never know). However, I realize it can be annoying for automated tests or continuous integration systems, so I am open to fixing a seed and fixing the error threshold for it.</p>
 <p>One note: the unit tests udpate a global database of <code>testpoints</code> being tested, which can be dumped to a JSON file for comparison against other implementations.</p>
 <pre class="py"><code># export ebisu/tests/test_ebisu.py
 import unittest
+import numpy as np
 
 
 def relerr(dirt, gold):
@@ -3250,8 +2851,7 @@ def klDivBeta(a, b, a2, b2):
 
 
 def kl(v, w):
-  return (klDivBeta(v[0], v[1], w[0], w[1]) +
-          klDivBeta(w[0], w[1], v[0], v[1])) / 2.
+  return (klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])) / 2.
 
 
 testpoints = []
@@ -3275,55 +2875,68 @@ class TestEbisu(unittest.TestCase):
     self.assertAlmostEqual(klDivBeta(3., 3., 1., 1.), 0.267864, places=5)
 
   def test_prior(self):
+    "test predictRecall vs predictRecallMonteCarlo"
 
     def inner(a, b, t0):
       global testpoints
       for t in map(lambda dt: dt * t0, [0.1, .99, 1., 1.01, 5.5]):
         mc = predictRecallMonteCarlo((a, b, t0), t, N=100 * 1000)
-        mean = predictRecall((a, b, t0), t)
-        var = predictRecallVar((a, b, t0), t)
+        mean = predictRecall((a, b, t0), t, exact=True)
         self.assertLess(relerr(mean, mc['mean']), 5e-2)
-        self.assertLess(relerr(var, mc['var']), 5e-2)
-        testpoints += [['predict', [a, b, t0], [t], dict(mean=mean, var=var)]]
+        testpoints += [['predict', [a, b, t0], [t], dict(mean=mean)]]
 
     inner(3.3, 4.4, 1.)
     inner(34.4, 34.4, 1.)
 
   def test_posterior(self):
+    "Test updateRecall via updateRecallMonteCarlo"
 
     def inner(a, b, t0, dts):
       global testpoints
       for t in map(lambda dt: dt * t0, dts):
         for x in [False, True]:
           msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
-          mc = updateRecallMonteCarlo((a, b, t0), x, t, N=1 * 100 * 1000)
           an = updateRecall((a, b, t0), x, t)
-          self.assertLess(
-              kl(an, mc), 1e-3, msg=msg + ' an={}, mc={}'.format(an, mc))
-
-          try:
-            quad1 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=True)
-          except OverflowError:
-            quad1 = None
-          if quad1 is not None:
-            self.assertLess(kl(quad1, mc), 1e-3, msg=msg)
-
-          try:
-            quad2 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=False)
-          except OverflowError:
-            quad2 = None
-          if quad2 is not None:
-            self.assertLess(kl(quad2, mc), 1e-3, msg=msg)
+          mc = updateRecallMonteCarlo((a, b, t0), x, t, an[2], N=100 * 1000)
+          self.assertLess(kl(an, mc), 5e-3, msg=msg + ' an={}, mc={}'.format(an, mc))
 
           testpoints += [['update', [a, b, t0], [x, t], dict(post=an)]]
 
     inner(3.3, 4.4, 1., [0.1, 1., 9.5])
-    inner(341.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+
+  def test_update_then_predict(self):
+    "Ensure #1 is fixed: prediction after update is monotonic"
+    future = np.linspace(.01, 1000, 101)
+
+    def inner(a, b, t0, dts):
+      for t in map(lambda dt: dt * t0, dts):
+        for x in [False, True]:
+          msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
+          newModel = updateRecall((a, b, t0), x, t)
+          predicted = np.vectorize(lambda tnow: predictRecall(newModel, tnow))(future)
+          self.assertTrue(
+              np.all(np.diff(predicted) &lt; 0), msg=msg + ' predicted={}'.format(predicted))
+
+    inner(3.3, 4.4, 1., [0.1, 1., 9.5])
+    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+
+  def test_halflife(self):
+    "Exercise modelToPercentileDecay"
+    percentiles = np.linspace(.01, .99, 101)
+
+    def inner(a, b, t0, dts):
+      for t in map(lambda dt: dt * t0, dts):
+        msg = 'a={},b={},t0={},t={}'.format(a, b, t0, t)
+        ts = np.vectorize(lambda p: modelToPercentileDecay((a, b, t), p))(percentiles)
+        self.assertTrue(np.all(np.diff(ts) &lt; 0), msg=msg + ' ts={}'.format(ts))
+
+    inner(3.3, 4.4, 1., [0.1, 1., 9.5])
+    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
 
 
 if __name__ == '__main__':
-  unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(
-      TestEbisu()))
+  unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(TestEbisu()))
 
   with open("test.json", "w") as out:
     import json
@@ -3350,9 +2963,8 @@ plt.close('all')
 plt.figure()
 [
     plt.plot(
-        ps,
-        stats.beta.pdf(ps, ab, ab) / stats.beta.pdf(.5, ab, ab),
-        label='α=β={}'.format(ab)) for ab in ablist
+        ps, stats.beta.pdf(ps, ab, ab) / stats.beta.pdf(.5, ab, ab), label='α=β={}'.format(ab))
+    for ab in ablist
 ]
 plt.legend(loc=2)
 plt.xticks(np.linspace(0, 1, 5))
@@ -3369,9 +2981,7 @@ plt.axhline(y=t0, linewidth=1, color='0.5')
 [
     plt.plot(
         ts,
-        list(
-            map(lambda t: priorToHalflife(updateRecall((a, a, t0), xobs, t)),
-                ts)),
+        list(map(lambda t: priorToHalflife(updateRecall((a, a, t0), xobs, t)), ts)),
         marker='x' if xobs == 1 else 'o',
         color='C{}'.format(aidx),
         label='α=β={}, {}'.format(a, 'pass' if xobs == 1 else 'fail'))
@@ -3405,12 +3015,10 @@ plt.figure()
         v2s(predictRecallVar(model, ts)),
         fmt='.-',
         label='Model ' + label,
-        color=color)
-    for model, color, label in [(modelA, 'C0', 'A'), (modelB, 'C1', 'B')]
+        color=color) for model, color, label in [(modelA, 'C0', 'A'), (modelB, 'C1', 'B')]
 ]
 [
-    plt.plot(
-        ts, 2**(-ts / halflife), '--', label='approx ' + label, color=color)
+    plt.plot(ts, 2**(-ts / halflife), '--', label='approx ' + label, color=color)
     for halflife, color, label in [(hlA, 'C0', 'A'), (hlB, 'C1', 'B')]
 ]
 # plt.yscale('log')
@@ -3418,15 +3026,14 @@ plt.legend(loc=0)
 plt.ylim([0, 1])
 plt.xlabel('Time (days)')
 plt.ylabel('Recall probability')
-plt.title('Predicted forgetting curves (halflife A={:0.0f}, B={:0.0f})'.format(
-    hlA, hlB))
+plt.title('Predicted forgetting curves (halflife A={:0.0f}, B={:0.0f})'.format(hlA, hlB))
 plt.savefig('figures/forgetting-curve.svg')
 plt.savefig('figures/forgetting-curve.png', dpi=300)
 plt.show()</code></pre>
 <p><img src="figures/forgetting-curve.png" alt="figures/forgetting-curve.png"></p>
 <p>This plot shows <code>predictRecall</code>’s fully analytical solution for two separate models over time as well as this approximation: model A has half-life of eleven days while model B has half-life of 7.9 days. We see that the approximation diverges a bit from the true solution.</p>
-<p>This also indicates that placing a prior on recall probabilities and propagating that prior through time via Ebbinghaus results in a <em>different</em> curve than Ebbinghaus’ exponential decay curve. This surprising result can be seen as a consequence of <a href="https://en.wikipedia.org/wiki/Jensen%27s_inequality">Jensen’s inequality</a>, which says that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.752ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7643.1 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-179-Title">
-<title id="MathJax-SVG-179-Title">E[f(p)] ≥ f(E[p])</title>
+<p>This also indicates that placing a prior on recall probabilities and propagating that prior through time via Ebbinghaus results in a <em>different</em> curve than Ebbinghaus’ exponential decay curve. This surprising result can be seen as a consequence of <a href="https://en.wikipedia.org/wiki/Jensen%27s_inequality">Jensen’s inequality</a>, which says that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.752ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7643.1 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-161-Title">
+<title id="MathJax-SVG-161-Title">E[f(p)] ≥ f(E[p])</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
@@ -3444,13 +3051,13 @@ plt.show()</code></pre>
  <use xlink:href="#MJMAIN-5D" x="6975" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="7253" y="0"></use>
 </g>
-</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.279ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 550.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-180-Title">
-<title id="MathJax-SVG-180-Title">f</title>
+</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.279ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 550.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-162-Title">
+<title id="MathJax-SVG-162-Title">f</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-66" x="0" y="0"></use>
 </g>
-</svg></span> is convex, and that the opposite is true if it is concave. In our case, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.487ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 4084.9 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-181-Title">
-<title id="MathJax-SVG-181-Title">f(p) = p^δ</title>
+</svg></span> is convex, and that the opposite is true if it is concave. In our case, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.487ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 4084.9 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-163-Title">
+<title id="MathJax-SVG-163-Title">f(p) = p^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-66" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-28" x="550" y="0"></use>
@@ -3513,4 +3120,4 @@ plt.show()</code></pre>
 <p>Many thanks to <a href="https://stats.stackexchange.com/q/273221/31187">mxwsn and commenters</a> as well as <a href="https://stats.stackexchange.com/q/272834/31187">jth</a> for their advice and patience with my statistical incompetence.</p>
 <p>Many thanks also to Drew Benedetti for reviewing this manuscript.</p>
 <p>John Otander’s <a href="http://markdowncss.github.io/modest/">Modest CSS</a> is used to style the Markdown output.</p>
-<svg style="display: none;"><defs id="MathJax_SVG_glyphs"><path stroke-width="1" id="MJMAIN-32" d="M109 429Q82 429 66 447T50 491Q50 562 103 614T235 666Q326 666 387 610T449 465Q449 422 429 383T381 315T301 241Q265 210 201 149L142 93L218 92Q375 92 385 97Q392 99 409 186V189H449V186Q448 183 436 95T421 3V0H50V19V31Q50 38 56 46T86 81Q115 113 136 137Q145 147 170 174T204 211T233 244T261 278T284 308T305 340T320 369T333 401T340 431T343 464Q343 527 309 573T212 619Q179 619 154 602T119 569T109 550Q109 549 114 549Q132 549 151 535T170 489Q170 464 154 447T109 429Z"></path><path stroke-width="1" id="MJMAIN-2212" d="M84 237T84 250T98 270H679Q694 262 694 250T679 230H98Q84 237 84 250Z"></path><path stroke-width="1" id="MJMAIN-394" d="M51 0Q46 4 46 7Q46 9 215 357T388 709Q391 716 416 716Q439 716 444 709Q447 705 616 357T786 7Q786 4 781 0H51ZM507 344L384 596L137 92L383 91H630Q630 93 507 344Z"></path><path stroke-width="1" id="MJMAIN-2F" d="M423 750Q432 750 438 744T444 730Q444 725 271 248T92 -240Q85 -250 75 -250Q68 -250 62 -245T56 -231Q56 -221 230 257T407 740Q411 750 423 750Z"></path><path stroke-width="1" id="MJMATHI-68" d="M137 683Q138 683 209 688T282 694Q294 694 294 685Q294 674 258 534Q220 386 220 383Q220 381 227 388Q288 442 357 442Q411 442 444 415T478 336Q478 285 440 178T402 50Q403 36 407 31T422 26Q450 26 474 56T513 138Q516 149 519 151T535 153Q555 153 555 145Q555 144 551 130Q535 71 500 33Q466 -10 419 -10H414Q367 -10 346 17T325 74Q325 90 361 192T398 345Q398 404 354 404H349Q266 404 205 306L198 293L164 158Q132 28 127 16Q114 -11 83 -11Q69 -11 59 -2T48 16Q48 30 121 320L195 616Q195 629 188 632T149 637H128Q122 643 122 645T124 664Q129 683 137 683Z"></path><path stroke-width="1" id="MJMATHI-74" d="M26 385Q19 392 19 395Q19 399 22 411T27 425Q29 430 36 430T87 431H140L159 511Q162 522 166 540T173 566T179 586T187 603T197 615T211 624T229 626Q247 625 254 615T261 596Q261 589 252 549T232 470L222 433Q222 431 272 431H323Q330 424 330 420Q330 398 317 385H210L174 240Q135 80 135 68Q135 26 162 26Q197 26 230 60T283 144Q285 150 288 151T303 153H307Q322 153 322 145Q322 142 319 133Q314 117 301 95T267 48T216 6T155 -11Q125 -11 98 4T59 56Q57 64 57 83V101L92 241Q127 382 128 383Q128 385 77 385H26Z"></path><path stroke-width="1" id="MJMATHI-78" d="M52 289Q59 331 106 386T222 442Q257 442 286 424T329 379Q371 442 430 442Q467 442 494 420T522 361Q522 332 508 314T481 292T458 288Q439 288 427 299T415 328Q415 374 465 391Q454 404 425 404Q412 404 406 402Q368 386 350 336Q290 115 290 78Q290 50 306 38T341 26Q378 26 414 59T463 140Q466 150 469 151T485 153H489Q504 153 504 145Q504 144 502 134Q486 77 440 33T333 -11Q263 -11 227 52Q186 -10 133 -10H127Q78 -10 57 16T35 71Q35 103 54 123T99 143Q142 143 142 101Q142 81 130 66T107 46T94 41L91 40Q91 39 97 36T113 29T132 26Q168 26 194 71Q203 87 217 139T245 247T261 313Q266 340 266 352Q266 380 251 392T217 404Q177 404 142 372T93 290Q91 281 88 280T72 278H58Q52 284 52 289Z"></path><path stroke-width="1" id="MJMAIN-223C" d="M55 166Q55 241 101 304T222 367Q260 367 296 349T362 304T421 252T484 208T554 189Q616 189 655 236T694 338Q694 350 698 358T708 367Q722 367 722 334Q722 260 677 197T562 134H554Q517 134 481 152T414 196T355 248T292 293T223 311Q179 311 145 286Q109 257 96 218T80 156T69 133Q55 133 55 166Z"></path><path stroke-width="1" id="MJMATHI-42" d="M231 637Q204 637 199 638T194 649Q194 676 205 682Q206 683 335 683Q594 683 608 681Q671 671 713 636T756 544Q756 480 698 429T565 360L555 357Q619 348 660 311T702 219Q702 146 630 78T453 1Q446 0 242 0Q42 0 39 2Q35 5 35 10Q35 17 37 24Q42 43 47 45Q51 46 62 46H68Q95 46 128 49Q142 52 147 61Q150 65 219 339T288 628Q288 635 231 637ZM649 544Q649 574 634 600T585 634Q578 636 493 637Q473 637 451 637T416 636H403Q388 635 384 626Q382 622 352 506Q352 503 351 500L320 374H401Q482 374 494 376Q554 386 601 434T649 544ZM595 229Q595 273 572 302T512 336Q506 337 429 337Q311 337 310 336Q310 334 293 263T258 122L240 52Q240 48 252 48T333 46Q422 46 429 47Q491 54 543 105T595 229Z"></path><path stroke-width="1" id="MJMATHI-65" d="M39 168Q39 225 58 272T107 350T174 402T244 433T307 442H310Q355 442 388 420T421 355Q421 265 310 237Q261 224 176 223Q139 223 138 221Q138 219 132 186T125 128Q125 81 146 54T209 26T302 45T394 111Q403 121 406 121Q410 121 419 112T429 98T420 82T390 55T344 24T281 -1T205 -11Q126 -11 83 42T39 168ZM373 353Q367 405 305 405Q272 405 244 391T199 357T170 316T154 280T149 261Q149 260 169 260Q282 260 327 284T373 353Z"></path><path stroke-width="1" id="MJMATHI-72" d="M21 287Q22 290 23 295T28 317T38 348T53 381T73 411T99 433T132 442Q161 442 183 430T214 408T225 388Q227 382 228 382T236 389Q284 441 347 441H350Q398 441 422 400Q430 381 430 363Q430 333 417 315T391 292T366 288Q346 288 334 299T322 328Q322 376 378 392Q356 405 342 405Q286 405 239 331Q229 315 224 298T190 165Q156 25 151 16Q138 -11 108 -11Q95 -11 87 -5T76 7T74 17Q74 30 114 189T154 366Q154 405 128 405Q107 405 92 377T68 316T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-6E" d="M21 287Q22 293 24 303T36 341T56 388T89 425T135 442Q171 442 195 424T225 390T231 369Q231 367 232 367L243 378Q304 442 382 442Q436 442 469 415T503 336T465 179T427 52Q427 26 444 26Q450 26 453 27Q482 32 505 65T540 145Q542 153 560 153Q580 153 580 145Q580 144 576 130Q568 101 554 73T508 17T439 -10Q392 -10 371 17T350 73Q350 92 386 193T423 345Q423 404 379 404H374Q288 404 229 303L222 291L189 157Q156 26 151 16Q138 -11 108 -11Q95 -11 87 -5T76 7T74 17Q74 30 112 180T152 343Q153 348 153 366Q153 405 129 405Q91 405 66 305Q60 285 60 284Q58 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-6F" d="M201 -11Q126 -11 80 38T34 156Q34 221 64 279T146 380Q222 441 301 441Q333 441 341 440Q354 437 367 433T402 417T438 387T464 338T476 268Q476 161 390 75T201 -11ZM121 120Q121 70 147 48T206 26Q250 26 289 58T351 142Q360 163 374 216T388 308Q388 352 370 375Q346 405 306 405Q243 405 195 347Q158 303 140 230T121 120Z"></path><path stroke-width="1" id="MJMATHI-75" d="M21 287Q21 295 30 318T55 370T99 420T158 442Q204 442 227 417T250 358Q250 340 216 246T182 105Q182 62 196 45T238 27T291 44T328 78L339 95Q341 99 377 247Q407 367 413 387T427 416Q444 431 463 431Q480 431 488 421T496 402L420 84Q419 79 419 68Q419 43 426 35T447 26Q469 29 482 57T512 145Q514 153 532 153Q551 153 551 144Q550 139 549 130T540 98T523 55T498 17T462 -8Q454 -10 438 -10Q372 -10 347 46Q345 45 336 36T318 21T296 6T267 -6T233 -11Q189 -11 155 7Q103 38 103 113Q103 170 138 262T173 379Q173 380 173 381Q173 390 173 393T169 400T158 404H154Q131 404 112 385T82 344T65 302T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-6C" d="M117 59Q117 26 142 26Q179 26 205 131Q211 151 215 152Q217 153 225 153H229Q238 153 241 153T246 151T248 144Q247 138 245 128T234 90T214 43T183 6T137 -11Q101 -11 70 11T38 85Q38 97 39 102L104 360Q167 615 167 623Q167 626 166 628T162 632T157 634T149 635T141 636T132 637T122 637Q112 637 109 637T101 638T95 641T94 647Q94 649 96 661Q101 680 107 682T179 688Q194 689 213 690T243 693T254 694Q266 694 266 686Q266 675 193 386T118 83Q118 81 118 75T117 65V59Z"></path><path stroke-width="1" id="MJMATHI-69" d="M184 600Q184 624 203 642T247 661Q265 661 277 649T290 619Q290 596 270 577T226 557Q211 557 198 567T184 600ZM21 287Q21 295 30 318T54 369T98 420T158 442Q197 442 223 419T250 357Q250 340 236 301T196 196T154 83Q149 61 149 51Q149 26 166 26Q175 26 185 29T208 43T235 78T260 137Q263 149 265 151T282 153Q302 153 302 143Q302 135 293 112T268 61T223 11T161 -11Q129 -11 102 10T74 74Q74 91 79 106T122 220Q160 321 166 341T173 380Q173 404 156 404H154Q124 404 99 371T61 287Q60 286 59 284T58 281T56 279T53 278T49 278T41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMAIN-28" d="M94 250Q94 319 104 381T127 488T164 576T202 643T244 695T277 729T302 750H315H319Q333 750 333 741Q333 738 316 720T275 667T226 581T184 443T167 250T184 58T225 -81T274 -167T316 -220T333 -241Q333 -250 318 -250H315H302L274 -226Q180 -141 137 -14T94 250Z"></path><path stroke-width="1" id="MJMATHI-70" d="M23 287Q24 290 25 295T30 317T40 348T55 381T75 411T101 433T134 442Q209 442 230 378L240 387Q302 442 358 442Q423 442 460 395T497 281Q497 173 421 82T249 -10Q227 -10 210 -4Q199 1 187 11T168 28L161 36Q160 35 139 -51T118 -138Q118 -144 126 -145T163 -148H188Q194 -155 194 -157T191 -175Q188 -187 185 -190T172 -194Q170 -194 161 -194T127 -193T65 -192Q-5 -192 -24 -194H-32Q-39 -187 -39 -183Q-37 -156 -26 -148H-6Q28 -147 33 -136Q36 -130 94 103T155 350Q156 355 156 364Q156 405 131 405Q109 405 94 377T71 316T59 280Q57 278 43 278H29Q23 284 23 287ZM178 102Q200 26 252 26Q282 26 310 49T356 107Q374 141 392 215T411 325V331Q411 405 350 405Q339 405 328 402T306 393T286 380T269 365T254 350T243 336T235 326L232 322Q232 321 229 308T218 264T204 212Q178 106 178 102Z"></path><path stroke-width="1" id="MJMAIN-29" d="M60 749L64 750Q69 750 74 750H86L114 726Q208 641 251 514T294 250Q294 182 284 119T261 12T224 -76T186 -143T145 -194T113 -227T90 -246Q87 -249 86 -250H74Q66 -250 63 -250T58 -247T55 -238Q56 -237 66 -225Q221 -64 221 250T66 725Q56 737 55 738Q55 746 60 749Z"></path><path stroke-width="1" id="MJMAIN-31" d="M213 578L200 573Q186 568 160 563T102 556H83V602H102Q149 604 189 617T245 641T273 663Q275 666 285 666Q294 666 302 660V361L303 61Q310 54 315 52T339 48T401 46H427V0H416Q395 3 257 3Q121 3 100 0H88V46H114Q136 46 152 46T177 47T193 50T201 52T207 57T213 61V578Z"></path><path stroke-width="1" id="MJMATHI-61" d="M33 157Q33 258 109 349T280 441Q331 441 370 392Q386 422 416 422Q429 422 439 414T449 394Q449 381 412 234T374 68Q374 43 381 35T402 26Q411 27 422 35Q443 55 463 131Q469 151 473 152Q475 153 483 153H487Q506 153 506 144Q506 138 501 117T481 63T449 13Q436 0 417 -8Q409 -10 393 -10Q359 -10 336 5T306 36L300 51Q299 52 296 50Q294 48 292 46Q233 -10 172 -10Q117 -10 75 30T33 157ZM351 328Q351 334 346 350T323 385T277 405Q242 405 210 374T160 293Q131 214 119 129Q119 126 119 118T118 106Q118 61 136 44T179 26Q217 26 254 59T298 110Q300 114 325 217T351 328Z"></path><path stroke-width="1" id="MJMATHI-3B1" d="M34 156Q34 270 120 356T309 442Q379 442 421 402T478 304Q484 275 485 237V208Q534 282 560 374Q564 388 566 390T582 393Q603 393 603 385Q603 376 594 346T558 261T497 161L486 147L487 123Q489 67 495 47T514 26Q528 28 540 37T557 60Q559 67 562 68T577 70Q597 70 597 62Q597 56 591 43Q579 19 556 5T512 -10H505Q438 -10 414 62L411 69L400 61Q390 53 370 41T325 18T267 -2T203 -11Q124 -11 79 39T34 156ZM208 26Q257 26 306 47T379 90L403 112Q401 255 396 290Q382 405 304 405Q235 405 183 332Q156 292 139 224T121 120Q121 71 146 49T208 26Z"></path><path stroke-width="1" id="MJMAIN-2C" d="M78 35T78 60T94 103T137 121Q165 121 187 96T210 8Q210 -27 201 -60T180 -117T154 -158T130 -185T117 -194Q113 -194 104 -185T95 -172Q95 -168 106 -156T131 -126T157 -76T173 -3V9L172 8Q170 7 167 6T161 3T152 1T140 0Q113 0 96 17Z"></path><path stroke-width="1" id="MJMATHI-3B2" d="M29 -194Q23 -188 23 -186Q23 -183 102 134T186 465Q208 533 243 584T309 658Q365 705 429 705H431Q493 705 533 667T573 570Q573 465 469 396L482 383Q533 332 533 252Q533 139 448 65T257 -10Q227 -10 203 -2T165 17T143 40T131 59T126 65L62 -188Q60 -194 42 -194H29ZM353 431Q392 431 427 419L432 422Q436 426 439 429T449 439T461 453T472 471T484 495T493 524T501 560Q503 569 503 593Q503 611 502 616Q487 667 426 667Q384 667 347 643T286 582T247 514T224 455Q219 439 186 308T152 168Q151 163 151 147Q151 99 173 68Q204 26 260 26Q302 26 349 51T425 137Q441 171 449 214T457 279Q457 337 422 372Q380 358 347 358H337Q258 358 258 389Q258 396 261 403Q275 431 353 431Z"></path><path stroke-width="1" id="MJMAIN-7C" d="M139 -249H137Q125 -249 119 -235V251L120 737Q130 750 139 750Q152 750 159 735V-235Q151 -249 141 -249H139Z"></path><path stroke-width="1" id="MJMAIN-2B" d="M56 237T56 250T70 270H369V420L370 570Q380 583 389 583Q402 583 409 568V270H707Q722 262 722 250T707 230H409V-68Q401 -82 391 -82H389H387Q375 -82 369 -68V230H70Q56 237 56 250Z"></path><path stroke-width="1" id="MJMAIN-2E" d="M78 60Q78 84 95 102T138 120Q162 120 180 104T199 61Q199 36 182 18T139 0T96 17T78 60Z"></path><path stroke-width="1" id="MJMAIN-3D" d="M56 347Q56 360 70 367H707Q722 359 722 347Q722 336 708 328L390 327H72Q56 332 56 347ZM56 153Q56 168 72 173H708Q722 163 722 153Q722 140 707 133H70Q56 140 56 153Z"></path><path stroke-width="1" id="MJMATHI-3B4" d="M195 609Q195 656 227 686T302 717Q319 716 351 709T407 697T433 690Q451 682 451 662Q451 644 438 628T403 612Q382 612 348 641T288 671T249 657T235 628Q235 584 334 463Q401 379 401 292Q401 169 340 80T205 -10H198Q127 -10 83 36T36 153Q36 286 151 382Q191 413 252 434Q252 435 245 449T230 481T214 521T201 566T195 609ZM112 130Q112 83 136 55T204 27Q233 27 256 51T291 111T309 178T316 232Q316 267 309 298T295 344T269 400L259 396Q215 381 183 342T137 256T118 179T112 130Z"></path><path stroke-width="1" id="MJMAIN-22C5" d="M78 250Q78 274 95 292T138 310Q162 310 180 294T199 251Q199 226 182 208T139 190T96 207T78 250Z"></path><path stroke-width="1" id="MJMAIN-3E" d="M84 520Q84 528 88 533T96 539L99 540Q106 540 253 471T544 334L687 265Q694 260 694 250T687 235Q685 233 395 96L107 -40H101Q83 -38 83 -20Q83 -19 83 -17Q82 -10 98 -1Q117 9 248 71Q326 108 378 132L626 250L378 368Q90 504 86 509Q84 513 84 520Z"></path><path stroke-width="1" id="MJMAIN-3C" d="M694 -11T694 -19T688 -33T678 -40Q671 -40 524 29T234 166L90 235Q83 240 83 250Q83 261 91 266Q664 540 678 540Q681 540 687 534T694 519T687 505Q686 504 417 376L151 250L417 124Q686 -4 687 -5Q694 -11 694 -19Z"></path><path stroke-width="1" id="MJMAIN-30" d="M96 585Q152 666 249 666Q297 666 345 640T423 548Q460 465 460 320Q460 165 417 83Q397 41 362 16T301 -15T250 -22Q224 -22 198 -16T137 16T82 83Q39 165 39 320Q39 494 96 585ZM321 597Q291 629 250 629Q208 629 178 597Q153 571 145 525T137 333Q137 175 145 125T181 46Q209 16 250 16Q290 16 318 46Q347 76 354 130T362 333Q362 478 354 524T321 597Z"></path><path stroke-width="1" id="MJMAIN-33" d="M127 463Q100 463 85 480T69 524Q69 579 117 622T233 665Q268 665 277 664Q351 652 390 611T430 522Q430 470 396 421T302 350L299 348Q299 347 308 345T337 336T375 315Q457 262 457 175Q457 96 395 37T238 -22Q158 -22 100 21T42 130Q42 158 60 175T105 193Q133 193 151 175T169 130Q169 119 166 110T159 94T148 82T136 74T126 70T118 67L114 66Q165 21 238 21Q293 21 321 74Q338 107 338 175V195Q338 290 274 322Q259 328 213 329L171 330L168 332Q166 335 166 348Q166 366 174 366Q202 366 232 371Q266 376 294 413T322 525V533Q322 590 287 612Q265 626 240 626Q208 626 181 615T143 592T132 580H135Q138 579 143 578T153 573T165 566T175 555T183 540T186 520Q186 498 172 481T127 463Z"></path><path stroke-width="1" id="MJMATHI-79" d="M21 287Q21 301 36 335T84 406T158 442Q199 442 224 419T250 355Q248 336 247 334Q247 331 231 288T198 191T182 105Q182 62 196 45T238 27Q261 27 281 38T312 61T339 94Q339 95 344 114T358 173T377 247Q415 397 419 404Q432 431 462 431Q475 431 483 424T494 412T496 403Q496 390 447 193T391 -23Q363 -106 294 -155T156 -205Q111 -205 77 -183T43 -117Q43 -95 50 -80T69 -58T89 -48T106 -45Q150 -45 150 -87Q150 -107 138 -122T115 -142T102 -147L99 -148Q101 -153 118 -160T152 -167H160Q177 -167 186 -165Q219 -156 247 -127T290 -65T313 -9T321 21L315 17Q309 13 296 6T270 -6Q250 -11 231 -11Q185 -11 150 11T104 82Q103 89 103 113Q103 170 138 262T173 379Q173 380 173 381Q173 390 173 393T169 400T158 404H154Q131 404 112 385T82 344T65 302T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-67" d="M311 43Q296 30 267 15T206 0Q143 0 105 45T66 160Q66 265 143 353T314 442Q361 442 401 394L404 398Q406 401 409 404T418 412T431 419T447 422Q461 422 470 413T480 394Q480 379 423 152T363 -80Q345 -134 286 -169T151 -205Q10 -205 10 -137Q10 -111 28 -91T74 -71Q89 -71 102 -80T116 -111Q116 -121 114 -130T107 -144T99 -154T92 -162L90 -164H91Q101 -167 151 -167Q189 -167 211 -155Q234 -144 254 -122T282 -75Q288 -56 298 -13Q311 35 311 43ZM384 328L380 339Q377 350 375 354T369 368T359 382T346 393T328 402T306 405Q262 405 221 352Q191 313 171 233T151 117Q151 38 213 38Q269 38 323 108L331 118L384 328Z"></path><path stroke-width="1" id="MJMATHI-50" d="M287 628Q287 635 230 637Q206 637 199 638T192 648Q192 649 194 659Q200 679 203 681T397 683Q587 682 600 680Q664 669 707 631T751 530Q751 453 685 389Q616 321 507 303Q500 302 402 301H307L277 182Q247 66 247 59Q247 55 248 54T255 50T272 48T305 46H336Q342 37 342 35Q342 19 335 5Q330 0 319 0Q316 0 282 1T182 2Q120 2 87 2T51 1Q33 1 33 11Q33 13 36 25Q40 41 44 43T67 46Q94 46 127 49Q141 52 146 61Q149 65 218 339T287 628ZM645 554Q645 567 643 575T634 597T609 619T560 635Q553 636 480 637Q463 637 445 637T416 636T404 636Q391 635 386 627Q384 621 367 550T332 412T314 344Q314 342 395 342H407H430Q542 342 590 392Q617 419 631 471T645 554Z"></path><path stroke-width="1" id="MJMATHI-58" d="M42 0H40Q26 0 26 11Q26 15 29 27Q33 41 36 43T55 46Q141 49 190 98Q200 108 306 224T411 342Q302 620 297 625Q288 636 234 637H206Q200 643 200 645T202 664Q206 677 212 683H226Q260 681 347 681Q380 681 408 681T453 682T473 682Q490 682 490 671Q490 670 488 658Q484 643 481 640T465 637Q434 634 411 620L488 426L541 485Q646 598 646 610Q646 628 622 635Q617 635 609 637Q594 637 594 648Q594 650 596 664Q600 677 606 683H618Q619 683 643 683T697 681T738 680Q828 680 837 683H845Q852 676 852 672Q850 647 840 637H824Q790 636 763 628T722 611T698 593L687 584Q687 585 592 480L505 384Q505 383 536 304T601 142T638 56Q648 47 699 46Q734 46 734 37Q734 35 732 23Q728 7 725 4T711 1Q708 1 678 1T589 2Q528 2 496 2T461 1Q444 1 444 10Q444 11 446 25Q448 35 450 39T455 44T464 46T480 47T506 54Q523 62 523 64Q522 64 476 181L429 299Q241 95 236 84Q232 76 232 72Q232 53 261 47Q262 47 267 47T273 46Q276 46 277 46T280 45T283 42T284 35Q284 26 282 19Q279 6 276 4T261 1Q258 1 243 1T201 2T142 2Q64 2 42 0Z"></path><path stroke-width="1" id="MJMAIN-3B" d="M78 370Q78 394 95 412T138 430Q162 430 180 414T199 371Q199 346 182 328T139 310T96 327T78 370ZM78 60Q78 85 94 103T137 121Q202 121 202 8Q202 -44 183 -94T144 -169T118 -194Q115 -194 106 -186T95 -174Q94 -171 107 -155T137 -107T160 -38Q161 -32 162 -22T165 -4T165 4Q165 5 161 4T142 0Q110 0 94 18T78 60Z"></path><path stroke-width="1" id="MJMATHI-59" d="M66 637Q54 637 49 637T39 638T32 641T30 647T33 664T42 682Q44 683 56 683Q104 680 165 680Q288 680 306 683H316Q322 677 322 674T320 656Q316 643 310 637H298Q242 637 242 624Q242 619 292 477T343 333L346 336Q350 340 358 349T379 373T411 410T454 461Q546 568 561 587T577 618Q577 634 545 637Q528 637 528 647Q528 649 530 661Q533 676 535 679T549 683Q551 683 578 682T657 680Q684 680 713 681T746 682Q763 682 763 673Q763 669 760 657T755 643Q753 637 734 637Q662 632 617 587Q608 578 477 424L348 273L322 169Q295 62 295 57Q295 46 363 46Q379 46 384 45T390 35Q390 33 388 23Q384 6 382 4T366 1Q361 1 324 1T232 2Q170 2 138 2T102 1Q84 1 84 9Q84 14 87 24Q88 27 89 30T90 35T91 39T93 42T96 44T101 45T107 45T116 46T129 46Q168 47 180 50T198 63Q201 68 227 171L252 274L129 623Q128 624 127 625T125 627T122 629T118 631T113 633T105 634T96 635T83 636T66 637Z"></path><path stroke-width="1" id="MJMAIN-2202" d="M202 508Q179 508 169 520T158 547Q158 557 164 577T185 624T230 675T301 710L333 715H345Q378 715 384 714Q447 703 489 661T549 568T566 457Q566 362 519 240T402 53Q321 -22 223 -22Q123 -22 73 56Q42 102 42 148V159Q42 276 129 370T322 465Q383 465 414 434T455 367L458 378Q478 461 478 515Q478 603 437 639T344 676Q266 676 223 612Q264 606 264 572Q264 547 246 528T202 508ZM430 306Q430 372 401 400T333 428Q270 428 222 382Q197 354 183 323T150 221Q132 149 132 116Q132 21 232 21Q244 21 250 22Q327 35 374 112Q389 137 409 196T430 306Z"></path><path stroke-width="1" id="MJMAIN-393" d="M128 619Q121 626 117 628T101 631T58 634H25V680H554V676Q556 670 568 560T582 444V440H542V444Q542 445 538 478T523 545T492 598Q454 634 349 634H334Q264 634 249 633T233 621Q232 618 232 339L233 61Q240 54 245 52T270 48T333 46H360V0H348Q324 3 182 3Q51 3 36 0H25V46H58Q100 47 109 49T128 61V619Z"></path><path stroke-width="1" id="MJMATHI-47" d="M50 252Q50 367 117 473T286 641T490 704Q580 704 633 653Q642 643 648 636T656 626L657 623Q660 623 684 649Q691 655 699 663T715 679T725 690L740 705H746Q760 705 760 698Q760 694 728 561Q692 422 692 421Q690 416 687 415T669 413H653Q647 419 647 422Q647 423 648 429T650 449T651 481Q651 552 619 605T510 659Q492 659 471 656T418 643T357 615T294 567T236 496T189 394T158 260Q156 242 156 221Q156 173 170 136T206 79T256 45T308 28T353 24Q407 24 452 47T514 106Q517 114 529 161T541 214Q541 222 528 224T468 227H431Q425 233 425 235T427 254Q431 267 437 273H454Q494 271 594 271Q634 271 659 271T695 272T707 272Q721 272 721 263Q721 261 719 249Q714 230 709 228Q706 227 694 227Q674 227 653 224Q646 221 643 215T629 164Q620 131 614 108Q589 6 586 3Q584 1 581 1Q571 1 553 21T530 52Q530 53 528 52T522 47Q448 -22 322 -22Q201 -22 126 55T50 252Z"></path><path stroke-width="1" id="MJMATHI-62" d="M73 647Q73 657 77 670T89 683Q90 683 161 688T234 694Q246 694 246 685T212 542Q204 508 195 472T180 418L176 399Q176 396 182 402Q231 442 283 442Q345 442 383 396T422 280Q422 169 343 79T173 -11Q123 -11 82 27T40 150V159Q40 180 48 217T97 414Q147 611 147 623T109 637Q104 637 101 637H96Q86 637 83 637T76 640T73 647ZM336 325V331Q336 405 275 405Q258 405 240 397T207 376T181 352T163 330L157 322L136 236Q114 150 114 114Q114 66 138 42Q154 26 178 26Q211 26 245 58Q270 81 285 114T318 219Q336 291 336 325Z"></path><path stroke-width="1" id="MJMATHI-71" d="M33 157Q33 258 109 349T280 441Q340 441 372 389Q373 390 377 395T388 406T404 418Q438 442 450 442Q454 442 457 439T460 434Q460 425 391 149Q320 -135 320 -139Q320 -147 365 -148H390Q396 -156 396 -157T393 -175Q389 -188 383 -194H370Q339 -192 262 -192Q234 -192 211 -192T174 -192T157 -193Q143 -193 143 -185Q143 -182 145 -170Q149 -154 152 -151T172 -148Q220 -148 230 -141Q238 -136 258 -53T279 32Q279 33 272 29Q224 -10 172 -10Q117 -10 75 30T33 157ZM352 326Q329 405 277 405Q242 405 210 374T160 293Q131 214 119 129Q119 126 119 118T118 106Q118 61 136 44T179 26Q233 26 290 98L298 109L352 326Z"></path><path stroke-width="1" id="MJMATHI-77" d="M580 385Q580 406 599 424T641 443Q659 443 674 425T690 368Q690 339 671 253Q656 197 644 161T609 80T554 12T482 -11Q438 -11 404 5T355 48Q354 47 352 44Q311 -11 252 -11Q226 -11 202 -5T155 14T118 53T104 116Q104 170 138 262T173 379Q173 380 173 381Q173 390 173 393T169 400T158 404H154Q131 404 112 385T82 344T65 302T57 280Q55 278 41 278H27Q21 284 21 287Q21 293 29 315T52 366T96 418T161 441Q204 441 227 416T250 358Q250 340 217 250T184 111Q184 65 205 46T258 26Q301 26 334 87L339 96V119Q339 122 339 128T340 136T341 143T342 152T345 165T348 182T354 206T362 238T373 281Q402 395 406 404Q419 431 449 431Q468 431 475 421T483 402Q483 389 454 274T422 142Q420 131 420 107V100Q420 85 423 71T442 42T487 26Q558 26 600 148Q609 171 620 213T632 273Q632 306 619 325T593 357T580 385Z"></path><path stroke-width="1" id="MJMATHI-45" d="M492 213Q472 213 472 226Q472 230 477 250T482 285Q482 316 461 323T364 330H312Q311 328 277 192T243 52Q243 48 254 48T334 46Q428 46 458 48T518 61Q567 77 599 117T670 248Q680 270 683 272Q690 274 698 274Q718 274 718 261Q613 7 608 2Q605 0 322 0H133Q31 0 31 11Q31 13 34 25Q38 41 42 43T65 46Q92 46 125 49Q139 52 144 61Q146 66 215 342T285 622Q285 629 281 629Q273 632 228 634H197Q191 640 191 642T193 659Q197 676 203 680H757Q764 676 764 669Q764 664 751 557T737 447Q735 440 717 440H705Q698 445 698 453L701 476Q704 500 704 528Q704 558 697 578T678 609T643 625T596 632T532 634H485Q397 633 392 631Q388 629 386 622Q385 619 355 499T324 377Q347 376 372 376H398Q464 376 489 391T534 472Q538 488 540 490T557 493Q562 493 565 493T570 492T572 491T574 487T577 483L544 351Q511 218 508 216Q505 213 492 213Z"></path><path stroke-width="1" id="MJMAIN-5B" d="M118 -250V750H255V710H158V-210H255V-250H118Z"></path><path stroke-width="1" id="MJMAIN-5D" d="M22 710V750H159V-250H22V-210H119V710H22Z"></path><path stroke-width="1" id="MJMATHI-3B3" d="M31 249Q11 249 11 258Q11 275 26 304T66 365T129 418T206 441Q233 441 239 440Q287 429 318 386T371 255Q385 195 385 170Q385 166 386 166L398 193Q418 244 443 300T486 391T508 430Q510 431 524 431H537Q543 425 543 422Q543 418 522 378T463 251T391 71Q385 55 378 6T357 -100Q341 -165 330 -190T303 -216Q286 -216 286 -188Q286 -138 340 32L346 51L347 69Q348 79 348 100Q348 257 291 317Q251 355 196 355Q148 355 108 329T51 260Q49 251 47 251Q45 249 31 249Z"></path><path stroke-width="1" id="MJMAIN-2265" d="M83 616Q83 624 89 630T99 636Q107 636 253 568T543 431T687 361Q694 356 694 346T687 331Q685 329 395 192L107 56H101Q83 58 83 76Q83 77 83 79Q82 86 98 95Q117 105 248 167Q326 204 378 228L626 346L360 472Q291 505 200 548Q112 589 98 597T83 616ZM84 -118Q84 -108 99 -98H678Q694 -104 694 -118Q694 -130 679 -138H98Q84 -131 84 -118Z"></path><path stroke-width="1" id="MJMATHI-73" d="M131 289Q131 321 147 354T203 415T300 442Q362 442 390 415T419 355Q419 323 402 308T364 292Q351 292 340 300T328 326Q328 342 337 354T354 372T367 378Q368 378 368 379Q368 382 361 388T336 399T297 405Q249 405 227 379T204 326Q204 301 223 291T278 274T330 259Q396 230 396 163Q396 135 385 107T352 51T289 7T195 -10Q118 -10 86 19T53 87Q53 126 74 143T118 160Q133 160 146 151T160 120Q160 94 142 76T111 58Q109 57 108 57T107 55Q108 52 115 47T146 34T201 27Q237 27 263 38T301 66T318 97T323 122Q323 150 302 164T254 181T195 196T148 231Q131 256 131 289Z"></path><path stroke-width="1" id="MJMATHI-4C" d="M228 637Q194 637 192 641Q191 643 191 649Q191 673 202 682Q204 683 217 683Q271 680 344 680Q485 680 506 683H518Q524 677 524 674T522 656Q517 641 513 637H475Q406 636 394 628Q387 624 380 600T313 336Q297 271 279 198T252 88L243 52Q243 48 252 48T311 46H328Q360 46 379 47T428 54T478 72T522 106T564 161Q580 191 594 228T611 270Q616 273 628 273H641Q647 264 647 262T627 203T583 83T557 9Q555 4 553 3T537 0T494 -1Q483 -1 418 -1T294 0H116Q32 0 32 10Q32 17 34 24Q39 43 44 45Q48 46 59 46H65Q92 46 125 49Q139 52 144 61Q147 65 216 339T285 628Q285 635 228 637Z"></path><path stroke-width="1" id="MJMATHI-6B" d="M121 647Q121 657 125 670T137 683Q138 683 209 688T282 694Q294 694 294 686Q294 679 244 477Q194 279 194 272Q213 282 223 291Q247 309 292 354T362 415Q402 442 438 442Q468 442 485 423T503 369Q503 344 496 327T477 302T456 291T438 288Q418 288 406 299T394 328Q394 353 410 369T442 390L458 393Q446 405 434 405H430Q398 402 367 380T294 316T228 255Q230 254 243 252T267 246T293 238T320 224T342 206T359 180T365 147Q365 130 360 106T354 66Q354 26 381 26Q429 26 459 145Q461 153 479 153H483Q499 153 499 144Q499 139 496 130Q455 -11 378 -11Q333 -11 305 15T277 90Q277 108 280 121T283 145Q283 167 269 183T234 206T200 217T182 220H180Q168 178 159 139T145 81T136 44T129 20T122 7T111 -2Q98 -11 83 -11Q66 -11 57 -1T48 16Q48 26 85 176T158 471L195 616Q196 629 188 632T149 637H144Q134 637 131 637T124 640T121 647Z"></path><path stroke-width="1" id="MJSZ1-222B" d="M113 -244Q113 -246 119 -251T139 -263T167 -269Q186 -269 199 -260Q220 -247 232 -218T251 -133T262 -15T276 155T297 367Q300 390 305 438T314 512T325 580T340 647T361 703T390 751T428 784T479 804Q481 804 488 804T501 805Q552 802 581 769T610 695Q610 669 594 657T561 645Q542 645 527 658T512 694Q512 705 516 714T526 729T538 737T548 742L552 743Q552 745 545 751T525 762T498 768Q475 768 460 756T434 716T418 652T407 559T398 444T387 300T369 133Q349 -38 337 -102T303 -207Q256 -306 169 -306Q119 -306 87 -272T55 -196Q55 -170 71 -158T104 -146Q123 -146 138 -159T153 -195Q153 -206 149 -215T139 -230T127 -238T117 -242L113 -244Z"></path><path stroke-width="1" id="MJMATHI-64" d="M366 683Q367 683 438 688T511 694Q523 694 523 686Q523 679 450 384T375 83T374 68Q374 26 402 26Q411 27 422 35Q443 55 463 131Q469 151 473 152Q475 153 483 153H487H491Q506 153 506 145Q506 140 503 129Q490 79 473 48T445 8T417 -8Q409 -10 393 -10Q359 -10 336 5T306 36L300 51Q299 52 296 50Q294 48 292 46Q233 -10 172 -10Q117 -10 75 30T33 157Q33 205 53 255T101 341Q148 398 195 420T280 442Q336 442 364 400Q369 394 369 396Q370 400 396 505T424 616Q424 629 417 632T378 637H357Q351 643 351 645T353 664Q358 683 366 683ZM352 326Q329 405 277 405Q242 405 210 374T160 293Q131 214 119 129Q119 126 119 118T118 106Q118 61 136 44T179 26Q233 26 290 98L298 109L352 326Z"></path><path stroke-width="1" id="MJMAIN-2032" d="M79 43Q73 43 52 49T30 61Q30 68 85 293T146 528Q161 560 198 560Q218 560 240 545T262 501Q262 496 260 486Q259 479 173 263T84 45T79 43Z"></path><path stroke-width="1" id="MJMATHI-6D" d="M21 287Q22 293 24 303T36 341T56 388T88 425T132 442T175 435T205 417T221 395T229 376L231 369Q231 367 232 367L243 378Q303 442 384 442Q401 442 415 440T441 433T460 423T475 411T485 398T493 385T497 373T500 364T502 357L510 367Q573 442 659 442Q713 442 746 415T780 336Q780 285 742 178T704 50Q705 36 709 31T724 26Q752 26 776 56T815 138Q818 149 821 151T837 153Q857 153 857 145Q857 144 853 130Q845 101 831 73T785 17T716 -10Q669 -10 648 17T627 73Q627 92 663 193T700 345Q700 404 656 404H651Q565 404 506 303L499 291L466 157Q433 26 428 16Q415 -11 385 -11Q372 -11 364 -4T353 8T350 18Q350 29 384 161L420 307Q423 322 423 345Q423 404 379 404H374Q288 404 229 303L222 291L189 157Q156 26 151 16Q138 -11 108 -11Q95 -11 87 -5T76 7T74 17Q74 30 112 181Q151 335 151 342Q154 357 154 369Q154 405 129 405Q107 405 92 377T69 316T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJSZ4-28" d="M758 -1237T758 -1240T752 -1249H736Q718 -1249 717 -1248Q711 -1245 672 -1199Q237 -706 237 251T672 1700Q697 1730 716 1749Q718 1750 735 1750H752Q758 1744 758 1741Q758 1737 740 1713T689 1644T619 1537T540 1380T463 1176Q348 802 348 251Q348 -242 441 -599T744 -1218Q758 -1237 758 -1240Z"></path><path stroke-width="1" id="MJSZ4-29" d="M33 1741Q33 1750 51 1750H60H65Q73 1750 81 1743T119 1700Q554 1207 554 251Q554 -707 119 -1199Q76 -1250 66 -1250Q65 -1250 62 -1250T56 -1249Q55 -1249 53 -1249T49 -1250Q33 -1250 33 -1239Q33 -1236 50 -1214T98 -1150T163 -1052T238 -910T311 -727Q443 -335 443 251Q443 402 436 532T405 831T339 1142T224 1438T50 1716Q33 1737 33 1741Z"></path><path stroke-width="1" id="MJMAIN-2248" d="M55 319Q55 360 72 393T114 444T163 472T205 482Q207 482 213 482T223 483Q262 483 296 468T393 413L443 381Q502 346 553 346Q609 346 649 375T694 454Q694 465 698 474T708 483Q722 483 722 452Q722 386 675 338T555 289Q514 289 468 310T388 357T308 404T224 426Q164 426 125 393T83 318Q81 289 69 289Q55 289 55 319ZM55 85Q55 126 72 159T114 210T163 238T205 248Q207 248 213 248T223 249Q262 249 296 234T393 179L443 147Q502 112 553 112Q609 112 649 141T694 220Q694 249 708 249T722 217Q722 153 675 104T555 55Q514 55 468 76T388 123T308 170T224 192Q164 192 125 159T83 84Q80 55 69 55Q55 55 55 85Z"></path><path stroke-width="1" id="MJMAIN-39" d="M352 287Q304 211 232 211Q154 211 104 270T44 396Q42 412 42 436V444Q42 537 111 606Q171 666 243 666Q245 666 249 666T257 665H261Q273 665 286 663T323 651T370 619T413 560Q456 472 456 334Q456 194 396 97Q361 41 312 10T208 -22Q147 -22 108 7T68 93T121 149Q143 149 158 135T173 96Q173 78 164 65T148 49T135 44L131 43Q131 41 138 37T164 27T206 22H212Q272 22 313 86Q352 142 352 280V287ZM244 248Q292 248 321 297T351 430Q351 508 343 542Q341 552 337 562T323 588T293 615T246 625Q208 625 181 598Q160 576 154 546T147 441Q147 358 152 329T172 282Q197 248 244 248Z"></path><path stroke-width="1" id="MJMAIN-36" d="M42 313Q42 476 123 571T303 666Q372 666 402 630T432 550Q432 525 418 510T379 495Q356 495 341 509T326 548Q326 592 373 601Q351 623 311 626Q240 626 194 566Q147 500 147 364L148 360Q153 366 156 373Q197 433 263 433H267Q313 433 348 414Q372 400 396 374T435 317Q456 268 456 210V192Q456 169 451 149Q440 90 387 34T253 -22Q225 -22 199 -14T143 16T92 75T56 172T42 313ZM257 397Q227 397 205 380T171 335T154 278T148 216Q148 133 160 97T198 39Q222 21 251 21Q302 21 329 59Q342 77 347 104T352 209Q352 289 347 316T329 361Q302 397 257 397Z"></path><path stroke-width="1" id="MJMAIN-35" d="M164 157Q164 133 148 117T109 101H102Q148 22 224 22Q294 22 326 82Q345 115 345 210Q345 313 318 349Q292 382 260 382H254Q176 382 136 314Q132 307 129 306T114 304Q97 304 95 310Q93 314 93 485V614Q93 664 98 664Q100 666 102 666Q103 666 123 658T178 642T253 634Q324 634 389 662Q397 666 402 666Q410 666 410 648V635Q328 538 205 538Q174 538 149 544L139 546V374Q158 388 169 396T205 412T256 420Q337 420 393 355T449 201Q449 109 385 44T229 -22Q148 -22 99 32T50 154Q50 178 61 192T84 210T107 214Q132 214 148 197T164 157Z"></path><path stroke-width="1" id="MJMATHI-56" d="M52 648Q52 670 65 683H76Q118 680 181 680Q299 680 320 683H330Q336 677 336 674T334 656Q329 641 325 637H304Q282 635 274 635Q245 630 242 620Q242 618 271 369T301 118L374 235Q447 352 520 471T595 594Q599 601 599 609Q599 633 555 637Q537 637 537 648Q537 649 539 661Q542 675 545 679T558 683Q560 683 570 683T604 682T668 681Q737 681 755 683H762Q769 676 769 672Q769 655 760 640Q757 637 743 637Q730 636 719 635T698 630T682 623T670 615T660 608T652 599T645 592L452 282Q272 -9 266 -16Q263 -18 259 -21L241 -22H234Q216 -22 216 -15Q213 -9 177 305Q139 623 138 626Q133 637 76 637H59Q52 642 52 648Z"></path><path stroke-width="1" id="MJMATHI-66" d="M118 -162Q120 -162 124 -164T135 -167T147 -168Q160 -168 171 -155T187 -126Q197 -99 221 27T267 267T289 382V385H242Q195 385 192 387Q188 390 188 397L195 425Q197 430 203 430T250 431Q298 431 298 432Q298 434 307 482T319 540Q356 705 465 705Q502 703 526 683T550 630Q550 594 529 578T487 561Q443 561 443 603Q443 622 454 636T478 657L487 662Q471 668 457 668Q445 668 434 658T419 630Q412 601 403 552T387 469T380 433Q380 431 435 431Q480 431 487 430T498 424Q499 420 496 407T491 391Q489 386 482 386T428 385H372L349 263Q301 15 282 -47Q255 -132 212 -173Q175 -205 139 -205Q107 -205 81 -186T55 -132Q55 -95 76 -78T118 -61Q162 -61 162 -103Q162 -122 151 -136T127 -157L118 -162Z"></path></defs></svg></body></html>
+<svg style="display: none;"><defs id="MathJax_SVG_glyphs"><path stroke-width="1" id="MJMAIN-32" d="M109 429Q82 429 66 447T50 491Q50 562 103 614T235 666Q326 666 387 610T449 465Q449 422 429 383T381 315T301 241Q265 210 201 149L142 93L218 92Q375 92 385 97Q392 99 409 186V189H449V186Q448 183 436 95T421 3V0H50V19V31Q50 38 56 46T86 81Q115 113 136 137Q145 147 170 174T204 211T233 244T261 278T284 308T305 340T320 369T333 401T340 431T343 464Q343 527 309 573T212 619Q179 619 154 602T119 569T109 550Q109 549 114 549Q132 549 151 535T170 489Q170 464 154 447T109 429Z"></path><path stroke-width="1" id="MJMAIN-2212" d="M84 237T84 250T98 270H679Q694 262 694 250T679 230H98Q84 237 84 250Z"></path><path stroke-width="1" id="MJMAIN-394" d="M51 0Q46 4 46 7Q46 9 215 357T388 709Q391 716 416 716Q439 716 444 709Q447 705 616 357T786 7Q786 4 781 0H51ZM507 344L384 596L137 92L383 91H630Q630 93 507 344Z"></path><path stroke-width="1" id="MJMAIN-2F" d="M423 750Q432 750 438 744T444 730Q444 725 271 248T92 -240Q85 -250 75 -250Q68 -250 62 -245T56 -231Q56 -221 230 257T407 740Q411 750 423 750Z"></path><path stroke-width="1" id="MJMATHI-68" d="M137 683Q138 683 209 688T282 694Q294 694 294 685Q294 674 258 534Q220 386 220 383Q220 381 227 388Q288 442 357 442Q411 442 444 415T478 336Q478 285 440 178T402 50Q403 36 407 31T422 26Q450 26 474 56T513 138Q516 149 519 151T535 153Q555 153 555 145Q555 144 551 130Q535 71 500 33Q466 -10 419 -10H414Q367 -10 346 17T325 74Q325 90 361 192T398 345Q398 404 354 404H349Q266 404 205 306L198 293L164 158Q132 28 127 16Q114 -11 83 -11Q69 -11 59 -2T48 16Q48 30 121 320L195 616Q195 629 188 632T149 637H128Q122 643 122 645T124 664Q129 683 137 683Z"></path><path stroke-width="1" id="MJMATHI-74" d="M26 385Q19 392 19 395Q19 399 22 411T27 425Q29 430 36 430T87 431H140L159 511Q162 522 166 540T173 566T179 586T187 603T197 615T211 624T229 626Q247 625 254 615T261 596Q261 589 252 549T232 470L222 433Q222 431 272 431H323Q330 424 330 420Q330 398 317 385H210L174 240Q135 80 135 68Q135 26 162 26Q197 26 230 60T283 144Q285 150 288 151T303 153H307Q322 153 322 145Q322 142 319 133Q314 117 301 95T267 48T216 6T155 -11Q125 -11 98 4T59 56Q57 64 57 83V101L92 241Q127 382 128 383Q128 385 77 385H26Z"></path><path stroke-width="1" id="MJMATHI-78" d="M52 289Q59 331 106 386T222 442Q257 442 286 424T329 379Q371 442 430 442Q467 442 494 420T522 361Q522 332 508 314T481 292T458 288Q439 288 427 299T415 328Q415 374 465 391Q454 404 425 404Q412 404 406 402Q368 386 350 336Q290 115 290 78Q290 50 306 38T341 26Q378 26 414 59T463 140Q466 150 469 151T485 153H489Q504 153 504 145Q504 144 502 134Q486 77 440 33T333 -11Q263 -11 227 52Q186 -10 133 -10H127Q78 -10 57 16T35 71Q35 103 54 123T99 143Q142 143 142 101Q142 81 130 66T107 46T94 41L91 40Q91 39 97 36T113 29T132 26Q168 26 194 71Q203 87 217 139T245 247T261 313Q266 340 266 352Q266 380 251 392T217 404Q177 404 142 372T93 290Q91 281 88 280T72 278H58Q52 284 52 289Z"></path><path stroke-width="1" id="MJMAIN-223C" d="M55 166Q55 241 101 304T222 367Q260 367 296 349T362 304T421 252T484 208T554 189Q616 189 655 236T694 338Q694 350 698 358T708 367Q722 367 722 334Q722 260 677 197T562 134H554Q517 134 481 152T414 196T355 248T292 293T223 311Q179 311 145 286Q109 257 96 218T80 156T69 133Q55 133 55 166Z"></path><path stroke-width="1" id="MJMATHI-42" d="M231 637Q204 637 199 638T194 649Q194 676 205 682Q206 683 335 683Q594 683 608 681Q671 671 713 636T756 544Q756 480 698 429T565 360L555 357Q619 348 660 311T702 219Q702 146 630 78T453 1Q446 0 242 0Q42 0 39 2Q35 5 35 10Q35 17 37 24Q42 43 47 45Q51 46 62 46H68Q95 46 128 49Q142 52 147 61Q150 65 219 339T288 628Q288 635 231 637ZM649 544Q649 574 634 600T585 634Q578 636 493 637Q473 637 451 637T416 636H403Q388 635 384 626Q382 622 352 506Q352 503 351 500L320 374H401Q482 374 494 376Q554 386 601 434T649 544ZM595 229Q595 273 572 302T512 336Q506 337 429 337Q311 337 310 336Q310 334 293 263T258 122L240 52Q240 48 252 48T333 46Q422 46 429 47Q491 54 543 105T595 229Z"></path><path stroke-width="1" id="MJMATHI-65" d="M39 168Q39 225 58 272T107 350T174 402T244 433T307 442H310Q355 442 388 420T421 355Q421 265 310 237Q261 224 176 223Q139 223 138 221Q138 219 132 186T125 128Q125 81 146 54T209 26T302 45T394 111Q403 121 406 121Q410 121 419 112T429 98T420 82T390 55T344 24T281 -1T205 -11Q126 -11 83 42T39 168ZM373 353Q367 405 305 405Q272 405 244 391T199 357T170 316T154 280T149 261Q149 260 169 260Q282 260 327 284T373 353Z"></path><path stroke-width="1" id="MJMATHI-72" d="M21 287Q22 290 23 295T28 317T38 348T53 381T73 411T99 433T132 442Q161 442 183 430T214 408T225 388Q227 382 228 382T236 389Q284 441 347 441H350Q398 441 422 400Q430 381 430 363Q430 333 417 315T391 292T366 288Q346 288 334 299T322 328Q322 376 378 392Q356 405 342 405Q286 405 239 331Q229 315 224 298T190 165Q156 25 151 16Q138 -11 108 -11Q95 -11 87 -5T76 7T74 17Q74 30 114 189T154 366Q154 405 128 405Q107 405 92 377T68 316T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-6E" d="M21 287Q22 293 24 303T36 341T56 388T89 425T135 442Q171 442 195 424T225 390T231 369Q231 367 232 367L243 378Q304 442 382 442Q436 442 469 415T503 336T465 179T427 52Q427 26 444 26Q450 26 453 27Q482 32 505 65T540 145Q542 153 560 153Q580 153 580 145Q580 144 576 130Q568 101 554 73T508 17T439 -10Q392 -10 371 17T350 73Q350 92 386 193T423 345Q423 404 379 404H374Q288 404 229 303L222 291L189 157Q156 26 151 16Q138 -11 108 -11Q95 -11 87 -5T76 7T74 17Q74 30 112 180T152 343Q153 348 153 366Q153 405 129 405Q91 405 66 305Q60 285 60 284Q58 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-6F" d="M201 -11Q126 -11 80 38T34 156Q34 221 64 279T146 380Q222 441 301 441Q333 441 341 440Q354 437 367 433T402 417T438 387T464 338T476 268Q476 161 390 75T201 -11ZM121 120Q121 70 147 48T206 26Q250 26 289 58T351 142Q360 163 374 216T388 308Q388 352 370 375Q346 405 306 405Q243 405 195 347Q158 303 140 230T121 120Z"></path><path stroke-width="1" id="MJMATHI-75" d="M21 287Q21 295 30 318T55 370T99 420T158 442Q204 442 227 417T250 358Q250 340 216 246T182 105Q182 62 196 45T238 27T291 44T328 78L339 95Q341 99 377 247Q407 367 413 387T427 416Q444 431 463 431Q480 431 488 421T496 402L420 84Q419 79 419 68Q419 43 426 35T447 26Q469 29 482 57T512 145Q514 153 532 153Q551 153 551 144Q550 139 549 130T540 98T523 55T498 17T462 -8Q454 -10 438 -10Q372 -10 347 46Q345 45 336 36T318 21T296 6T267 -6T233 -11Q189 -11 155 7Q103 38 103 113Q103 170 138 262T173 379Q173 380 173 381Q173 390 173 393T169 400T158 404H154Q131 404 112 385T82 344T65 302T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-6C" d="M117 59Q117 26 142 26Q179 26 205 131Q211 151 215 152Q217 153 225 153H229Q238 153 241 153T246 151T248 144Q247 138 245 128T234 90T214 43T183 6T137 -11Q101 -11 70 11T38 85Q38 97 39 102L104 360Q167 615 167 623Q167 626 166 628T162 632T157 634T149 635T141 636T132 637T122 637Q112 637 109 637T101 638T95 641T94 647Q94 649 96 661Q101 680 107 682T179 688Q194 689 213 690T243 693T254 694Q266 694 266 686Q266 675 193 386T118 83Q118 81 118 75T117 65V59Z"></path><path stroke-width="1" id="MJMATHI-69" d="M184 600Q184 624 203 642T247 661Q265 661 277 649T290 619Q290 596 270 577T226 557Q211 557 198 567T184 600ZM21 287Q21 295 30 318T54 369T98 420T158 442Q197 442 223 419T250 357Q250 340 236 301T196 196T154 83Q149 61 149 51Q149 26 166 26Q175 26 185 29T208 43T235 78T260 137Q263 149 265 151T282 153Q302 153 302 143Q302 135 293 112T268 61T223 11T161 -11Q129 -11 102 10T74 74Q74 91 79 106T122 220Q160 321 166 341T173 380Q173 404 156 404H154Q124 404 99 371T61 287Q60 286 59 284T58 281T56 279T53 278T49 278T41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMAIN-28" d="M94 250Q94 319 104 381T127 488T164 576T202 643T244 695T277 729T302 750H315H319Q333 750 333 741Q333 738 316 720T275 667T226 581T184 443T167 250T184 58T225 -81T274 -167T316 -220T333 -241Q333 -250 318 -250H315H302L274 -226Q180 -141 137 -14T94 250Z"></path><path stroke-width="1" id="MJMATHI-70" d="M23 287Q24 290 25 295T30 317T40 348T55 381T75 411T101 433T134 442Q209 442 230 378L240 387Q302 442 358 442Q423 442 460 395T497 281Q497 173 421 82T249 -10Q227 -10 210 -4Q199 1 187 11T168 28L161 36Q160 35 139 -51T118 -138Q118 -144 126 -145T163 -148H188Q194 -155 194 -157T191 -175Q188 -187 185 -190T172 -194Q170 -194 161 -194T127 -193T65 -192Q-5 -192 -24 -194H-32Q-39 -187 -39 -183Q-37 -156 -26 -148H-6Q28 -147 33 -136Q36 -130 94 103T155 350Q156 355 156 364Q156 405 131 405Q109 405 94 377T71 316T59 280Q57 278 43 278H29Q23 284 23 287ZM178 102Q200 26 252 26Q282 26 310 49T356 107Q374 141 392 215T411 325V331Q411 405 350 405Q339 405 328 402T306 393T286 380T269 365T254 350T243 336T235 326L232 322Q232 321 229 308T218 264T204 212Q178 106 178 102Z"></path><path stroke-width="1" id="MJMAIN-29" d="M60 749L64 750Q69 750 74 750H86L114 726Q208 641 251 514T294 250Q294 182 284 119T261 12T224 -76T186 -143T145 -194T113 -227T90 -246Q87 -249 86 -250H74Q66 -250 63 -250T58 -247T55 -238Q56 -237 66 -225Q221 -64 221 250T66 725Q56 737 55 738Q55 746 60 749Z"></path><path stroke-width="1" id="MJMAIN-31" d="M213 578L200 573Q186 568 160 563T102 556H83V602H102Q149 604 189 617T245 641T273 663Q275 666 285 666Q294 666 302 660V361L303 61Q310 54 315 52T339 48T401 46H427V0H416Q395 3 257 3Q121 3 100 0H88V46H114Q136 46 152 46T177 47T193 50T201 52T207 57T213 61V578Z"></path><path stroke-width="1" id="MJMATHI-61" d="M33 157Q33 258 109 349T280 441Q331 441 370 392Q386 422 416 422Q429 422 439 414T449 394Q449 381 412 234T374 68Q374 43 381 35T402 26Q411 27 422 35Q443 55 463 131Q469 151 473 152Q475 153 483 153H487Q506 153 506 144Q506 138 501 117T481 63T449 13Q436 0 417 -8Q409 -10 393 -10Q359 -10 336 5T306 36L300 51Q299 52 296 50Q294 48 292 46Q233 -10 172 -10Q117 -10 75 30T33 157ZM351 328Q351 334 346 350T323 385T277 405Q242 405 210 374T160 293Q131 214 119 129Q119 126 119 118T118 106Q118 61 136 44T179 26Q217 26 254 59T298 110Q300 114 325 217T351 328Z"></path><path stroke-width="1" id="MJMATHI-3B1" d="M34 156Q34 270 120 356T309 442Q379 442 421 402T478 304Q484 275 485 237V208Q534 282 560 374Q564 388 566 390T582 393Q603 393 603 385Q603 376 594 346T558 261T497 161L486 147L487 123Q489 67 495 47T514 26Q528 28 540 37T557 60Q559 67 562 68T577 70Q597 70 597 62Q597 56 591 43Q579 19 556 5T512 -10H505Q438 -10 414 62L411 69L400 61Q390 53 370 41T325 18T267 -2T203 -11Q124 -11 79 39T34 156ZM208 26Q257 26 306 47T379 90L403 112Q401 255 396 290Q382 405 304 405Q235 405 183 332Q156 292 139 224T121 120Q121 71 146 49T208 26Z"></path><path stroke-width="1" id="MJMAIN-2C" d="M78 35T78 60T94 103T137 121Q165 121 187 96T210 8Q210 -27 201 -60T180 -117T154 -158T130 -185T117 -194Q113 -194 104 -185T95 -172Q95 -168 106 -156T131 -126T157 -76T173 -3V9L172 8Q170 7 167 6T161 3T152 1T140 0Q113 0 96 17Z"></path><path stroke-width="1" id="MJMATHI-3B2" d="M29 -194Q23 -188 23 -186Q23 -183 102 134T186 465Q208 533 243 584T309 658Q365 705 429 705H431Q493 705 533 667T573 570Q573 465 469 396L482 383Q533 332 533 252Q533 139 448 65T257 -10Q227 -10 203 -2T165 17T143 40T131 59T126 65L62 -188Q60 -194 42 -194H29ZM353 431Q392 431 427 419L432 422Q436 426 439 429T449 439T461 453T472 471T484 495T493 524T501 560Q503 569 503 593Q503 611 502 616Q487 667 426 667Q384 667 347 643T286 582T247 514T224 455Q219 439 186 308T152 168Q151 163 151 147Q151 99 173 68Q204 26 260 26Q302 26 349 51T425 137Q441 171 449 214T457 279Q457 337 422 372Q380 358 347 358H337Q258 358 258 389Q258 396 261 403Q275 431 353 431Z"></path><path stroke-width="1" id="MJMAIN-7C" d="M139 -249H137Q125 -249 119 -235V251L120 737Q130 750 139 750Q152 750 159 735V-235Q151 -249 141 -249H139Z"></path><path stroke-width="1" id="MJMAIN-2B" d="M56 237T56 250T70 270H369V420L370 570Q380 583 389 583Q402 583 409 568V270H707Q722 262 722 250T707 230H409V-68Q401 -82 391 -82H389H387Q375 -82 369 -68V230H70Q56 237 56 250Z"></path><path stroke-width="1" id="MJMAIN-2E" d="M78 60Q78 84 95 102T138 120Q162 120 180 104T199 61Q199 36 182 18T139 0T96 17T78 60Z"></path><path stroke-width="1" id="MJMAIN-3D" d="M56 347Q56 360 70 367H707Q722 359 722 347Q722 336 708 328L390 327H72Q56 332 56 347ZM56 153Q56 168 72 173H708Q722 163 722 153Q722 140 707 133H70Q56 140 56 153Z"></path><path stroke-width="1" id="MJMATHI-3B4" d="M195 609Q195 656 227 686T302 717Q319 716 351 709T407 697T433 690Q451 682 451 662Q451 644 438 628T403 612Q382 612 348 641T288 671T249 657T235 628Q235 584 334 463Q401 379 401 292Q401 169 340 80T205 -10H198Q127 -10 83 36T36 153Q36 286 151 382Q191 413 252 434Q252 435 245 449T230 481T214 521T201 566T195 609ZM112 130Q112 83 136 55T204 27Q233 27 256 51T291 111T309 178T316 232Q316 267 309 298T295 344T269 400L259 396Q215 381 183 342T137 256T118 179T112 130Z"></path><path stroke-width="1" id="MJMAIN-22C5" d="M78 250Q78 274 95 292T138 310Q162 310 180 294T199 251Q199 226 182 208T139 190T96 207T78 250Z"></path><path stroke-width="1" id="MJMAIN-3E" d="M84 520Q84 528 88 533T96 539L99 540Q106 540 253 471T544 334L687 265Q694 260 694 250T687 235Q685 233 395 96L107 -40H101Q83 -38 83 -20Q83 -19 83 -17Q82 -10 98 -1Q117 9 248 71Q326 108 378 132L626 250L378 368Q90 504 86 509Q84 513 84 520Z"></path><path stroke-width="1" id="MJMAIN-3C" d="M694 -11T694 -19T688 -33T678 -40Q671 -40 524 29T234 166L90 235Q83 240 83 250Q83 261 91 266Q664 540 678 540Q681 540 687 534T694 519T687 505Q686 504 417 376L151 250L417 124Q686 -4 687 -5Q694 -11 694 -19Z"></path><path stroke-width="1" id="MJMAIN-30" d="M96 585Q152 666 249 666Q297 666 345 640T423 548Q460 465 460 320Q460 165 417 83Q397 41 362 16T301 -15T250 -22Q224 -22 198 -16T137 16T82 83Q39 165 39 320Q39 494 96 585ZM321 597Q291 629 250 629Q208 629 178 597Q153 571 145 525T137 333Q137 175 145 125T181 46Q209 16 250 16Q290 16 318 46Q347 76 354 130T362 333Q362 478 354 524T321 597Z"></path><path stroke-width="1" id="MJMAIN-33" d="M127 463Q100 463 85 480T69 524Q69 579 117 622T233 665Q268 665 277 664Q351 652 390 611T430 522Q430 470 396 421T302 350L299 348Q299 347 308 345T337 336T375 315Q457 262 457 175Q457 96 395 37T238 -22Q158 -22 100 21T42 130Q42 158 60 175T105 193Q133 193 151 175T169 130Q169 119 166 110T159 94T148 82T136 74T126 70T118 67L114 66Q165 21 238 21Q293 21 321 74Q338 107 338 175V195Q338 290 274 322Q259 328 213 329L171 330L168 332Q166 335 166 348Q166 366 174 366Q202 366 232 371Q266 376 294 413T322 525V533Q322 590 287 612Q265 626 240 626Q208 626 181 615T143 592T132 580H135Q138 579 143 578T153 573T165 566T175 555T183 540T186 520Q186 498 172 481T127 463Z"></path><path stroke-width="1" id="MJMATHI-79" d="M21 287Q21 301 36 335T84 406T158 442Q199 442 224 419T250 355Q248 336 247 334Q247 331 231 288T198 191T182 105Q182 62 196 45T238 27Q261 27 281 38T312 61T339 94Q339 95 344 114T358 173T377 247Q415 397 419 404Q432 431 462 431Q475 431 483 424T494 412T496 403Q496 390 447 193T391 -23Q363 -106 294 -155T156 -205Q111 -205 77 -183T43 -117Q43 -95 50 -80T69 -58T89 -48T106 -45Q150 -45 150 -87Q150 -107 138 -122T115 -142T102 -147L99 -148Q101 -153 118 -160T152 -167H160Q177 -167 186 -165Q219 -156 247 -127T290 -65T313 -9T321 21L315 17Q309 13 296 6T270 -6Q250 -11 231 -11Q185 -11 150 11T104 82Q103 89 103 113Q103 170 138 262T173 379Q173 380 173 381Q173 390 173 393T169 400T158 404H154Q131 404 112 385T82 344T65 302T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJMATHI-67" d="M311 43Q296 30 267 15T206 0Q143 0 105 45T66 160Q66 265 143 353T314 442Q361 442 401 394L404 398Q406 401 409 404T418 412T431 419T447 422Q461 422 470 413T480 394Q480 379 423 152T363 -80Q345 -134 286 -169T151 -205Q10 -205 10 -137Q10 -111 28 -91T74 -71Q89 -71 102 -80T116 -111Q116 -121 114 -130T107 -144T99 -154T92 -162L90 -164H91Q101 -167 151 -167Q189 -167 211 -155Q234 -144 254 -122T282 -75Q288 -56 298 -13Q311 35 311 43ZM384 328L380 339Q377 350 375 354T369 368T359 382T346 393T328 402T306 405Q262 405 221 352Q191 313 171 233T151 117Q151 38 213 38Q269 38 323 108L331 118L384 328Z"></path><path stroke-width="1" id="MJMATHI-50" d="M287 628Q287 635 230 637Q206 637 199 638T192 648Q192 649 194 659Q200 679 203 681T397 683Q587 682 600 680Q664 669 707 631T751 530Q751 453 685 389Q616 321 507 303Q500 302 402 301H307L277 182Q247 66 247 59Q247 55 248 54T255 50T272 48T305 46H336Q342 37 342 35Q342 19 335 5Q330 0 319 0Q316 0 282 1T182 2Q120 2 87 2T51 1Q33 1 33 11Q33 13 36 25Q40 41 44 43T67 46Q94 46 127 49Q141 52 146 61Q149 65 218 339T287 628ZM645 554Q645 567 643 575T634 597T609 619T560 635Q553 636 480 637Q463 637 445 637T416 636T404 636Q391 635 386 627Q384 621 367 550T332 412T314 344Q314 342 395 342H407H430Q542 342 590 392Q617 419 631 471T645 554Z"></path><path stroke-width="1" id="MJMATHI-58" d="M42 0H40Q26 0 26 11Q26 15 29 27Q33 41 36 43T55 46Q141 49 190 98Q200 108 306 224T411 342Q302 620 297 625Q288 636 234 637H206Q200 643 200 645T202 664Q206 677 212 683H226Q260 681 347 681Q380 681 408 681T453 682T473 682Q490 682 490 671Q490 670 488 658Q484 643 481 640T465 637Q434 634 411 620L488 426L541 485Q646 598 646 610Q646 628 622 635Q617 635 609 637Q594 637 594 648Q594 650 596 664Q600 677 606 683H618Q619 683 643 683T697 681T738 680Q828 680 837 683H845Q852 676 852 672Q850 647 840 637H824Q790 636 763 628T722 611T698 593L687 584Q687 585 592 480L505 384Q505 383 536 304T601 142T638 56Q648 47 699 46Q734 46 734 37Q734 35 732 23Q728 7 725 4T711 1Q708 1 678 1T589 2Q528 2 496 2T461 1Q444 1 444 10Q444 11 446 25Q448 35 450 39T455 44T464 46T480 47T506 54Q523 62 523 64Q522 64 476 181L429 299Q241 95 236 84Q232 76 232 72Q232 53 261 47Q262 47 267 47T273 46Q276 46 277 46T280 45T283 42T284 35Q284 26 282 19Q279 6 276 4T261 1Q258 1 243 1T201 2T142 2Q64 2 42 0Z"></path><path stroke-width="1" id="MJMAIN-3B" d="M78 370Q78 394 95 412T138 430Q162 430 180 414T199 371Q199 346 182 328T139 310T96 327T78 370ZM78 60Q78 85 94 103T137 121Q202 121 202 8Q202 -44 183 -94T144 -169T118 -194Q115 -194 106 -186T95 -174Q94 -171 107 -155T137 -107T160 -38Q161 -32 162 -22T165 -4T165 4Q165 5 161 4T142 0Q110 0 94 18T78 60Z"></path><path stroke-width="1" id="MJMATHI-59" d="M66 637Q54 637 49 637T39 638T32 641T30 647T33 664T42 682Q44 683 56 683Q104 680 165 680Q288 680 306 683H316Q322 677 322 674T320 656Q316 643 310 637H298Q242 637 242 624Q242 619 292 477T343 333L346 336Q350 340 358 349T379 373T411 410T454 461Q546 568 561 587T577 618Q577 634 545 637Q528 637 528 647Q528 649 530 661Q533 676 535 679T549 683Q551 683 578 682T657 680Q684 680 713 681T746 682Q763 682 763 673Q763 669 760 657T755 643Q753 637 734 637Q662 632 617 587Q608 578 477 424L348 273L322 169Q295 62 295 57Q295 46 363 46Q379 46 384 45T390 35Q390 33 388 23Q384 6 382 4T366 1Q361 1 324 1T232 2Q170 2 138 2T102 1Q84 1 84 9Q84 14 87 24Q88 27 89 30T90 35T91 39T93 42T96 44T101 45T107 45T116 46T129 46Q168 47 180 50T198 63Q201 68 227 171L252 274L129 623Q128 624 127 625T125 627T122 629T118 631T113 633T105 634T96 635T83 636T66 637Z"></path><path stroke-width="1" id="MJMAIN-2202" d="M202 508Q179 508 169 520T158 547Q158 557 164 577T185 624T230 675T301 710L333 715H345Q378 715 384 714Q447 703 489 661T549 568T566 457Q566 362 519 240T402 53Q321 -22 223 -22Q123 -22 73 56Q42 102 42 148V159Q42 276 129 370T322 465Q383 465 414 434T455 367L458 378Q478 461 478 515Q478 603 437 639T344 676Q266 676 223 612Q264 606 264 572Q264 547 246 528T202 508ZM430 306Q430 372 401 400T333 428Q270 428 222 382Q197 354 183 323T150 221Q132 149 132 116Q132 21 232 21Q244 21 250 22Q327 35 374 112Q389 137 409 196T430 306Z"></path><path stroke-width="1" id="MJMAIN-393" d="M128 619Q121 626 117 628T101 631T58 634H25V680H554V676Q556 670 568 560T582 444V440H542V444Q542 445 538 478T523 545T492 598Q454 634 349 634H334Q264 634 249 633T233 621Q232 618 232 339L233 61Q240 54 245 52T270 48T333 46H360V0H348Q324 3 182 3Q51 3 36 0H25V46H58Q100 47 109 49T128 61V619Z"></path><path stroke-width="1" id="MJMATHI-47" d="M50 252Q50 367 117 473T286 641T490 704Q580 704 633 653Q642 643 648 636T656 626L657 623Q660 623 684 649Q691 655 699 663T715 679T725 690L740 705H746Q760 705 760 698Q760 694 728 561Q692 422 692 421Q690 416 687 415T669 413H653Q647 419 647 422Q647 423 648 429T650 449T651 481Q651 552 619 605T510 659Q492 659 471 656T418 643T357 615T294 567T236 496T189 394T158 260Q156 242 156 221Q156 173 170 136T206 79T256 45T308 28T353 24Q407 24 452 47T514 106Q517 114 529 161T541 214Q541 222 528 224T468 227H431Q425 233 425 235T427 254Q431 267 437 273H454Q494 271 594 271Q634 271 659 271T695 272T707 272Q721 272 721 263Q721 261 719 249Q714 230 709 228Q706 227 694 227Q674 227 653 224Q646 221 643 215T629 164Q620 131 614 108Q589 6 586 3Q584 1 581 1Q571 1 553 21T530 52Q530 53 528 52T522 47Q448 -22 322 -22Q201 -22 126 55T50 252Z"></path><path stroke-width="1" id="MJMATHI-62" d="M73 647Q73 657 77 670T89 683Q90 683 161 688T234 694Q246 694 246 685T212 542Q204 508 195 472T180 418L176 399Q176 396 182 402Q231 442 283 442Q345 442 383 396T422 280Q422 169 343 79T173 -11Q123 -11 82 27T40 150V159Q40 180 48 217T97 414Q147 611 147 623T109 637Q104 637 101 637H96Q86 637 83 637T76 640T73 647ZM336 325V331Q336 405 275 405Q258 405 240 397T207 376T181 352T163 330L157 322L136 236Q114 150 114 114Q114 66 138 42Q154 26 178 26Q211 26 245 58Q270 81 285 114T318 219Q336 291 336 325Z"></path><path stroke-width="1" id="MJMATHI-71" d="M33 157Q33 258 109 349T280 441Q340 441 372 389Q373 390 377 395T388 406T404 418Q438 442 450 442Q454 442 457 439T460 434Q460 425 391 149Q320 -135 320 -139Q320 -147 365 -148H390Q396 -156 396 -157T393 -175Q389 -188 383 -194H370Q339 -192 262 -192Q234 -192 211 -192T174 -192T157 -193Q143 -193 143 -185Q143 -182 145 -170Q149 -154 152 -151T172 -148Q220 -148 230 -141Q238 -136 258 -53T279 32Q279 33 272 29Q224 -10 172 -10Q117 -10 75 30T33 157ZM352 326Q329 405 277 405Q242 405 210 374T160 293Q131 214 119 129Q119 126 119 118T118 106Q118 61 136 44T179 26Q233 26 290 98L298 109L352 326Z"></path><path stroke-width="1" id="MJMATHI-77" d="M580 385Q580 406 599 424T641 443Q659 443 674 425T690 368Q690 339 671 253Q656 197 644 161T609 80T554 12T482 -11Q438 -11 404 5T355 48Q354 47 352 44Q311 -11 252 -11Q226 -11 202 -5T155 14T118 53T104 116Q104 170 138 262T173 379Q173 380 173 381Q173 390 173 393T169 400T158 404H154Q131 404 112 385T82 344T65 302T57 280Q55 278 41 278H27Q21 284 21 287Q21 293 29 315T52 366T96 418T161 441Q204 441 227 416T250 358Q250 340 217 250T184 111Q184 65 205 46T258 26Q301 26 334 87L339 96V119Q339 122 339 128T340 136T341 143T342 152T345 165T348 182T354 206T362 238T373 281Q402 395 406 404Q419 431 449 431Q468 431 475 421T483 402Q483 389 454 274T422 142Q420 131 420 107V100Q420 85 423 71T442 42T487 26Q558 26 600 148Q609 171 620 213T632 273Q632 306 619 325T593 357T580 385Z"></path><path stroke-width="1" id="MJMATHI-45" d="M492 213Q472 213 472 226Q472 230 477 250T482 285Q482 316 461 323T364 330H312Q311 328 277 192T243 52Q243 48 254 48T334 46Q428 46 458 48T518 61Q567 77 599 117T670 248Q680 270 683 272Q690 274 698 274Q718 274 718 261Q613 7 608 2Q605 0 322 0H133Q31 0 31 11Q31 13 34 25Q38 41 42 43T65 46Q92 46 125 49Q139 52 144 61Q146 66 215 342T285 622Q285 629 281 629Q273 632 228 634H197Q191 640 191 642T193 659Q197 676 203 680H757Q764 676 764 669Q764 664 751 557T737 447Q735 440 717 440H705Q698 445 698 453L701 476Q704 500 704 528Q704 558 697 578T678 609T643 625T596 632T532 634H485Q397 633 392 631Q388 629 386 622Q385 619 355 499T324 377Q347 376 372 376H398Q464 376 489 391T534 472Q538 488 540 490T557 493Q562 493 565 493T570 492T572 491T574 487T577 483L544 351Q511 218 508 216Q505 213 492 213Z"></path><path stroke-width="1" id="MJMAIN-5B" d="M118 -250V750H255V710H158V-210H255V-250H118Z"></path><path stroke-width="1" id="MJMAIN-5D" d="M22 710V750H159V-250H22V-210H119V710H22Z"></path><path stroke-width="1" id="MJMATHI-3B3" d="M31 249Q11 249 11 258Q11 275 26 304T66 365T129 418T206 441Q233 441 239 440Q287 429 318 386T371 255Q385 195 385 170Q385 166 386 166L398 193Q418 244 443 300T486 391T508 430Q510 431 524 431H537Q543 425 543 422Q543 418 522 378T463 251T391 71Q385 55 378 6T357 -100Q341 -165 330 -190T303 -216Q286 -216 286 -188Q286 -138 340 32L346 51L347 69Q348 79 348 100Q348 257 291 317Q251 355 196 355Q148 355 108 329T51 260Q49 251 47 251Q45 249 31 249Z"></path><path stroke-width="1" id="MJMAIN-2265" d="M83 616Q83 624 89 630T99 636Q107 636 253 568T543 431T687 361Q694 356 694 346T687 331Q685 329 395 192L107 56H101Q83 58 83 76Q83 77 83 79Q82 86 98 95Q117 105 248 167Q326 204 378 228L626 346L360 472Q291 505 200 548Q112 589 98 597T83 616ZM84 -118Q84 -108 99 -98H678Q694 -104 694 -118Q694 -130 679 -138H98Q84 -131 84 -118Z"></path><path stroke-width="1" id="MJMATHI-73" d="M131 289Q131 321 147 354T203 415T300 442Q362 442 390 415T419 355Q419 323 402 308T364 292Q351 292 340 300T328 326Q328 342 337 354T354 372T367 378Q368 378 368 379Q368 382 361 388T336 399T297 405Q249 405 227 379T204 326Q204 301 223 291T278 274T330 259Q396 230 396 163Q396 135 385 107T352 51T289 7T195 -10Q118 -10 86 19T53 87Q53 126 74 143T118 160Q133 160 146 151T160 120Q160 94 142 76T111 58Q109 57 108 57T107 55Q108 52 115 47T146 34T201 27Q237 27 263 38T301 66T318 97T323 122Q323 150 302 164T254 181T195 196T148 231Q131 256 131 289Z"></path><path stroke-width="1" id="MJMATHI-4C" d="M228 637Q194 637 192 641Q191 643 191 649Q191 673 202 682Q204 683 217 683Q271 680 344 680Q485 680 506 683H518Q524 677 524 674T522 656Q517 641 513 637H475Q406 636 394 628Q387 624 380 600T313 336Q297 271 279 198T252 88L243 52Q243 48 252 48T311 46H328Q360 46 379 47T428 54T478 72T522 106T564 161Q580 191 594 228T611 270Q616 273 628 273H641Q647 264 647 262T627 203T583 83T557 9Q555 4 553 3T537 0T494 -1Q483 -1 418 -1T294 0H116Q32 0 32 10Q32 17 34 24Q39 43 44 45Q48 46 59 46H65Q92 46 125 49Q139 52 144 61Q147 65 216 339T285 628Q285 635 228 637Z"></path><path stroke-width="1" id="MJMATHI-6B" d="M121 647Q121 657 125 670T137 683Q138 683 209 688T282 694Q294 694 294 686Q294 679 244 477Q194 279 194 272Q213 282 223 291Q247 309 292 354T362 415Q402 442 438 442Q468 442 485 423T503 369Q503 344 496 327T477 302T456 291T438 288Q418 288 406 299T394 328Q394 353 410 369T442 390L458 393Q446 405 434 405H430Q398 402 367 380T294 316T228 255Q230 254 243 252T267 246T293 238T320 224T342 206T359 180T365 147Q365 130 360 106T354 66Q354 26 381 26Q429 26 459 145Q461 153 479 153H483Q499 153 499 144Q499 139 496 130Q455 -11 378 -11Q333 -11 305 15T277 90Q277 108 280 121T283 145Q283 167 269 183T234 206T200 217T182 220H180Q168 178 159 139T145 81T136 44T129 20T122 7T111 -2Q98 -11 83 -11Q66 -11 57 -1T48 16Q48 26 85 176T158 471L195 616Q196 629 188 632T149 637H144Q134 637 131 637T124 640T121 647Z"></path><path stroke-width="1" id="MJSZ1-222B" d="M113 -244Q113 -246 119 -251T139 -263T167 -269Q186 -269 199 -260Q220 -247 232 -218T251 -133T262 -15T276 155T297 367Q300 390 305 438T314 512T325 580T340 647T361 703T390 751T428 784T479 804Q481 804 488 804T501 805Q552 802 581 769T610 695Q610 669 594 657T561 645Q542 645 527 658T512 694Q512 705 516 714T526 729T538 737T548 742L552 743Q552 745 545 751T525 762T498 768Q475 768 460 756T434 716T418 652T407 559T398 444T387 300T369 133Q349 -38 337 -102T303 -207Q256 -306 169 -306Q119 -306 87 -272T55 -196Q55 -170 71 -158T104 -146Q123 -146 138 -159T153 -195Q153 -206 149 -215T139 -230T127 -238T117 -242L113 -244Z"></path><path stroke-width="1" id="MJMATHI-64" d="M366 683Q367 683 438 688T511 694Q523 694 523 686Q523 679 450 384T375 83T374 68Q374 26 402 26Q411 27 422 35Q443 55 463 131Q469 151 473 152Q475 153 483 153H487H491Q506 153 506 145Q506 140 503 129Q490 79 473 48T445 8T417 -8Q409 -10 393 -10Q359 -10 336 5T306 36L300 51Q299 52 296 50Q294 48 292 46Q233 -10 172 -10Q117 -10 75 30T33 157Q33 205 53 255T101 341Q148 398 195 420T280 442Q336 442 364 400Q369 394 369 396Q370 400 396 505T424 616Q424 629 417 632T378 637H357Q351 643 351 645T353 664Q358 683 366 683ZM352 326Q329 405 277 405Q242 405 210 374T160 293Q131 214 119 129Q119 126 119 118T118 106Q118 61 136 44T179 26Q233 26 290 98L298 109L352 326Z"></path><path stroke-width="1" id="MJMAIN-2032" d="M79 43Q73 43 52 49T30 61Q30 68 85 293T146 528Q161 560 198 560Q218 560 240 545T262 501Q262 496 260 486Q259 479 173 263T84 45T79 43Z"></path><path stroke-width="1" id="MJMATHI-6D" d="M21 287Q22 293 24 303T36 341T56 388T88 425T132 442T175 435T205 417T221 395T229 376L231 369Q231 367 232 367L243 378Q303 442 384 442Q401 442 415 440T441 433T460 423T475 411T485 398T493 385T497 373T500 364T502 357L510 367Q573 442 659 442Q713 442 746 415T780 336Q780 285 742 178T704 50Q705 36 709 31T724 26Q752 26 776 56T815 138Q818 149 821 151T837 153Q857 153 857 145Q857 144 853 130Q845 101 831 73T785 17T716 -10Q669 -10 648 17T627 73Q627 92 663 193T700 345Q700 404 656 404H651Q565 404 506 303L499 291L466 157Q433 26 428 16Q415 -11 385 -11Q372 -11 364 -4T353 8T350 18Q350 29 384 161L420 307Q423 322 423 345Q423 404 379 404H374Q288 404 229 303L222 291L189 157Q156 26 151 16Q138 -11 108 -11Q95 -11 87 -5T76 7T74 17Q74 30 112 181Q151 335 151 342Q154 357 154 369Q154 405 129 405Q107 405 92 377T69 316T57 280Q55 278 41 278H27Q21 284 21 287Z"></path><path stroke-width="1" id="MJSZ4-28" d="M758 -1237T758 -1240T752 -1249H736Q718 -1249 717 -1248Q711 -1245 672 -1199Q237 -706 237 251T672 1700Q697 1730 716 1749Q718 1750 735 1750H752Q758 1744 758 1741Q758 1737 740 1713T689 1644T619 1537T540 1380T463 1176Q348 802 348 251Q348 -242 441 -599T744 -1218Q758 -1237 758 -1240Z"></path><path stroke-width="1" id="MJSZ4-29" d="M33 1741Q33 1750 51 1750H60H65Q73 1750 81 1743T119 1700Q554 1207 554 251Q554 -707 119 -1199Q76 -1250 66 -1250Q65 -1250 62 -1250T56 -1249Q55 -1249 53 -1249T49 -1250Q33 -1250 33 -1239Q33 -1236 50 -1214T98 -1150T163 -1052T238 -910T311 -727Q443 -335 443 251Q443 402 436 532T405 831T339 1142T224 1438T50 1716Q33 1737 33 1741Z"></path><path stroke-width="1" id="MJMAIN-2248" d="M55 319Q55 360 72 393T114 444T163 472T205 482Q207 482 213 482T223 483Q262 483 296 468T393 413L443 381Q502 346 553 346Q609 346 649 375T694 454Q694 465 698 474T708 483Q722 483 722 452Q722 386 675 338T555 289Q514 289 468 310T388 357T308 404T224 426Q164 426 125 393T83 318Q81 289 69 289Q55 289 55 319ZM55 85Q55 126 72 159T114 210T163 238T205 248Q207 248 213 248T223 249Q262 249 296 234T393 179L443 147Q502 112 553 112Q609 112 649 141T694 220Q694 249 708 249T722 217Q722 153 675 104T555 55Q514 55 468 76T388 123T308 170T224 192Q164 192 125 159T83 84Q80 55 69 55Q55 55 55 85Z"></path><path stroke-width="1" id="MJMAIN-39" d="M352 287Q304 211 232 211Q154 211 104 270T44 396Q42 412 42 436V444Q42 537 111 606Q171 666 243 666Q245 666 249 666T257 665H261Q273 665 286 663T323 651T370 619T413 560Q456 472 456 334Q456 194 396 97Q361 41 312 10T208 -22Q147 -22 108 7T68 93T121 149Q143 149 158 135T173 96Q173 78 164 65T148 49T135 44L131 43Q131 41 138 37T164 27T206 22H212Q272 22 313 86Q352 142 352 280V287ZM244 248Q292 248 321 297T351 430Q351 508 343 542Q341 552 337 562T323 588T293 615T246 625Q208 625 181 598Q160 576 154 546T147 441Q147 358 152 329T172 282Q197 248 244 248Z"></path><path stroke-width="1" id="MJMAIN-36" d="M42 313Q42 476 123 571T303 666Q372 666 402 630T432 550Q432 525 418 510T379 495Q356 495 341 509T326 548Q326 592 373 601Q351 623 311 626Q240 626 194 566Q147 500 147 364L148 360Q153 366 156 373Q197 433 263 433H267Q313 433 348 414Q372 400 396 374T435 317Q456 268 456 210V192Q456 169 451 149Q440 90 387 34T253 -22Q225 -22 199 -14T143 16T92 75T56 172T42 313ZM257 397Q227 397 205 380T171 335T154 278T148 216Q148 133 160 97T198 39Q222 21 251 21Q302 21 329 59Q342 77 347 104T352 209Q352 289 347 316T329 361Q302 397 257 397Z"></path><path stroke-width="1" id="MJMAIN-35" d="M164 157Q164 133 148 117T109 101H102Q148 22 224 22Q294 22 326 82Q345 115 345 210Q345 313 318 349Q292 382 260 382H254Q176 382 136 314Q132 307 129 306T114 304Q97 304 95 310Q93 314 93 485V614Q93 664 98 664Q100 666 102 666Q103 666 123 658T178 642T253 634Q324 634 389 662Q397 666 402 666Q410 666 410 648V635Q328 538 205 538Q174 538 149 544L139 546V374Q158 388 169 396T205 412T256 420Q337 420 393 355T449 201Q449 109 385 44T229 -22Q148 -22 99 32T50 154Q50 178 61 192T84 210T107 214Q132 214 148 197T164 157Z"></path><path stroke-width="1" id="MJMATHI-66" d="M118 -162Q120 -162 124 -164T135 -167T147 -168Q160 -168 171 -155T187 -126Q197 -99 221 27T267 267T289 382V385H242Q195 385 192 387Q188 390 188 397L195 425Q197 430 203 430T250 431Q298 431 298 432Q298 434 307 482T319 540Q356 705 465 705Q502 703 526 683T550 630Q550 594 529 578T487 561Q443 561 443 603Q443 622 454 636T478 657L487 662Q471 668 457 668Q445 668 434 658T419 630Q412 601 403 552T387 469T380 433Q380 431 435 431Q480 431 487 430T498 424Q499 420 496 407T491 391Q489 386 482 386T428 385H372L349 263Q301 15 282 -47Q255 -132 212 -173Q175 -205 139 -205Q107 -205 81 -186T55 -132Q55 -95 76 -78T118 -61Q162 -61 162 -103Q162 -122 151 -136T127 -157L118 -162Z"></path></defs></svg></body></html>

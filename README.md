@@ -197,7 +197,7 @@ Now, let us turn to the final piece of the math, how to update our prior on a fa
 
 ### Updating the posterior with quiz results
 
-One option could be this: since we have analytical expressions for the mean and variance of the prior on \\(p_t^δ\\), convert these to the [closest Beta distribution](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) and straightforwardly update with the Bernoulli likelihood as mentioned [above](#bernoulli-quizzes). However, we will show that it is more accurate to do the likelihood update analytically, and delay fitting to a Beta until the last minute.
+One option could be this: since we have analytical expressions for the mean and variance of the prior on \\(p_t^δ\\), convert these to the [closest Beta distribution](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) and straightforwardly update with the Bernoulli likelihood as mentioned [above](#bernoulli-quizzes). However, we can do much better.
 
 By application of Bayes rule, the posterior is
 \\[Posterior(p|x) = \frac{Prior(p) · Lik(x|p)}{\int_0^1 Prior(p) · Lik(x|p) \\, dp}.\\]
@@ -268,19 +268,17 @@ The above is in its own fenced code block because I don’t want Hydrogen to eva
 
 Let’s present our Python implementation of the core Ebisu functions, `predictRecall` and `updateRecall`, and a couple of other related functions that live in the main `ebisu` module. All these functions consume a model encoding a Beta prior on recall probabilities at time \\(t\\), consisting of a 3-tuple containing \\((α, β, t)\\). I could have gone all object-oriented here but I chose to leave all these functions as stand-alone functions that consume and transform this 3-tuple because (1) I’m not an OOP devotee, and (2) I wanted to maximize the transparency of of this implementation so it can readily be ported to non-OOP, non-Pythonic languages.
 
-> **Important** Note how none of these functions deal with *timestamps*. All time is captured in “time since last review”, and your external application has to store timestamps (as illustrated in the [Ebisu Jupyter Notebook](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb)). This is a deliberate choice! Ebisu wants to know as *little* about your facts as possible.
+> **Important** Note how none of these functions deal with *timestamps*. All time is captured in “time since last review”, and your external application has to assign units and store timestamps (as illustrated in the [Ebisu Jupyter Notebook](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb)). This is a deliberate choice! Ebisu wants to know as *little* about your facts as possible.
 
-In the [math section](#mean-and-variance-of-the-recall-probability-right-now) above we derived the mean recall probability at time \\(t_{now} = t · δ\\) given a model \\(α, β, t\\): \\(E[p_t^δ] = Γ(α + β) · Γ(α) / (Γ(α + δ) · Γ(α + β + δ))\\). There are no sums-of-gammas here, so this is readily computed using log-gamma routine (`gammaln` in Scipy) to avoid overflowing and precision-loss in `predictRecall` (🍏 below).
+In the [math section](#mean-and-variance-of-the-recall-probability-right-now) above we derived the mean recall probability at time \\(t_{now} = t · δ\\) given a model \\(α, β, t\\): \\(E[p_t^δ] = Γ(α + β) · Γ(α + δ) / (Γ(α) · Γ(α + β + δ))\\). There are no sums-of-gammas here, so this is readily computed using log-gamma routine (`gammaln` in Scipy) to avoid overflowing and precision-loss in `predictRecall` (🍏 below).
 
-We also derived the variance, \\(Var[p_t^δ] = E[p_t^{2 δ}] - (E[p_t^δ])^2\\). This might be a helpful value and is computed by `predictRecallVar` (🍋 below). In order to avoid risking catastrophic cancellation by subtracting two potentially large floats (it’d be nice to prove that this will never happen given our \\(γ_n\\)’s but I haven’t yet done so), we use a simplification of `logsumexp` to evaluate the subtraction—this trick uses the following identity to avoid subtracting potentially very large floats: `exp(x) - exp(y) = exp(m) * (exp(a-m) - exp(b-m))` where `m = max(x, y)` and where `x` and `y` are logs of the two summands. This is basically `logsumexp` without the final `log`, so this trick is called `_subtractexp` (⚾️) below.
-
-These two functions have the same signature: they consume
-- a `model`: represents the Beta prior on recall probability at one specific time since the fact’s last review, and
-- a `tnow`, the time elapsed since the last time this fact was quizzed.
+Two computational speedups are allowed for:
+- we can skip the final `exp` that converts from the log-domain to the linear domain as long as we don’t need an actual probability (i.e., a number between 0 and 1). The output of the function will then be a “pseudo-probability” and can be compared to other “pseudo-probabilities” are returned by the function. Taking advantage of this can, for a representative case I have here, reduce the runtime from 5.69 µs (± 158 ns) to 4.01 µs (± 215 ns), a 1.4× speedup.
+- \\(Γ(α + β) - Γ(α)\\) is independent of \\(t_{now}\\) and can be precomputed, for example, when the prior is first established. If this value is passed in, the runtime further reduces to 2.47 µs (± 162 ns), giving a total speedup of 2.3×, with no loss of accuracy. A helper function `cacheIndependent` is provided: 🥥 below.
 
 ```py
 # export ebisu/ebisu.py #
-def predictRecall(prior, tnow):
+def predictRecall(prior, tnow, exact=False, independent=None):
   """Expected recall probability now, given a prior distribution on it. 🍏
 
   `prior` is a tuple representing the prior distribution on recall probability
@@ -291,49 +289,29 @@ def predictRecall(prior, tnow):
 
   `tnow` is the *actual* time elapsed since this fact's most recent review.
 
-  Returns the expectation of the recall probability `tnow` after last review, a
-  float between 0 and 1.
+  Optional keyword paramter `exact` makes the return value a probability, specifically, the expected recall probability `tnow` after the last review: a number between 0 and 1. If `exact` is false (the default), some calculations are skipped and the return value won't be a probability, but can still be compared against other values returned by this function. That is, if `predictRecall(prior1, tnow1, exact=True) < predictRecall(prior2, tnow2, exact=True)`, then it is guaranteed that `predictRecall(prior1, tnow1, exact=False) < predictRecall(prior2, tnow2, exact=False)`. The default is set to false for computational reasons.
 
-  See documentation for derivation.
+  Optional keyword parameter `independent` is a precalculated number that is only dependent on `prior` and independent of `tnow`, allowing some computational speedup if cached ahead of time. It can be obtained with `ebisu.cacheIndependent`.
+
+  See README for derivation.
   """
   from scipy.special import gammaln
   from numpy import exp
   alpha, beta, t = prior
+  if not independent:
+    independent = gammaln(alpha + beta) - gammaln(alpha)
   dt = tnow / t
-  return exp(
-      gammaln(alpha + dt) - gammaln(alpha + beta + dt) -
-      (gammaln(alpha) - gammaln(alpha + beta)))
+  ret = gammaln(alpha + dt) - gammaln(alpha + beta + dt) + independent
+  return exp(ret) if exact else ret
 
+def cacheIndependent(prior):
+  """Precompute a value to speed up `predictRecall`. 🥥
 
-def _subtractexp(x, y):
-  """Evaluates exp(x) - exp(y) a bit more accurately than that. ⚾️
-
-  This can avoid cancellation in case `x` and `y` are both large and close,
-  similar to scipy.misc.logsumexp except without the last log.
-  """
-  from numpy import exp, maximum
-  maxval = maximum(x, y)
-  return exp(maxval) * (exp(x - maxval) - exp(y - maxval))
-
-
-def predictRecallVar(prior, tnow):
-  """Variance of recall probability now. 🍋
-
-  This function returns the variance of the distribution whose mean is given by
-  `ebisu.predictRecall`. See it's documentation for details.
-
-  Returns a float.
+  Send the output of this function to `predictRecall`'s `independent` keyword argument.
   """
   from scipy.special import gammaln
   alpha, beta, t = prior
-  dt = tnow / t
-  s = [
-      gammaln(alpha + n * dt) - gammaln(alpha + beta + n * dt) for n in range(3)
-  ]
-  md = 2 * (s[1] - s[0])
-  md2 = s[2] - s[0]
-
-  return _subtractexp(md2, md)
+  return gammaln(alpha + beta) - gammaln(alpha)
 ```
 
 Next is the implementation of `updateRecall` (🍌), which accepts
@@ -343,18 +321,12 @@ Next is the implementation of `updateRecall` (🍌), which accepts
 
 and returns a *new* model, representing an updated Beta prior on recall probability, this time after `tnow` time has elapsed since a fact was quizzed.
 
-**In case of successful quiz** `updateRecall` analytically computes the true posterior’s
-- mean (expectation) \\(γ_2 / γ_1\\), which can be evaluated completely in the log domain, and
-- variance \\(γ_3 / γ_1 - (E[p|x=1])^2\\), which as the previous variance we evaluate in the log domain and use `_subtractexp` (⚾️ above) to avoid cancellation errors,
-    - where \\(γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)\\).
+**In case of successful quiz** `updateRecall` analytically computes the true posterior, which is GB1-distributed, and then exactly transforms these into a Beta distribution to yield the new model.
 
-**In case of unsuccessful quiz** these values are
-- mean \\((γ_2 - γ_1) / (γ_1 - γ_0)\\), which we rewrite to remain in the log domain and use a ratio of two `expm1`s, which accurately evaluates `exp(x) - 1`—recall that subtraction with large floating-point numbers is more risky than division; and
-- variance \\((γ_3 (γ_1 - γ_0) + γ_2 (γ_0 + γ_1 - γ_2) - γ_1^2) / (γ_1 - γ_0)^2\\). This we evaluate with a sequence of *four* `logsumexp`s to minimize risk of floating-point precision loss.
-
-> Recall that \\(α\\) and \\(β\\) come from the model representing the prior, while \\(δ = t / t_{now}\\) depends on both \\(t\\) (from the model) and the actual time since the previous quiz \\(t_{now}\\).
-
-After the mean and variance are evaluated, these are converted to a Beta distribution. We’ll talk about that after this code block.
+**In case of unsuccessful quiz**, `updateRecall` numerically fits a GB1 to the true posterior by matching the two distributions’ moments (via non-linear least squares). This approximate GB1 distribution is then exactly transformed back to a Beta distribution to yield the new model. Three helper functions are used:
+- `gb1Moments`, which computes the moments of an arbitrary GB1 random variable,
+- `failureMoments`, which computes the moments of the posterior upon a failed quiz, and
+- `gb1ToBeta`, which translates a GB1 distribution on recall probability back in time to a pure Beta distribution.
 
 ```py
 # export ebisu/ebisu.py #
@@ -373,79 +345,110 @@ def updateRecall(prior, result, tnow):
   Returns a new object (like `prior`) describing the posterior distribution of
   recall probability at `tnow`.
   """
-  from scipy.special import gammaln
-  from numpy import exp
-  alpha, beta, t = prior
+  (alpha, beta, t) = prior
   dt = tnow / t
   if result:
-    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
-    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`
-    # variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
-    # Simplify all three to get the following:
-    same = gammaln(alpha + beta + dt) - gammaln(alpha + dt)
-    muln = gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt) + same
-    mu = exp(muln)
-    var = _subtractexp(
-        same + gammaln(alpha + 3 * dt) - gammaln(alpha + beta + 3 * dt),
-        2 * muln)
+    gb1 = (1.0 / dt, 1.0, alpha + dt, beta, tnow)
   else:
-    # Mathematica code is same as above, but replace one `p` with `(1-p)`
-    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
-    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
-    # var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
-    # Then simplify and combine
+    mom = np.array(failureMoments(prior, result, tnow, num=2))
 
-    from scipy.misc import logsumexp
-    from numpy import expm1
+    def f(bd):
+      b, d = bd
+      this = np.array(gb1Moments(1 / d, 1., alpha, b, num=2))
+      return this - mom
 
-    s = [
-        gammaln(alpha + n * dt) - gammaln(alpha + beta + n * dt)
-        for n in range(4)
-    ]
+    from scipy.optimize import least_squares
+    res = least_squares(f, [beta, dt], bounds=((1.01, 0), (np.inf, np.inf)))
+    newBeta, newDelta = res.x
+    gb1 = (1 / newDelta, 1, alpha, newBeta, tnow)
 
-    mu = expm1(s[2] - s[1]) / -expm1(s[0] - s[1])
+  return gb1ToBeta(gb1)
 
-    def lse(a, b):
-      return list(logsumexp(a, b=b, return_sign=True))
 
-    n1 = lse([s[1], s[0]], [1, -1])
-    n1[0] += s[3]
-    n2 = lse([s[0], s[1], s[2]], [1, 1, -1])
-    n2[0] += s[2]
-    n3 = [s[1] * 2, 1.]
-    d = lse([s[1], s[0]], [1, -1])
-    d[0] *= 2
-    n = lse([n1[0], n2[0], n3[0]], [n1[1], n2[1], -n3[1]])
-    var = exp(n[0] - d[0])
+def gb1ToBeta(gb1: Tuple[float, float, float, float, float]):
+  """Convert a GB1 model (five parameters: four GB1 parameters, time) to a Beta model"""
+  return (gb1[2], gb1[3], gb1[4] * gb1[0])
 
-  newAlpha, newBeta = _meanVarToBeta(mu, var)
-  return newAlpha, newBeta, tnow
+
+def failureMoments(model: Tuple[float, float, float],
+                   result: bool,
+                   tnow: float,
+                   num: int = 4,
+                   returnLog: bool = True):
+  """Moments of the posterior on recall at time `tnow` upon quiz failure"""
+  a, b, t0 = model
+  t = tnow / t0
+  from scipy.special import gammaln, logsumexp
+  from numpy import exp
+  s = [gammaln(a + n * t) - gammaln(a + b + n * t) for n in range(num + 2)]
+  marginal = logsumexp([s[0], s[1]], b=[1, -1])
+  ret = [(logsumexp([s[n], s[n + 1]], b=[1, -1]) - marginal) for n in range(1, num + 1)]
+  return ret if returnLog else [exp(x) for x in ret]
+
+def gb1Moments(a: float, b: float, p: float, q: float, num: int = 2, returnLog: bool = True):
+  """Raw moments of GB1, via Wikipedia"""
+  from scipy.special import betaln
+  bpq = betaln(p, q)
+  logb = np.log(b)
+  ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
+  return ret if returnLog else [np.exp(x) for x in ret]
 ```
 
-Finally we have a couple more helper functions in the main `ebisu` namespace. `_meanVarToBeta` (🏈 below) uses simple algebra to [fit a Beta distribution](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) to a mean and variance—it’s used in `updateRecall`.
+Finally we have a couple more helper functions in the main `ebisu` namespace.
 
-I’ve thought about taking `priorToHalflife` (🏀 below) out of the main `ebisu` namespace because it’s not used by the core algorithm, but rather is for visualization purposes. Given a `model` (as above, a 3-tuple representing a Beta distribution prior on a fact’s recall probability at a specific time after its last review), it runs `predictRecall` over and over in a potentially-time-consuming bracketed search to find the *half-life*, that is, the time between reviews at which the recall probability is 50% (customizable via the `percentile` argument). This bracketed search, Scipy’s sophisticated [Brent’s algorithm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.brentq.html), requires a min and max values to search over and the defaults of `mint=1e-3` and `maxt=100` might not suffice for all cases.
+It is often useful to find out how much time has to elapse for memory to decay to a given recall probability. The time for memory to decay to 50% recall probability is the half-life. A quiz app might store the time when each quiz’s recall probability reaches 50%, 5%, 0.05%, …, as a computationally-efficient approximation to the exact recall probability. I am grateful to Robert Kern for contributing the `priorToPercentileDecay` function (🏀 below).
 
 The least important function from a usage point of view is also the most important function for someone getting started with Ebisu: I call it `defaultModel` (🍗 below) and it simply creates a “model” object (a 3-tuple) out of the arguments it’s given. It’s included in the `ebisu` namespace to help developers who totally lack confidence in picking parameters: the only information it absolutely needs is an expected half-life, e.g., four hours or twenty-four hours or however long you expect a newly-learned fact takes to decay to 50% recall.
 
 ```py
 # export ebisu/ebisu.py #
-def _meanVarToBeta(mean, var):
-  """Fit a Beta distribution to a mean and variance. 🏈"""
-  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
-  tmp = mean * (1 - mean) / var - 1
-  alpha = mean * tmp
-  beta = (1 - mean) * tmp
-  return alpha, beta
+def priorToPercentileDecay(prior, percentile=0.5):
+  """When will memory decay to a given percentile? 🏀
+  
+  Use a root-finding routine in log-delta space to find the delta that
+  will cause the GB1 distribution to have a mean of the requested quantile.
+  Because we are using well-behaved normalized deltas instead of times, and
+  owing to the monotonicity of the expectation with respect to delta, we can
+  quickly scan for a rough estimate of the scale of delta, then do a finishing
+  optimization to get the right value.
+  """
+  from scipy.special import betaln
+  from scipy.optimize import root_scalar
+  alpha, beta, t0 = model
+  logBab = betaln(alpha, beta)
+  logPercentile = np.log(percentile)
+
+  def f(lndelta):
+    logMean = betaln(alpha + np.exp(lndelta), beta) - logBab
+    return logMean - logPercentile
+
+  # Scan for a bracket.
+  bracket_width = 6.0
+  blow = -bracket_width / 2.0
+  bhigh = bracket_width / 2.0
+  flow = f(blow)
+  fhigh = f(bhigh)
+  while flow > 0 and fhigh > 0:
+    # Move the bracket up.
+    blow = bhigh
+    flow = fhigh
+    bhigh += bracket_width
+    fhigh = f(bhigh)
+  while flow < 0 and fhigh < 0:
+    # Move the bracket down.
+    bhigh = blow
+    fhigh = flow
+    blow -= bracket_width
+    flow = f(blow)
+
+  assert flow > 0 and fhigh < 0
+
+  sol = root_scalar(f, bracket=[blow, bhigh])
+  t1 = np.exp(sol.root) * t0
+  return t1
 
 
-def priorToHalflife(prior, percentile=0.5, maxt=100, mint=1e-3):
-  """Find the half-life corresponding to a time-based prior on recall. 🏀"""
-  from scipy.optimize import brentq
-  return brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
-
-
-def defaultModel(t, alpha=4.0, beta=None):
+def defaultModel(t, alpha=3.0, beta=None):
   """Convert recall probability prior's raw parameters into a model object. 🍗
 
   `t` is your guess as to the half-life of any given fact, in units that you
@@ -461,21 +464,27 @@ def defaultModel(t, alpha=4.0, beta=None):
   return (alpha, beta or alpha, t)
 ```
 
-With the exception of `defaultModel`, `priorToHalflife`, `predictRecallVar`, all the above functions are considered core Ebisu functions and any implementation should provide them:
-- `predictRecall` and
-- `updateRecall`,
-- aided by private helper functions
-    - `_meanVarToBeta` and
-    - `_subtractexp`.
+I would expect all the functions above to be present in all implementations of Ebisu:
+- `predictRecall`, aided by a public helper function `cacheIndependent`,
+- `updateRecall`, aided by private helper functions `gb1ToBeta`, `failureMoments`, and `gb1Moments`,
+- `priorToPercentileDecay`, and
+- `defaultModel`.
 
 The functions in the following section are either for illustrative or debugging purposes.
 
 ### Miscellaneous functions
 I wrote a number of other functions that help provide insight or help debug the above functions in the main `ebisu` workspace but are not necessary for an actual implementation. These are in the `ebisu.alternate` submodule and not nearly as much time has been spent on polish or optimization as the above core functions.
 
+First, a helper function that fits a Beta random variable to a mean and variance.
 ```py
 # export ebisu/alternate.py #
-from .ebisu import _meanVarToBeta
+def _meanVarToBeta(mean, var):
+  """Fit a Beta distribution to a mean and variance. 🏈"""
+  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
+  tmp = mean * (1 - mean) / var - 1
+  alpha = mean * tmp
+  beta = (1 - mean) * tmp
+  return alpha, beta
 ```
 
 `predictRecallMode` and `predictRecallMedian` return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variance \\(p_t^δ\\) whose mean is returned by `predictRecall` (🍏 above). Recall that \\(δ = t / t_{now}\\).
@@ -628,7 +637,7 @@ def updateRecallQuad(prior, result, tnow, analyticMarginal=True):
   return newAlpha, newBeta, tnow
 
 
-def updateRecallMonteCarlo(prior, result, tnow, N=10 * 1000):
+def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000):
   """Update recall probability with quiz result via Monte Carlo simulation.
 
   Same arguments as `ebisu.updateRecall`, see that docstring for details.
@@ -648,38 +657,23 @@ def updateRecallMonteCarlo(prior, result, tnow, N=10 * 1000):
   # This is the Bernoulli likelihood [bernoulliLikelihood]
   weights = (tnowPrior)**result * ((1 - tnowPrior)**(1 - result))
 
+  # Now propagate this posterior to the tback
+  tbackPrior = tnowPrior**(tback/tnow)
+
   # See [weightedMean]
-  weightedMean = np.sum(weights * tnowPrior) / np.sum(weights)
+  weightedMean = np.sum(weights * tbackPrior) / np.sum(weights)
   # See [weightedVar]
   weightedVar = np.sum(weights *
-                       (tnowPrior - weightedMean)**2) / np.sum(weights)
+                       (tbackPrior - weightedMean)**2) / np.sum(weights)
 
   newAlpha, newBeta = _meanVarToBeta(weightedMean, weightedVar)
 
-  return newAlpha, newBeta, tnow
+  return newAlpha, newBeta, tback
 ```
 
 That’s it—that’s all the code in the `ebisu` module!
 
 ### Test code
-
-Before diving into unit tests, I promised [above](#updating-the-posterior-with-quiz-results) to show the suboptimality of fitting a Beta to the prior on \\(p_t^δ\\) and performing a straightforward conjugate update. Assume you can trust `updateRecall` for now, which fits a Beta to the full *posterior*. The following shows the difference between the two models: the numerical differences start in the first digit after the decimal point.
-
-```py
-def betafitBeforeLikelihood(a, b, t1, x, t2):
-  a2, b2 = _meanVarToBeta(
-      predictRecall((a, b, t1), t2), predictRecallVar((a, b, t1), t2))
-  return a2 + x, b2 + 1 - x, t2
-
-
-print("Beta fit BEFORE posterior:", updateRecall((3.3, 4.4, 1.), 1., 2.))
-print("Beta fit AFTER posterior:",
-      betafitBeforeLikelihood(3.3, 4.4, 1., 1., 2.))
-# Output:
-# Beta fit BEFORE posterior: (2.2138973610926804, 4.6678159395305334, 2.0)
-# Beta fit AFTER posterior: (2.3075328265376691, 4.8652384243261961, 2.0)
-```
-
 I use the built-in `unittest`, and I can run all the tests from Atom via Hydrogen/Jupyter but for historic reasons I don’t want Jupyter to deal with the `ebisu` namespace, just functions (since most of these functions and tests existed before the module’s layout was decided). So the following is in its own fenced code block that I don’t evaluate in Atom.
 
 ```py

@@ -6,24 +6,29 @@ import ebisu
 from typing import Dict, Tuple, Sequence
 
 
-def failureMoments(model: Tuple[float, float, float], result: bool, tnow: float, num: int = 4):
+def failureMoments(model: Tuple[float, float, float],
+                   result: bool,
+                   tnow: float,
+                   num: int = 4,
+                   returnLog: bool = True):
   """Moments of the posterior on recall at time tnow upon quiz failure"""
   a, b, t0 = model
   t = tnow / t0
   from scipy.special import gammaln, logsumexp
-  from numpy import log, exp
+  from numpy import exp
   s = [gammaln(a + n * t) - gammaln(a + b + n * t) for n in range(num + 2)]
-  logt = log(t)
   marginal = logsumexp([s[0], s[1]], b=[1, -1])
-  return [exp(logsumexp([s[n], s[n + 1]], b=[1, -1]) - marginal) for n in range(1, num + 1)]
+  ret = [(logsumexp([s[n], s[n + 1]], b=[1, -1]) - marginal) for n in range(1, num + 1)]
+  return ret if returnLog else [exp(x) for x in ret]
 
 
-def gb1Moments(a: float, b: float, p: float, q: float, num: int = 2):
+def gb1Moments(a: float, b: float, p: float, q: float, num: int = 2, returnLog: bool = True):
   """Raw moments of GB1 via Wikipedia"""
   from scipy.special import betaln
   bpq = betaln(p, q)
   logb = np.log(b)
-  return [np.exp(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
+  ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
+  return ret if returnLog else [np.exp(x) for x in ret]
 
 
 def gb1ToBeta(gb1: Tuple[float, float, float, float, float]):
@@ -31,7 +36,30 @@ def gb1ToBeta(gb1: Tuple[float, float, float, float, float]):
   return (gb1[2], gb1[3], gb1[4] * gb1[0])
 
 
-def updateViaGb1(prior: Tuple[float, float, float], result: bool, tnow: float):
+def updateGb1(prior: Tuple[float, float, float], result: bool, tnow: float):
+  """GB1-based replacement to ebisu.updateRecall"""
+  (alpha, beta, t) = prior
+  dt = tnow / t
+  if result:
+    gb1 = (1.0 / dt, 1.0, alpha + dt, beta, tnow)
+  else:
+    mom = np.array(failureMoments(prior, result, tnow, num=2))
+
+    def f(bd):
+      b, d = bd
+      this = np.array(gb1Moments(1 / d, 1., alpha, b, num=2))
+      return this - mom
+
+    from scipy.optimize import least_squares
+    res = least_squares(f, [beta, dt], bounds=((1.01, 0), (np.inf, np.inf)))
+    # print("optimization cost", res)
+    newBeta, newDelta = res.x
+    gb1 = (1 / newDelta, 1, alpha, newBeta, tnow)
+
+  return gb1ToBeta(gb1)
+
+
+def updateTest(prior: Tuple[float, float, float], result: bool, tnow: float):
   """Alternate to ebisu.updateRecall that returns several posterior Beta models"""
   (alpha, beta, t) = prior
   delta = tnow / t
@@ -48,7 +76,7 @@ def updateViaGb1(prior: Tuple[float, float, float], result: bool, tnow: float):
 
     from scipy.optimize import least_squares
     res = least_squares(f, [beta, delta], bounds=((1.01, 0), (np.inf, np.inf)))
-    # print("optimization cost", res.cost)
+    # print("optimization cost", res)
     newBeta, newDelta = res.x
     gb1 = (1 / newDelta, 1, alpha, newBeta, tnow)
 
@@ -112,11 +140,12 @@ def estimate_half_life(model, quantile=0.5):
     optimization to get the right value.
     """
   alpha, beta, t0 = model
-  Bab = special.beta(alpha, beta)
+  logBab = special.betaln(alpha, beta)
+  logQuantile = np.log(quantile)
 
   def f(lndelta):
-    mean = special.beta(alpha + np.exp(lndelta), beta) / Bab
-    return mean - quantile
+    logMean = special.betaln(alpha + np.exp(lndelta), beta) - logBab
+    return logMean - logQuantile
 
   # Scan for a bracket.
   bracket_width = 6.0
@@ -165,19 +194,46 @@ def moveBeta(model: Tuple[float, float, float]):
   return (alpha1, beta1, th)
 
 
+def meanVarToGB1(mu, var):
+  m2 = var + mu**2
+  mom = np.array([mu, m2])
+
+  def f(bd):
+    b, d = bd
+    this = np.array(gb1Moments(1 / d, 1., alpha, b, num=2))
+    return this - mom
+
+  from scipy.optimize import least_squares
+  res = least_squares(f, [beta, dt], bounds=((1.01, 0), (np.inf, np.inf)))
+  newBeta, newDelta = res.x
+  return (1 / newDelta, 1, alpha, newBeta, tnow)
+
+
 if __name__ == '__main__':
   import pylab as plt
   plt.style.use('ggplot')
   model = (4., 30., 1.)
+  model = (40., 6., 1.)
+  model = (4., 6., 1.)
 
-  # model = (40., 6., 1.)
-  # model = (4., 6., 1.)
-
+  def updateRecallMonteCarlo(prior, result, tnow, N=10 * 1000):
+    import scipy.stats as stats
+    alpha, beta, t = prior
+    tPrior = stats.beta.rvs(alpha, beta, size=N)
+    tnowPrior = tPrior**(tnow / t)
+    # This is the Bernoulli likelihood [bernoulliLikelihood]
+    weights = (tnowPrior)**result * ((1 - tnowPrior)**(1 - result))
+    # See [weightedMean]
+    weightedMean = np.sum(weights * tnowPrior) / np.sum(weights)
+    # See [weightedVar]
+    weightedVar = np.sum(weights * (tnowPrior - weightedMean)**2) / np.sum(weights)
+    newAlpha, newBeta = _meanVarToBeta(weightedMean, weightedVar)
+    return newAlpha, newBeta, tnow
 
   def simulation(model, result, tnow):
     gold = ebisu.updateRecall(model, result, tnow)
 
-    newModel = updateViaGb1(model, result, tnow)
+    newModel = updateTest(model, result, tnow)
     print(newModel)
     t = np.linspace(.1, 100 * 1, 50 * 1)
 
@@ -204,7 +260,26 @@ if __name__ == '__main__':
     plt.semilogy(t, trace(newModel['postToBeta']), linewidth=1, label='post2beta')
     # plt.semilogy(t, trace(newModel['moveBetasOnly']), '-', linewidth=2, label='orig@HL')
     plt.legend()
-    plt.title('Quiz={}, T={}'.format(result, tnow))
+    plt.title('Model=({},{},{}), Quiz={} @ Tnow={}'.format(*model, result, tnow))
+
+    result = False
+    import scipy.stats as stats
+    alpha, beta, tau = model
+    N = 10 * 1000 * 1000
+    priorTau = stats.beta.rvs(alpha, beta, size=N)
+    tQuiz = 3.
+    priorTQuiz = priorTau**(tQuiz / tau)
+    posteriorWeights = (priorTQuiz)**result * ((1 - priorTQuiz)**(1 - result))
+    posteriorModel = updateGb1(model, result, tQuiz)
+    posteriorNewTau = (priorTQuiz)**(posteriorModel[2] / tQuiz)
+    weightedMean = np.sum(posteriorWeights * posteriorNewTau) / np.sum(posteriorWeights)
+    weightedVar = np.sum(posteriorWeights *
+                         (posteriorNewTau - weightedMean)**2) / np.sum(posteriorWeights)
+    print('expected', summarizeBeta(posteriorModel[0], posteriorModel[1]))
+    print('actual', [weightedMean, weightedVar])
+
+    def summarizeBeta(a, b):
+      return dict(mean=a / (a + b), var=a * b / (a + b)**2 / (a + b + 1))
 
   simulation(model, True, 100.)
   simulation(model, False, 100.)
@@ -280,4 +355,6 @@ Similarly for `model = (40, 6, 1)` and `(4., 30., 1.)`.
 
 Well, I don't like how the telescoping behaves for `(4., 30., 1.)`. True
 and False at T=0.01 both are not great far past the new halflife.
+
+Similarly for (40, 6, 1), True and false at T=0.01 don't behave as expected. 
 """

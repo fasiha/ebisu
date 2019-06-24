@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
 
-from .ebisu import _meanVarToBeta
+def _meanVarToBeta(mean, var):
+  """Fit a Beta distribution to a mean and variance. 🏈"""
+  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
+  tmp = mean * (1 - mean) / var - 1
+  alpha = mean * tmp
+  beta = (1 - mean) * tmp
+  return alpha, beta
 import numpy as np
 
 
@@ -75,59 +81,7 @@ def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
       median=np.median(tnowPrior),
       mode=bincenters[freqs.argmax()],
       var=np.var(tnowPrior))
-
-
-def updateRecallQuad(prior, result, tnow, analyticMarginal=True):
-  """Update recall probability with quiz result via quadrature integration.
-
-  Same arguments as `ebisu.updateRecall`, see that docstring for details.
-
-  An extra keyword argument: `analyticMarginal` if false will compute the
-  marginal (the denominator in Bayes rule) using quadrature as well. If true, an
-  analytical expression will be used.
-  """
-  from scipy.integrate import quad
-  alpha, beta, t = prior
-  dt = tnow / t
-
-  if result == 1:
-    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1) * p
-  else:
-    # difference from above: -------------------------------------------^vvvv
-    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta - 1) * (1 - p)
-
-  if analyticMarginal:
-    from scipy.special import beta as fbeta
-    if result == 1:
-      marginal = dt * fbeta(alpha + dt, beta)
-    else:
-      marginal = dt * (fbeta(alpha, beta) - fbeta(alpha + dt, beta))
-  else:
-    marginalEst = quad(marginalInt, 0, 1)
-    if marginalEst[0] < marginalEst[1] * 10.:
-      raise OverflowError('Marginal integral error too high: value={}, error={}'.format(
-          marginalEst[0], marginalEst[1]))
-    marginal = marginalEst[0]
-
-  muInt = lambda p: marginalInt(p) * p
-  muEst = quad(muInt, 0, 1)
-  if muEst[0] < muEst[1] * 10.:
-    raise OverflowError('Mean integral error too high: value={}, error={}'.format(
-        muEst[0], muEst[1]))
-  mu = muEst[0] / marginal
-
-  varInt = lambda p: marginalInt(p) * (p - mu)**2
-  varEst = quad(varInt, 0, 1)
-  if varEst[0] < varEst[1] * 10.:
-    raise OverflowError('Variance integral error too high: value={}, error={}'.format(
-        varEst[0], varEst[1]))
-  var = varEst[0] / marginal
-
-  newAlpha, newBeta = _meanVarToBeta(mu, var)
-  return newAlpha, newBeta, tnow
-
-
-def updateRecallMonteCarlo(prior, result, tnow, N=10 * 1000):
+def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
   """Update recall probability with quiz result via Monte Carlo simulation.
 
   Same arguments as `ebisu.updateRecall`, see that docstring for details.
@@ -147,11 +101,14 @@ def updateRecallMonteCarlo(prior, result, tnow, N=10 * 1000):
   # This is the Bernoulli likelihood [bernoulliLikelihood]
   weights = (tnowPrior)**result * ((1 - tnowPrior)**(1 - result))
 
+  # Now propagate this posterior to the tback
+  tbackPrior = tnowPrior**(tback / tnow)
+
   # See [weightedMean]
-  weightedMean = np.sum(weights * tnowPrior) / np.sum(weights)
+  weightedMean = np.sum(weights * tbackPrior) / np.sum(weights)
   # See [weightedVar]
-  weightedVar = np.sum(weights * (tnowPrior - weightedMean)**2) / np.sum(weights)
+  weightedVar = np.sum(weights * (tbackPrior - weightedMean)**2) / np.sum(weights)
 
   newAlpha, newBeta = _meanVarToBeta(weightedMean, weightedVar)
 
-  return newAlpha, newBeta, tnow
+  return newAlpha, newBeta, tback

@@ -3,6 +3,7 @@
 from ebisu import *
 from ebisu.alternate import *
 import unittest
+import numpy as np
 
 
 def relerr(dirt, gold):
@@ -26,8 +27,7 @@ def klDivBeta(a, b, a2, b2):
 
 
 def kl(v, w):
-  return (klDivBeta(v[0], v[1], w[0], w[1]) +
-          klDivBeta(w[0], w[1], v[0], v[1])) / 2.
+  return (klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])) / 2.
 
 
 testpoints = []
@@ -56,11 +56,9 @@ class TestEbisu(unittest.TestCase):
       global testpoints
       for t in map(lambda dt: dt * t0, [0.1, .99, 1., 1.01, 5.5]):
         mc = predictRecallMonteCarlo((a, b, t0), t, N=100 * 1000)
-        mean = predictRecall((a, b, t0), t)
-        var = predictRecallVar((a, b, t0), t)
+        mean = predictRecall((a, b, t0), t, exact=True)
         self.assertLess(relerr(mean, mc['mean']), 5e-2)
-        self.assertLess(relerr(var, mc['var']), 5e-2)
-        testpoints += [['predict', [a, b, t0], [t], dict(mean=mean, var=var)]]
+        testpoints += [['predict', [a, b, t0], [t], dict(mean=mean)]]
 
     inner(3.3, 4.4, 1.)
     inner(34.4, 34.4, 1.)
@@ -72,34 +70,33 @@ class TestEbisu(unittest.TestCase):
       for t in map(lambda dt: dt * t0, dts):
         for x in [False, True]:
           msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
-          mc = updateRecallMonteCarlo((a, b, t0), x, t, N=1 * 100 * 1000)
           an = updateRecall((a, b, t0), x, t)
-          self.assertLess(
-              kl(an, mc), 1e-3, msg=msg + ' an={}, mc={}'.format(an, mc))
-
-          try:
-            quad1 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=True)
-          except OverflowError:
-            quad1 = None
-          if quad1 is not None:
-            self.assertLess(kl(quad1, mc), 1e-3, msg=msg)
-
-          try:
-            quad2 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=False)
-          except OverflowError:
-            quad2 = None
-          if quad2 is not None:
-            self.assertLess(kl(quad2, mc), 1e-3, msg=msg)
+          mc = updateRecallMonteCarlo((a, b, t0), x, t, an[2], N=100 * 1000)
+          self.assertLess(kl(an, mc), 5e-3, msg=msg + ' an={}, mc={}'.format(an, mc))
 
           testpoints += [['update', [a, b, t0], [x, t], dict(post=an)]]
 
     inner(3.3, 4.4, 1., [0.1, 1., 9.5])
-    inner(341.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+
+  def test_update_then_predict(self):
+    future = np.linspace(.01, 1000, 101)
+
+    def inner(a, b, t0, dts):
+      for t in map(lambda dt: dt * t0, dts):
+        for x in [False, True]:
+          msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
+          newModel = updateRecall((a, b, t0), x, t)
+          predicted = np.vectorize(lambda tnow: predictRecall(newModel, tnow))(future)
+          self.assertTrue(
+              np.all(np.diff(predicted) < 0), msg=msg + ' predicted={}'.format(predicted))
+
+    inner(3.3, 4.4, 1., [0.1, 1., 9.5])
+    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
 
 
 if __name__ == '__main__':
-  unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(
-      TestEbisu()))
+  unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(TestEbisu()))
 
   with open("test.json", "w") as out:
     import json

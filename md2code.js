@@ -23,10 +23,7 @@ _.chunk(fencepos, 2).forEach(([[_, i], [__, j]]) => {
 
   if (language === 'py' || language === 'python') {
     contents =
-        spawnSync(
-            'yapf', ['--style', '{based_on_style: chromium, COLUMN_LIMIT:80}'],
-            {input: contents, encoding: 'utf8'})
-            .stdout;
+        spawnSync('yapf', [], {input: contents, encoding: 'utf8'}).stdout;
     replacement.push({start: i, end: j, contentStart, contents});
   }
 

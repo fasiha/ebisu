@@ -304,6 +304,7 @@ def predictRecall(prior, tnow, exact=False, independent=None):
   ret = gammaln(alpha + dt) - gammaln(alpha + beta + dt) + independent
   return exp(ret) if exact else ret
 
+
 def cacheIndependent(prior):
   """Precompute a value to speed up `predictRecall`. 🥥
 
@@ -350,6 +351,8 @@ def updateRecall(prior, result, tnow):
   if result:
     gb1 = (1.0 / dt, 1.0, alpha + dt, beta, tnow)
   else:
+    import numpy as np
+
     mom = np.array(failureMoments(prior, result, tnow, num=2))
 
     def f(bd):
@@ -365,17 +368,23 @@ def updateRecall(prior, result, tnow):
   return gb1ToBeta(gb1)
 
 
-def gb1ToBeta(gb1: Tuple[float, float, float, float, float]):
-  """Convert a GB1 model (five parameters: four GB1 parameters, time) to a Beta model"""
+def gb1ToBeta(gb1):
+  """Convert a GB1 model (five parameters: four GB1 parameters, time) to a Beta model
+  
+  `gb1: Tuple[float, float, float, float, float]`
+  """
   return (gb1[2], gb1[3], gb1[4] * gb1[0])
 
 
-def failureMoments(model: Tuple[float, float, float],
-                   result: bool,
-                   tnow: float,
-                   num: int = 4,
-                   returnLog: bool = True):
-  """Moments of the posterior on recall at time `tnow` upon quiz failure"""
+def failureMoments(model, result, tnow, num=4, returnLog=True):
+  """Moments of the posterior on recall at time `tnow` upon quiz failure
+  
+  - `model: Tuple[float, float, float]`
+  - `result: bool`
+  - `tnow: float`
+  - `num: int`
+  - `returnLog: bool`
+  """
   a, b, t0 = model
   t = tnow / t0
   from scipy.special import gammaln, logsumexp
@@ -385,9 +394,14 @@ def failureMoments(model: Tuple[float, float, float],
   ret = [(logsumexp([s[n], s[n + 1]], b=[1, -1]) - marginal) for n in range(1, num + 1)]
   return ret if returnLog else [exp(x) for x in ret]
 
-def gb1Moments(a: float, b: float, p: float, q: float, num: int = 2, returnLog: bool = True):
-  """Raw moments of GB1, via Wikipedia"""
+
+def gb1Moments(a, b, p, q, num=2, returnLog=True):
+  """Raw moments of GB1, via Wikipedia
+  
+  `a: float, b: float, p: float, q: float, num: int, returnLog: bool`
+  """
   from scipy.special import betaln
+  import numpy as np
   bpq = betaln(p, q)
   logb = np.log(b)
   ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
@@ -522,8 +536,8 @@ def predictRecallMode(prior, tnow):
 
     eps = 1e-3
     others = [
-        eps, mode - eps if mode > eps else mode / 2,
-        mode + eps if mode < 1 - eps else (1 + mode) / 2, 1 - eps
+        eps, mode - eps if mode > eps else mode / 2, mode + eps if mode < 1 - eps else
+        (1 + mode) / 2, 1 - eps
     ]
     otherPr = map(pr, others)
     if max(otherPr) <= modePr:
@@ -550,6 +564,7 @@ def predictRecallMedian(prior, tnow, percentile=0.5):
   dt = tnow / t
   return betaincinv(alpha, beta, percentile)**dt
 
+
 def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
   """Monte Carlo simulation of the immediate recall probability.
 
@@ -572,72 +587,11 @@ def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
       var=np.var(tnowPrior))
 ```
 
-Next we have alternate approaches to `updateRecall` (🍌 above), namely, using quadrature integration (i.e., numerical integration) and Monte Carlo simulation.
-
-`updateRecallQuad` uses quadrature integration to evaluate the expectation and variance of of \\(p_t^δ | x\\), both of which can be expressed as integrals—recall that \\(E[f(p)] = \int_0^1 f(p) P(p) \, dp\\) for any function \\(f(p)\\), and where \\(P(p)\\) is the density function. Also recall from [above](#updating-the-posterior-with-quiz-results) that the posterior has the form
-\\[Posterior(p|x) = \frac{Prior(p) · Lik(x|p)}{\int_0^1 Prior(p) · Lik(x|p) \, dp}.\\]
-That denominator (the marginal of \\(x\\)) can be evaluated via quadrature, or by an analytical expression obtained from Wolfram Alpha (the unit tests below do both, overkill). However, the *prior* on \\(p_t^δ\\), derived [above](#moving-beta-distributions-through-time), is used here as-is since it has been extensively tested using Monte Carlo (see `predictRecallMonteCarlo` above). Any of the three integrals can fail to converge to a sensible value, in which case an exception is thrown (and in that case, the unit test is skipped).
-
-`updateRecallMonteCarlo` is deceptively simple. Like `predictRecallMonteCarlo` above, it draws samples from the Beta distribution in `model` and propagates them through Ebbinghaus’ forgetting curve to the time specified, but then it assigns weights to each sample—each weight is that sample’s probability according to the Bernoulli likelihood. This is equivalent to multiplying the prior with the likelihood—and we needn’t bother with the marginal because it’s just a normalizing factor which would scale all weights equally. The function then computes the *weighted* mean and variance (reference links in the source below) before straightforwardly converting these to a new Beta prior as done by `updateRecall`. (I am grateful to [mxwsn](https://stats.stackexchange.com/q/273221/31187) for suggesting this elegant approach.)
+Next we have a Monte Carlo approache to `updateRecall` (🍌 above), the deceptively-simple `updateRecallMonteCarlo`. Like `predictRecallMonteCarlo` above, it draws samples from the Beta distribution in `model` and propagates them through Ebbinghaus’ forgetting curve to the time specified. To model the likelihood update from the quiz result, it assigns weights to each sample—each weight is that sample’s probability according to the Bernoulli likelihood. (This is equivalent to multiplying the prior with the likelihood—and we needn’t bother with the marginal because it’s just a normalizing factor which would scale all weights equally. I am grateful to [mxwsn](https://stats.stackexchange.com/q/273221/31187) for suggesting this elegant approach.) Since our real GB1-based `updateRecall` above returns posteriors at potentially different times, `updateRecallMonteCarlo` optionally takes a `tback` time to rewind or forward-wind the Monte Carlo ensemble, again through Ebbinghaus’ exponential decay curve. Finally, the ensemble is collapsed to a weighted mean and variance and converted to a Beta distribution.
 
 ```py
 # export ebisu/alternate.py #
-def updateRecallQuad(prior, result, tnow, analyticMarginal=True):
-  """Update recall probability with quiz result via quadrature integration.
-
-  Same arguments as `ebisu.updateRecall`, see that docstring for details.
-
-  An extra keyword argument: `analyticMarginal` if false will compute the
-  marginal (the denominator in Bayes rule) using quadrature as well. If true, an
-  analytical expression will be used.
-  """
-  from scipy.integrate import quad
-  alpha, beta, t = prior
-  dt = tnow / t
-
-  if result == 1:
-    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(beta -
-                                                                         1) * p
-  else:
-    # difference from above: -------------------------------------------^vvvv
-    marginalInt = lambda p: p**((alpha - dt) / dt) * (1 - p**(1 / dt))**(
-        beta - 1) * (1 - p)
-
-  if analyticMarginal:
-    from scipy.special import beta as fbeta
-    if result == 1:
-      marginal = dt * fbeta(alpha + dt, beta)
-    else:
-      marginal = dt * (fbeta(alpha, beta) - fbeta(alpha + dt, beta))
-  else:
-    marginalEst = quad(marginalInt, 0, 1)
-    if marginalEst[0] < marginalEst[1] * 10.:
-      raise OverflowError(
-          'Marginal integral error too high: value={}, error={}'.format(
-              marginalEst[0], marginalEst[1]))
-    marginal = marginalEst[0]
-
-  muInt = lambda p: marginalInt(p) * p
-  muEst = quad(muInt, 0, 1)
-  if muEst[0] < muEst[1] * 10.:
-    raise OverflowError(
-        'Mean integral error too high: value={}, error={}'.format(
-            muEst[0], muEst[1]))
-  mu = muEst[0] / marginal
-
-  varInt = lambda p: marginalInt(p) * (p - mu)**2
-  varEst = quad(varInt, 0, 1)
-  if varEst[0] < varEst[1] * 10.:
-    raise OverflowError(
-        'Variance integral error too high: value={}, error={}'.format(
-            varEst[0], varEst[1]))
-  var = varEst[0] / marginal
-
-  newAlpha, newBeta = _meanVarToBeta(mu, var)
-  return newAlpha, newBeta, tnow
-
-
-def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000):
+def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
   """Update recall probability with quiz result via Monte Carlo simulation.
 
   Same arguments as `ebisu.updateRecall`, see that docstring for details.
@@ -658,13 +612,12 @@ def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000):
   weights = (tnowPrior)**result * ((1 - tnowPrior)**(1 - result))
 
   # Now propagate this posterior to the tback
-  tbackPrior = tnowPrior**(tback/tnow)
+  tbackPrior = tnowPrior**(tback / tnow)
 
   # See [weightedMean]
   weightedMean = np.sum(weights * tbackPrior) / np.sum(weights)
   # See [weightedVar]
-  weightedVar = np.sum(weights *
-                       (tbackPrior - weightedMean)**2) / np.sum(weights)
+  weightedVar = np.sum(weights * (tbackPrior - weightedMean)**2) / np.sum(weights)
 
   newAlpha, newBeta = _meanVarToBeta(weightedMean, weightedVar)
 
@@ -684,13 +637,15 @@ from ebisu.alternate import *
 
 In these unit tests, I compare
 - `predictRecall` and `predictRecallVar` against `predictRecallMonteCarlo`, and
-- `updateRecall` against `updateRecallQuad` (both with analytical and numerical marginal) and against `updateRecallMonteCarlo`.
+- `updateRecall` against `updateRecallMonteCarlo`.
 
-For the latter, since all the functions return a Beta distribution’s parameters, I compare the resulting distributions in terms of [Kullback–Leibler divergence](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Quantities_of_information_.28entropy.29) (actually, the symmetric distance version), which is a nice way to measure the difference between two probability distributions. There is also a little unit test for my implementation for the KL divergence on Beta distributions.
+I also want to make sure that `predictRecall` and `updateRecall` both produce sane values when extremely under- and over-reviewing, i.e., immediately after review as well as far into the future.
 
-For the former, I compare means and variances using relative error, \\(|x-y| / |y|\\), since they do not return distributions, only means/variances.
+For testing `updateRecall`, since all functions return a Beta distribution, I compare the resulting distributions in terms of [Kullback–Leibler divergence](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Quantities_of_information_.28entropy.29) (actually, the symmetric distance version), which is a nice way to measure the difference between two probability distributions. There is also a little unit test for my implementation for the KL divergence on Beta distributions.
 
-For both sets of functions, a range of \\(δ = t_{now} / t\\) and both outcomes of quiz results (true and false) are tested to ensure they all produce the same answers. Sometimes, quadrature integration fails to find a solution, in which case it is not compared to the Monte Carlo and analytical versions.
+For testing `predictRecall`, I compare means using relative error, \\(|x-y| / |y|\\).
+
+For both sets of functions, a range of \\(δ = t_{now} / t\\) and both outcomes of quiz results (true and false) are tested to ensure they all produce the same answers.
 
 Often the unit tests fails because the tolerances are a little tight, and the random number generator seed is variable, which leads to errors exceeding thresholds. I actually prefer to see these occasional test failures because it gives me confidence that the thresholds are where I want them to be (if I set the thresholds too loose, and I somehow accidentally greatly improved accuracy, I might never know). However, I realize it can be annoying for automated tests or continuous integration systems, so I am open to fixing a seed and fixing the error threshold for it.
 
@@ -699,6 +654,7 @@ One note: the unit tests udpate a global database of `testpoints` being tested, 
 ```py
 # export ebisu/tests/test_ebisu.py
 import unittest
+import numpy as np
 
 
 def relerr(dirt, gold):
@@ -722,8 +678,7 @@ def klDivBeta(a, b, a2, b2):
 
 
 def kl(v, w):
-  return (klDivBeta(v[0], v[1], w[0], w[1]) +
-          klDivBeta(w[0], w[1], v[0], v[1])) / 2.
+  return (klDivBeta(v[0], v[1], w[0], w[1]) + klDivBeta(w[0], w[1], v[0], v[1])) / 2.
 
 
 testpoints = []
@@ -752,11 +707,9 @@ class TestEbisu(unittest.TestCase):
       global testpoints
       for t in map(lambda dt: dt * t0, [0.1, .99, 1., 1.01, 5.5]):
         mc = predictRecallMonteCarlo((a, b, t0), t, N=100 * 1000)
-        mean = predictRecall((a, b, t0), t)
-        var = predictRecallVar((a, b, t0), t)
+        mean = predictRecall((a, b, t0), t, exact=True)
         self.assertLess(relerr(mean, mc['mean']), 5e-2)
-        self.assertLess(relerr(var, mc['var']), 5e-2)
-        testpoints += [['predict', [a, b, t0], [t], dict(mean=mean, var=var)]]
+        testpoints += [['predict', [a, b, t0], [t], dict(mean=mean)]]
 
     inner(3.3, 4.4, 1.)
     inner(34.4, 34.4, 1.)
@@ -768,34 +721,33 @@ class TestEbisu(unittest.TestCase):
       for t in map(lambda dt: dt * t0, dts):
         for x in [False, True]:
           msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
-          mc = updateRecallMonteCarlo((a, b, t0), x, t, N=1 * 100 * 1000)
           an = updateRecall((a, b, t0), x, t)
-          self.assertLess(
-              kl(an, mc), 1e-3, msg=msg + ' an={}, mc={}'.format(an, mc))
-
-          try:
-            quad1 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=True)
-          except OverflowError:
-            quad1 = None
-          if quad1 is not None:
-            self.assertLess(kl(quad1, mc), 1e-3, msg=msg)
-
-          try:
-            quad2 = updateRecallQuad((a, b, t0), x, t, analyticMarginal=False)
-          except OverflowError:
-            quad2 = None
-          if quad2 is not None:
-            self.assertLess(kl(quad2, mc), 1e-3, msg=msg)
+          mc = updateRecallMonteCarlo((a, b, t0), x, t, an[2], N=100 * 1000)
+          self.assertLess(kl(an, mc), 5e-3, msg=msg + ' an={}, mc={}'.format(an, mc))
 
           testpoints += [['update', [a, b, t0], [x, t], dict(post=an)]]
 
     inner(3.3, 4.4, 1., [0.1, 1., 9.5])
-    inner(341.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+
+  def test_update_then_predict(self):
+    future = np.linspace(.01, 1000, 101)
+
+    def inner(a, b, t0, dts):
+      for t in map(lambda dt: dt * t0, dts):
+        for x in [False, True]:
+          msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
+          newModel = updateRecall((a, b, t0), x, t)
+          predicted = np.vectorize(lambda tnow: predictRecall(newModel, tnow))(future)
+          self.assertTrue(
+              np.all(np.diff(predicted) < 0), msg=msg + ' predicted={}'.format(predicted))
+
+    inner(3.3, 4.4, 1., [0.1, 1., 9.5])
+    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
 
 
 if __name__ == '__main__':
-  unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(
-      TestEbisu()))
+  unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(TestEbisu()))
 
   with open("test.json", "w") as out:
     import json
@@ -830,9 +782,8 @@ plt.close('all')
 plt.figure()
 [
     plt.plot(
-        ps,
-        stats.beta.pdf(ps, ab, ab) / stats.beta.pdf(.5, ab, ab),
-        label='α=β={}'.format(ab)) for ab in ablist
+        ps, stats.beta.pdf(ps, ab, ab) / stats.beta.pdf(.5, ab, ab), label='α=β={}'.format(ab))
+    for ab in ablist
 ]
 plt.legend(loc=2)
 plt.xticks(np.linspace(0, 1, 5))
@@ -849,9 +800,7 @@ plt.axhline(y=t0, linewidth=1, color='0.5')
 [
     plt.plot(
         ts,
-        list(
-            map(lambda t: priorToHalflife(updateRecall((a, a, t0), xobs, t)),
-                ts)),
+        list(map(lambda t: priorToHalflife(updateRecall((a, a, t0), xobs, t)), ts)),
         marker='x' if xobs == 1 else 'o',
         color='C{}'.format(aidx),
         label='α=β={}, {}'.format(a, 'pass' if xobs == 1 else 'fail'))
@@ -892,12 +841,10 @@ plt.figure()
         v2s(predictRecallVar(model, ts)),
         fmt='.-',
         label='Model ' + label,
-        color=color)
-    for model, color, label in [(modelA, 'C0', 'A'), (modelB, 'C1', 'B')]
+        color=color) for model, color, label in [(modelA, 'C0', 'A'), (modelB, 'C1', 'B')]
 ]
 [
-    plt.plot(
-        ts, 2**(-ts / halflife), '--', label='approx ' + label, color=color)
+    plt.plot(ts, 2**(-ts / halflife), '--', label='approx ' + label, color=color)
     for halflife, color, label in [(hlA, 'C0', 'A'), (hlB, 'C1', 'B')]
 ]
 # plt.yscale('log')
@@ -905,8 +852,7 @@ plt.legend(loc=0)
 plt.ylim([0, 1])
 plt.xlabel('Time (days)')
 plt.ylabel('Recall probability')
-plt.title('Predicted forgetting curves (halflife A={:0.0f}, B={:0.0f})'.format(
-    hlA, hlB))
+plt.title('Predicted forgetting curves (halflife A={:0.0f}, B={:0.0f})'.format(hlA, hlB))
 plt.savefig('figures/forgetting-curve.svg')
 plt.savefig('figures/forgetting-curve.png', dpi=300)
 plt.show()
@@ -980,6 +926,7 @@ Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/3
 Many thanks also to Drew Benedetti for reviewing this manuscript.
 
 John Otander’s [Modest CSS](http://markdowncss.github.io/modest/) is used to style the Markdown output.
+
 
 
 

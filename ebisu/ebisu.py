@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-def predictRecall(prior, tnow):
+def predictRecall(prior, tnow, exact=False, independent=None):
   """Expected recall probability now, given a prior distribution on it. 🍏
 
   `prior` is a tuple representing the prior distribution on recall probability
@@ -11,49 +11,30 @@ def predictRecall(prior, tnow):
 
   `tnow` is the *actual* time elapsed since this fact's most recent review.
 
-  Returns the expectation of the recall probability `tnow` after last review, a
-  float between 0 and 1.
+  Optional keyword paramter `exact` makes the return value a probability, specifically, the expected recall probability `tnow` after the last review: a number between 0 and 1. If `exact` is false (the default), some calculations are skipped and the return value won't be a probability, but can still be compared against other values returned by this function. That is, if `predictRecall(prior1, tnow1, exact=True) < predictRecall(prior2, tnow2, exact=True)`, then it is guaranteed that `predictRecall(prior1, tnow1, exact=False) < predictRecall(prior2, tnow2, exact=False)`. The default is set to false for computational reasons.
 
-  See documentation for derivation.
+  Optional keyword parameter `independent` is a precalculated number that is only dependent on `prior` and independent of `tnow`, allowing some computational speedup if cached ahead of time. It can be obtained with `ebisu.cacheIndependent`.
+
+  See README for derivation.
   """
   from scipy.special import gammaln
   from numpy import exp
   alpha, beta, t = prior
+  if not independent:
+    independent = gammaln(alpha + beta) - gammaln(alpha)
   dt = tnow / t
-  return exp(
-      gammaln(alpha + dt) - gammaln(alpha + beta + dt) -
-      (gammaln(alpha) - gammaln(alpha + beta)))
+  ret = gammaln(alpha + dt) - gammaln(alpha + beta + dt) + independent
+  return exp(ret) if exact else ret
 
 
-def _subtractexp(x, y):
-  """Evaluates exp(x) - exp(y) a bit more accurately than that. ⚾️
+def cacheIndependent(prior):
+  """Precompute a value to speed up `predictRecall`. 🥥
 
-  This can avoid cancellation in case `x` and `y` are both large and close,
-  similar to scipy.misc.logsumexp except without the last log.
-  """
-  from numpy import exp, maximum
-  maxval = maximum(x, y)
-  return exp(maxval) * (exp(x - maxval) - exp(y - maxval))
-
-
-def predictRecallVar(prior, tnow):
-  """Variance of recall probability now. 🍋
-
-  This function returns the variance of the distribution whose mean is given by
-  `ebisu.predictRecall`. See it's documentation for details.
-
-  Returns a float.
+  Send the output of this function to `predictRecall`'s `independent` keyword argument.
   """
   from scipy.special import gammaln
   alpha, beta, t = prior
-  dt = tnow / t
-  s = [
-      gammaln(alpha + n * dt) - gammaln(alpha + beta + n * dt) for n in range(3)
-  ]
-  md = 2 * (s[1] - s[0])
-  md2 = s[2] - s[0]
-
-  return _subtractexp(md2, md)
+  return gammaln(alpha + beta) - gammaln(alpha)
 def updateRecall(prior, result, tnow):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
@@ -69,69 +50,113 @@ def updateRecall(prior, result, tnow):
   Returns a new object (like `prior`) describing the posterior distribution of
   recall probability at `tnow`.
   """
-  from scipy.special import gammaln
-  from numpy import exp
-  alpha, beta, t = prior
+  (alpha, beta, t) = prior
   dt = tnow / t
   if result:
-    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p, {p,0,1}]`
-    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*p, {p,0,1}]`
-    # variance: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*p*(p - m)^2, {p,0,1}]`
-    # Simplify all three to get the following:
-    same = gammaln(alpha + beta + dt) - gammaln(alpha + dt)
-    muln = gammaln(alpha + 2 * dt) - gammaln(alpha + beta + 2 * dt) + same
-    mu = exp(muln)
-    var = _subtractexp(
-        same + gammaln(alpha + 3 * dt) - gammaln(alpha + beta + 3 * dt),
-        2 * muln)
+    gb1 = (1.0 / dt, 1.0, alpha + dt, beta, tnow)
   else:
-    # Mathematica code is same as above, but replace one `p` with `(1-p)`
-    # marginal: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), {p,0,1}]`
-    # mean: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p, {p,0,1}]`
-    # var: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*(p - m)^2, {p,0,1}]`
-    # Then simplify and combine
+    import numpy as np
 
-    from scipy.misc import logsumexp
-    from numpy import expm1
+    mom = np.array(failureMoments(prior, result, tnow, num=2))
 
-    s = [
-        gammaln(alpha + n * dt) - gammaln(alpha + beta + n * dt)
-        for n in range(4)
-    ]
+    def f(bd):
+      b, d = bd
+      this = np.array(gb1Moments(1 / d, 1., alpha, b, num=2))
+      return this - mom
 
-    mu = expm1(s[2] - s[1]) / -expm1(s[0] - s[1])
+    from scipy.optimize import least_squares
+    res = least_squares(f, [beta, dt], bounds=((1.01, 0), (np.inf, np.inf)))
+    newBeta, newDelta = res.x
+    gb1 = (1 / newDelta, 1, alpha, newBeta, tnow)
 
-    def lse(a, b):
-      return list(logsumexp(a, b=b, return_sign=True))
-
-    n1 = lse([s[1], s[0]], [1, -1])
-    n1[0] += s[3]
-    n2 = lse([s[0], s[1], s[2]], [1, 1, -1])
-    n2[0] += s[2]
-    n3 = [s[1] * 2, 1.]
-    d = lse([s[1], s[0]], [1, -1])
-    d[0] *= 2
-    n = lse([n1[0], n2[0], n3[0]], [n1[1], n2[1], -n3[1]])
-    var = exp(n[0] - d[0])
-
-  newAlpha, newBeta = _meanVarToBeta(mu, var)
-  return newAlpha, newBeta, tnow
-def _meanVarToBeta(mean, var):
-  """Fit a Beta distribution to a mean and variance. 🏈"""
-  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
-  tmp = mean * (1 - mean) / var - 1
-  alpha = mean * tmp
-  beta = (1 - mean) * tmp
-  return alpha, beta
+  return gb1ToBeta(gb1)
 
 
-def priorToHalflife(prior, percentile=0.5, maxt=100, mint=1e-3):
-  """Find the half-life corresponding to a time-based prior on recall. 🏀"""
-  from scipy.optimize import brentq
-  return brentq(lambda now: predictRecall(prior, now) - percentile, mint, maxt)
+def gb1ToBeta(gb1):
+  """Convert a GB1 model (five parameters: four GB1 parameters, time) to a Beta model
+  
+  `gb1: Tuple[float, float, float, float, float]`
+  """
+  return (gb1[2], gb1[3], gb1[4] * gb1[0])
 
 
-def defaultModel(t, alpha=4.0, beta=None):
+def failureMoments(model, result, tnow, num=4, returnLog=True):
+  """Moments of the posterior on recall at time `tnow` upon quiz failure
+  
+  - `model: Tuple[float, float, float]`
+  - `result: bool`
+  - `tnow: float`
+  - `num: int`
+  - `returnLog: bool`
+  """
+  a, b, t0 = model
+  t = tnow / t0
+  from scipy.special import gammaln, logsumexp
+  from numpy import exp
+  s = [gammaln(a + n * t) - gammaln(a + b + n * t) for n in range(num + 2)]
+  marginal = logsumexp([s[0], s[1]], b=[1, -1])
+  ret = [(logsumexp([s[n], s[n + 1]], b=[1, -1]) - marginal) for n in range(1, num + 1)]
+  return ret if returnLog else [exp(x) for x in ret]
+
+
+def gb1Moments(a, b, p, q, num=2, returnLog=True):
+  """Raw moments of GB1, via Wikipedia
+  
+  `a: float, b: float, p: float, q: float, num: int, returnLog: bool`
+  """
+  from scipy.special import betaln
+  import numpy as np
+  bpq = betaln(p, q)
+  logb = np.log(b)
+  ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
+  return ret if returnLog else [np.exp(x) for x in ret]
+def priorToPercentileDecay(prior, percentile=0.5):
+  """When will memory decay to a given percentile? 🏀
+  
+  Use a root-finding routine in log-delta space to find the delta that
+  will cause the GB1 distribution to have a mean of the requested quantile.
+  Because we are using well-behaved normalized deltas instead of times, and
+  owing to the monotonicity of the expectation with respect to delta, we can
+  quickly scan for a rough estimate of the scale of delta, then do a finishing
+  optimization to get the right value.
+  """
+  from scipy.special import betaln
+  from scipy.optimize import root_scalar
+  alpha, beta, t0 = model
+  logBab = betaln(alpha, beta)
+  logPercentile = np.log(percentile)
+
+  def f(lndelta):
+    logMean = betaln(alpha + np.exp(lndelta), beta) - logBab
+    return logMean - logPercentile
+
+  # Scan for a bracket.
+  bracket_width = 6.0
+  blow = -bracket_width / 2.0
+  bhigh = bracket_width / 2.0
+  flow = f(blow)
+  fhigh = f(bhigh)
+  while flow > 0 and fhigh > 0:
+    # Move the bracket up.
+    blow = bhigh
+    flow = fhigh
+    bhigh += bracket_width
+    fhigh = f(bhigh)
+  while flow < 0 and fhigh < 0:
+    # Move the bracket down.
+    bhigh = blow
+    fhigh = flow
+    blow -= bracket_width
+    flow = f(blow)
+
+  assert flow > 0 and fhigh < 0
+
+  sol = root_scalar(f, bracket=[blow, bhigh])
+  t1 = np.exp(sol.root) * t0
+  return t1
+
+
+def defaultModel(t, alpha=3.0, beta=None):
   """Convert recall probability prior's raw parameters into a model object. 🍗
 
   `t` is your guess as to the half-life of any given fact, in units that you

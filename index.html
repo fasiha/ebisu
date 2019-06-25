@@ -2477,7 +2477,7 @@ def updateRecall(prior, result, tnow):
   else:
     import numpy as np
 
-    mom = np.array(failureMoments(prior, result, tnow, num=2))
+    mom = np.array(failureMoments(prior, tnow, num=2))
 
     def f(bd):
       b, d = bd
@@ -2500,11 +2500,10 @@ def gb1ToBeta(gb1):
   return (gb1[2], gb1[3], gb1[4] * gb1[0])
 
 
-def failureMoments(model, result, tnow, num=4, returnLog=True):
+def failureMoments(model, tnow, num=4, returnLog=True):
   """Moments of the posterior on recall at time `tnow` upon quiz failure
   
   - `model: Tuple[float, float, float]`
-  - `result: bool`
   - `tnow: float`
   - `num: int`
   - `returnLog: bool`
@@ -2769,7 +2768,7 @@ def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
   weights = (tnowPrior)**result * ((1 - tnowPrior)**(1 - result))
 
   # Now propagate this posterior to the tback
-  tbackPrior = tnowPrior**(tback / tnow)
+  tbackPrior = tPrior**(tback / t)
 
   # See [weightedMean]
   weightedMean = np.sum(weights * tbackPrior) / np.sum(weights)
@@ -2790,7 +2789,7 @@ from ebisu.alternate import *</code></pre>
 <li><code>predictRecall</code> and <code>predictRecallVar</code> against <code>predictRecallMonteCarlo</code>, and</li>
 <li><code>updateRecall</code> against <code>updateRecallMonteCarlo</code>.</li>
 </ul>
-<p>I also want to make sure that <code>predictRecall</code> and <code>updateRecall</code> both produce sane values when extremely under- and over-reviewing, i.e., immediately after review as well as far into the future.</p>
+<p>I also want to make sure that <code>predictRecall</code> and <code>updateRecall</code> both produce sane values when extremely under- and over-reviewing, i.e., immediately after review as well as far into the future. And we should also exercise <code>modelToPercentileDecay</code>.</p>
 <p>For testing <code>updateRecall</code>, since all functions return a Beta distribution, I compare the resulting distributions in terms of <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Quantities_of_information_.28entropy.29">Kullback–Leibler divergence</a> (actually, the symmetric distance version), which is a nice way to measure the difference between two probability distributions. There is also a little unit test for my implementation for the KL divergence on Beta distributions.</p>
 <p>For testing <code>predictRecall</code>, I compare means using relative error, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.231ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4404.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-159-Title">
 <title id="MathJax-SVG-159-Title">|x-y| / |y|</title>
@@ -2955,7 +2954,7 @@ plt.rcParams['svg.fonttype'] = 'none'
 
 t0 = 7.
 
-ts = np.arange(1, 31.)
+ts = np.arange(1, 301.)
 ps = np.linspace(0, 1., 200)
 ablist = [3, 12]
 
@@ -2981,7 +2980,7 @@ plt.axhline(y=t0, linewidth=1, color='0.5')
 [
     plt.plot(
         ts,
-        list(map(lambda t: priorToHalflife(updateRecall((a, a, t0), xobs, t)), ts)),
+        list(map(lambda t: modelToPercentileDecay(updateRecall((a, a, t0), xobs, t)), ts)),
         marker='x' if xobs == 1 else 'o',
         color='C{}'.format(aidx),
         label='α=β={}, {}'.format(a, 'pass' if xobs == 1 else 'fail'))
@@ -2998,24 +2997,18 @@ plt.show()</code></pre>
 <p><img src="figures/models.png" alt="figures/models.png"></p>
 <p><img src="figures/halflife.png" alt="figures/halflife.png"></p>
 <h3 id="why-we-work-with-random-variables">Why we work with random variables</h3>
-<p>This second snippet addresses a potential approximation which isn’t too accurate but might be useful in some situations. The function <code>predictRecall</code> (🍏 above) evaluates the log-gamma function four times and an <code>exp</code> once. One may ask, why not use the half-life returned by <code>priorToHalflife</code> and Ebbinghaus’ forgetting curve, thereby approximating the current recall probability for a fact as <code>2 ** (-tnow / priorToHalflife(model))</code>? While this is likely more computationally efficient (after computing the half-life up-front), it is also less precise:</p>
-<pre class="py"><code>v2s = lambda var: np.sqrt(var) / 10
-ts = np.linspace(1, 41)
+<p>This second snippet addresses a potential approximation which isn’t too accurate but might be useful in some situations. The function <code>predictRecall</code> (🍏 above) in exaxct mode evaluates the log-gamma function four times and an <code>exp</code> once. One may ask, why not use the half-life returned by <code>modelToPercentileDecay</code> and Ebbinghaus’ forgetting curve, thereby approximating the current recall probability for a fact as <code>2 ** (-tnow / modelToPercentileDecay(model))</code>? While this is likely more computationally efficient (after computing the half-life up-front), it is also less precise:</p>
+<pre class="py"><code>ts = np.linspace(1, 41)
 
 modelA = updateRecall((3., 3., 7.), 1, 15.)
 modelB = updateRecall((12., 12., 7.), 1, 15.)
-hlA = priorToHalflife(modelA)
-hlB = priorToHalflife(modelB)
+hlA = modelToPercentileDecay(modelA)
+hlB = modelToPercentileDecay(modelB)
 
 plt.figure()
 [
-    plt.errorbar(
-        ts,
-        predictRecall(model, ts),
-        v2s(predictRecallVar(model, ts)),
-        fmt='.-',
-        label='Model ' + label,
-        color=color) for model, color, label in [(modelA, 'C0', 'A'), (modelB, 'C1', 'B')]
+    plt.plot(ts, predictRecall(model, ts, exact=True), '.-', label='Model ' + label, color=color)
+    for model, color, label in [(modelA, 'C0', 'A'), (modelB, 'C1', 'B')]
 ]
 [
     plt.plot(ts, 2**(-ts / halflife), '--', label='approx ' + label, color=color)
@@ -3074,8 +3067,8 @@ plt.show()</code></pre>
 ts = np.linspace(1, 14)
 
 plt.axhline(y=0, linewidth=3, color='0.33')
-plt.plot(ts, predictRecall(modelA, ts) - 2**(-ts / hlA), label='Model A')
-plt.plot(ts, predictRecall(modelB, ts) - 2**(-ts / hlB), label='Model B')
+plt.plot(ts, predictRecall(modelA, ts, exact=True) - 2**(-ts / hlA), label='Model A')
+plt.plot(ts, predictRecall(modelB, ts, exact=True) - 2**(-ts / hlB), label='Model B')
 plt.gcf().subplots_adjust(left=0.15)
 plt.legend(loc=0)
 plt.xlabel('Time (days)')

@@ -102,7 +102,7 @@ def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
   weights = (tnowPrior)**result * ((1 - tnowPrior)**(1 - result))
 
   # Now propagate this posterior to the tback
-  tbackPrior = tnowPrior**(tback / tnow)
+  tbackPrior = tPrior**(tback / t)
 
   # See [weightedMean]
   weightedMean = np.sum(weights * tbackPrior) / np.sum(weights)

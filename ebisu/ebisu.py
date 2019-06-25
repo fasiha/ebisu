@@ -57,7 +57,7 @@ def updateRecall(prior, result, tnow):
   else:
     import numpy as np
 
-    mom = np.array(failureMoments(prior, result, tnow, num=2))
+    mom = np.array(failureMoments(prior, tnow, num=2))
 
     def f(bd):
       b, d = bd
@@ -80,11 +80,10 @@ def gb1ToBeta(gb1):
   return (gb1[2], gb1[3], gb1[4] * gb1[0])
 
 
-def failureMoments(model, result, tnow, num=4, returnLog=True):
+def failureMoments(model, tnow, num=4, returnLog=True):
   """Moments of the posterior on recall at time `tnow` upon quiz failure
   
   - `model: Tuple[float, float, float]`
-  - `result: bool`
   - `tnow: float`
   - `num: int`
   - `returnLog: bool`

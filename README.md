@@ -353,7 +353,7 @@ def updateRecall(prior, result, tnow):
   else:
     import numpy as np
 
-    mom = np.array(failureMoments(prior, result, tnow, num=2))
+    mom = np.array(failureMoments(prior, tnow, num=2))
 
     def f(bd):
       b, d = bd
@@ -376,11 +376,10 @@ def gb1ToBeta(gb1):
   return (gb1[2], gb1[3], gb1[4] * gb1[0])
 
 
-def failureMoments(model, result, tnow, num=4, returnLog=True):
+def failureMoments(model, tnow, num=4, returnLog=True):
   """Moments of the posterior on recall at time `tnow` upon quiz failure
   
   - `model: Tuple[float, float, float]`
-  - `result: bool`
   - `tnow: float`
   - `num: int`
   - `returnLog: bool`
@@ -613,7 +612,7 @@ def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
   weights = (tnowPrior)**result * ((1 - tnowPrior)**(1 - result))
 
   # Now propagate this posterior to the tback
-  tbackPrior = tnowPrior**(tback / tnow)
+  tbackPrior = tPrior**(tback / t)
 
   # See [weightedMean]
   weightedMean = np.sum(weights * tbackPrior) / np.sum(weights)
@@ -937,19 +936,4 @@ Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/3
 Many thanks also to Drew Benedetti for reviewing this manuscript.
 
 John Otander’s [Modest CSS](http://markdowncss.github.io/modest/) is used to style the Markdown output.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

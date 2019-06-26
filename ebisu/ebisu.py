@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+
 def predictRecall(prior, tnow, exact=False, independent=None):
   """Expected recall probability now, given a prior distribution on it. 🍏
 
@@ -35,7 +36,9 @@ def cacheIndependent(prior):
   from scipy.special import gammaln
   alpha, beta, t = prior
   return gammaln(alpha + beta) - gammaln(alpha)
-def updateRecall(prior, result, tnow):
+
+
+def updateRecall(prior, result, tnow, tback=None, useBeta=True):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
@@ -50,13 +53,15 @@ def updateRecall(prior, result, tnow):
   Returns a new object (like `prior`) describing the posterior distribution of
   recall probability at `tnow`.
   """
+  if tback is None:
+    tback = prior[2]
   if result:
     (alpha, beta, t) = prior
     dt = tnow / t
     gb1 = (1.0 / dt, 1.0, alpha + dt, beta, tnow)
     return gb1ToBeta(gb1)
   else:
-    return [*xformUpdate(prior, tnow), prior[2]]
+    return [*xformUpdateBack(prior, tnow, tback), tback]
 
 
 def _meanVarToBeta(mean, var):
@@ -68,28 +73,49 @@ def _meanVarToBeta(mean, var):
   return alpha, beta
 
 
-def xformUpdate(prior, tnow):
+def xformUpdate(prior, tnow, useBeta=True):
   a, b, t0 = prior
   t = tnow / t0
+  from scipy.special import betaln, gammaln, logsumexp
+  from numpy import exp
+  B = betaln
+
+  def sub(a, b):
+    return logsumexp([a, b], b=[1, -1])
+
+  if useBeta:
+    denominator = sub(B(a, b), B(a + t, b))
+    mean = sub(B(a + 1, b), B(a + t + 1, b)) - denominator
+    m2 = sub(B(a + 2, b), B(a + t + 2, b)) - denominator
+  else:
+    denominator = sub(gammaln(a) - gammaln(a + b), gammaln(a + t) - gammaln(a + t + b))
+    mean = sub(
+        gammaln(a + 1) - gammaln(a + 1 + b) - denominator,
+        gammaln(a + t + 1) - gammaln(a + t + 1 + b) - denominator)
+    m2 = sub(
+        gammaln(a + 2) - gammaln(a + 2 + b) - denominator,
+        gammaln(a + t + 2) - gammaln(a + t + 2 + b) - denominator)
+  var = sub(m2, 2 * mean)
+  return _meanVarToBeta(exp(mean), exp(var))
+
+
+def xformUpdateBack(prior, tnow, tback):
+  a, b, t0 = prior
+  d = tnow / t0
+  e = tnow / tback
+  # print('d,e,e/d', d, e, e / d)
   import mpmath as mp
   mp.mp.dps = 100
   B = mp.beta
+
   bab = B(a, b)
-  memo = dict()
+  marg = 1 - B(a + d, b) / bab
 
-  def mp(n):
-    if n in memo:
-      return memo[n]
-    res = B(a + n * t, b) / bab
-    memo[n] = res
-    return res
+  mean = (B(a + d / e * 1, b) - B(a + d / e * (1 + e), b)) / (marg * bab)
+  m2 = (B(a + d / e * 2, b) - B(a + d / e * (e + 2), b)) / (marg * bab)
 
-  marg = 1 - mp(1)
-  mean = (B(a + 1, b) - B(a + t + 1, b)) / (marg * bab)
-  m2 = (B(a + 2, b) - B(a + t + 2, b)) / (marg * bab)
-  var = m2 - mean**2
-  import numpy as np
-  return _meanVarToBeta(float(mean), float(var))
+  var = (m2 - mean**2)
+  return [float(x) for x in _meanVarToBeta((mean), (var))]
 
 
 def gb1ToBeta(gb1):
@@ -100,35 +126,6 @@ def gb1ToBeta(gb1):
   return (gb1[2], gb1[3], gb1[4] * gb1[0])
 
 
-def failureMoments(model, tnow, num=4, returnLog=True):
-  """Moments of the posterior on recall at time `tnow` upon quiz failure
-  
-  - `model: Tuple[float, float, float]`
-  - `tnow: float`
-  - `num: int`
-  - `returnLog: bool`
-  """
-  a, b, t0 = model
-  t = tnow / t0
-  from scipy.special import gammaln, logsumexp
-  from numpy import exp
-  s = [gammaln(a + n * t) - gammaln(a + b + n * t) for n in range(num + 2)]
-  marginal = logsumexp([s[0], s[1]], b=[1, -1])
-  ret = [(logsumexp([s[n], s[n + 1]], b=[1, -1]) - marginal) for n in range(1, num + 1)]
-  return ret if returnLog else [exp(x) for x in ret]
-
-
-def gb1Moments(a, b, p, q, num=2, returnLog=True):
-  """Raw moments of GB1, via Wikipedia
-  
-  `a: float, b: float, p: float, q: float, num: int, returnLog: bool`
-  """
-  from scipy.special import betaln
-  import numpy as np
-  bpq = betaln(p, q)
-  logb = np.log(b)
-  ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
-  return ret if returnLog else [np.exp(x) for x in ret]
 def modelToPercentileDecay(model, percentile=0.5):
   """When will memory decay to a given percentile? 🏀
   

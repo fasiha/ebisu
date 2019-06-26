@@ -50,26 +50,46 @@ def updateRecall(prior, result, tnow):
   Returns a new object (like `prior`) describing the posterior distribution of
   recall probability at `tnow`.
   """
-  (alpha, beta, t) = prior
-  dt = tnow / t
   if result:
+    (alpha, beta, t) = prior
+    dt = tnow / t
     gb1 = (1.0 / dt, 1.0, alpha + dt, beta, tnow)
+    return gb1ToBeta(gb1)
   else:
-    import numpy as np
+    return [*xformUpdate(prior, tnow), prior[2]]
 
-    mom = np.array(failureMoments(prior, tnow, num=2))
 
-    def f(bd):
-      b, d = bd
-      this = np.array(gb1Moments(1 / d, 1., alpha, b, num=2))
-      return this - mom
+def _meanVarToBeta(mean, var):
+  """Fit a Beta distribution to a mean and variance. 🏈"""
+  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
+  tmp = mean * (1 - mean) / var - 1
+  alpha = mean * tmp
+  beta = (1 - mean) * tmp
+  return alpha, beta
 
-    from scipy.optimize import least_squares
-    res = least_squares(f, [beta, dt], bounds=((1.01, 0), (np.inf, np.inf)))
-    newBeta, newDelta = res.x
-    gb1 = (1 / newDelta, 1, alpha, newBeta, tnow)
 
-  return gb1ToBeta(gb1)
+def xformUpdate(prior, tnow):
+  a, b, t0 = prior
+  t = tnow / t0
+  import mpmath as mp
+  mp.mp.dps = 100
+  B = mp.beta
+  bab = B(a, b)
+  memo = dict()
+
+  def mp(n):
+    if n in memo:
+      return memo[n]
+    res = B(a + n * t, b) / bab
+    memo[n] = res
+    return res
+
+  marg = 1 - mp(1)
+  mean = (B(a + 1, b) - B(a + t + 1, b)) / (marg * bab)
+  m2 = (B(a + 2, b) - B(a + t + 2, b)) / (marg * bab)
+  var = m2 - mean**2
+  import numpy as np
+  return _meanVarToBeta(float(mean), float(var))
 
 
 def gb1ToBeta(gb1):

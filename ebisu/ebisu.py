@@ -103,19 +103,21 @@ def xformUpdateBack(prior, tnow, tback):
   a, b, t0 = prior
   d = tnow / t0
   e = tnow / tback
-  # print('d,e,e/d', d, e, e / d)
-  import mpmath as mp
-  mp.mp.dps = 100
-  B = mp.beta
 
-  bab = B(a, b)
-  marg = 1 - B(a + d, b) / bab
+  from scipy.special import betaln, gammaln, logsumexp
+  from numpy import exp
+  B = betaln
 
-  mean = (B(a + d / e * 1, b) - B(a + d / e * (1 + e), b)) / (marg * bab)
-  m2 = (B(a + d / e * 2, b) - B(a + d / e * (e + 2), b)) / (marg * bab)
+  def sub(a, b):
+    return logsumexp([a, b], b=[1, -1])
 
-  var = (m2 - mean**2)
-  return [float(x) for x in _meanVarToBeta((mean), (var))]
+  denominator = sub(B(a, b), B(a + d, b))
+
+  mean = sub(B(a + d / e * 1, b) - denominator, B(a + d / e * (1 + e), b) - denominator)
+  m2 = sub(B(a + d / e * 2, b) - denominator, B(a + d / e * (e + 2), b) - denominator)
+
+  var = sub(m2, 2 * mean)
+  return _meanVarToBeta(exp(mean), exp(var))
 
 
 def gb1ToBeta(gb1):

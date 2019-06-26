@@ -53,15 +53,36 @@ def updateRecall(prior, result, tnow, tback=None, useBeta=True):
   Returns a new object (like `prior`) describing the posterior distribution of
   recall probability at `tnow`.
   """
+  (alpha, beta, t) = prior
   if tback is None:
-    tback = prior[2]
+    tback = t
   if result:
-    (alpha, beta, t) = prior
     dt = tnow / t
     gb1 = (1.0 / dt, 1.0, alpha + dt, beta, tnow)
-    return gb1ToBeta(gb1)
+    updated = gb1ToBeta(gb1)
+
+    if tback == t:
+      return updated
+
+    m1, m2 = gb1Moments(updated[2] / tback, 1., updated[0], updated[1], num=2, returnLog=True)
+    var = sub(m2, 2 * m1)
+    import numpy as np
+    return [*_meanVarToBeta(np.exp(m1), np.exp(var)), tback]
   else:
     return [*xformUpdateBack(prior, tnow, tback), tback]
+
+
+def gb1Moments(a, b, p, q, num=2, returnLog=True):
+  """Raw moments of GB1, via Wikipedia
+
+  `a: float, b: float, p: float, q: float, num: int, returnLog: bool`
+  """
+  from scipy.special import betaln
+  import numpy as np
+  bpq = betaln(p, q)
+  logb = np.log(b)
+  ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
+  return ret if returnLog else [np.exp(x) for x in ret]
 
 
 def _meanVarToBeta(mean, var):
@@ -73,15 +94,17 @@ def _meanVarToBeta(mean, var):
   return alpha, beta
 
 
+def sub(a, b):
+  from scipy.special import logsumexp
+  return logsumexp([a, b], b=[1, -1])
+
+
 def xformUpdate(prior, tnow, useBeta=True):
   a, b, t0 = prior
   t = tnow / t0
-  from scipy.special import betaln, gammaln, logsumexp
+  from scipy.special import betaln, gammaln
   from numpy import exp
   B = betaln
-
-  def sub(a, b):
-    return logsumexp([a, b], b=[1, -1])
 
   if useBeta:
     denominator = sub(B(a, b), B(a + t, b))
@@ -104,12 +127,9 @@ def xformUpdateBack(prior, tnow, tback):
   d = tnow / t0
   e = tnow / tback
 
-  from scipy.special import betaln, gammaln, logsumexp
+  from scipy.special import betaln
   from numpy import exp
   B = betaln
-
-  def sub(a, b):
-    return logsumexp([a, b], b=[1, -1])
 
   denominator = sub(B(a, b), B(a + d, b))
 

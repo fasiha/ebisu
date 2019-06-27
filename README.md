@@ -183,15 +183,11 @@ A quiz app can calculate the average current recall probability for each fact us
 ### Choice of initial model parameters
 Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple \\([α, β, t]\\) initially, for example when the student has first learned a fact.
 
-For \\(t\\)—I propose setting \\(t\\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \\(t\\) to four hours or a day, respectively.
+Set \(t\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \(t\) to four hours or a day, respectively.
 
-Then, set \\(α = β ≥ 2\\): the \\(α = β\\) part will center the Beta distribution for \\(p_t\\) at 0.5 (making \\(t\\) an actual half-life). A higher value for \\(α = β\\) encodes *higher* confidence in the expected half-life \\(t\\), which in turn makes the model *less* sensitive to quiz results (as we’ll show in the next section). A good default is \\(α = β = 3\\), which lets the algorithm aggressively change the half-life in response to quiz results.
+Then, pick \(α = β > 1\). First, for \(t\) to be a half-life, \(α = β\). Second, a higher value for \(α = β\) means *higher* confidence that the true half-life is indeed \(t\), which in turn makes the model *less* sensitive to quiz results—this is, after all, a Bayesian prior. A good default is \(α = β = 3\), which lets the algorithm aggressively change the half-life in response to quiz results. Refer to the plot [above](#how-it-works) contrasting the aggressive \(α = β = 3\) model to the conservative \(α = β = 12\) model.
 
-If a student indicates they’re familiar with a flashcard already, quiz apps should increase the initial half-life \\(t\\), or in the opposite case, lower the half-life for flashcards that a student is very tentative about. This should be the default way of handling easy or hard cards. Varying \\(α = β\\) for different flashcards does a different thing: it makes the algorithm more or less confident that that half-life is correct. We are still experimenting with whether varying \\(α = β\\) for initial flashcards makes sense.
-
-> Recall the traditional explanation of \\(α\\) and \\(β\\) are the number of successes and failures, respectively, that have been observed by flipping a weighted coin—or in our application, the number of successful versus unsuccessful quiz results for a sequence of quizzes on the same fact \\(t\\) days apart.
->
-> Also recall that [above](#how-it-works) we visually contrasted the \\(α = β = 3\\) model (very sensitive and responsive) to the much more conservative \\(α = β = 12\\) model.
+Quiz apps that allow a students to indicate initial familiarity (or lack thereof) with a flashcard should modify the initial half-life \(t\). It remains an open question whether quiz apps should vary initial \(α = β\) for different flashcards.
 
 Now, let us turn to the final piece of the math, how to update our prior on a fact’s recall probability when a quiz result arrives.
 
@@ -205,10 +201,20 @@ Here, “prior” refers to the GB1 density \\(P(p_t^δ)\\) derived above. \\(Li
 
 We’ll break up the posterior into two cases, depending on whether the quiz is successful \\(x=1\\), or unsuccessful \\(x=0\\).
 
-For the \\(x=1\\) case (successful quiz), the posterior is actually conjugate, and felicitously remains a GB1 random variable:
+For the successful quiz case \\(x=1\\), the posterior is actually conjugate, and felicitously remains a GB1 random variable:
 \\[(p_{t_2} | x_{t_2} = 1) ∼ GB1(p; a=1/δ, b=1, p=α+δ; q=β).\\]
-To highlight the difference between this and the prior, note that the posterior has parameter \\(p=α+δ\\), whereas the prior in the previous section had \\(p=α\\). This makes it effortless to express the distribution of the recall probability at the original half-life \\(t\\), instead of at the quiz time \\(t_2\\) which might be very small or large (over- or under-review):
+That is, the third parameter goes from \\(p=α\\) in the prior to \\(p=α+δ\\) in the posterior. (Sorry for using “p” both to mean recall probability and the third parameter of a GB1 distribution.)
+
+The great advantage of the posterior being a GB1 random variable is that we can effortlessly rewind the posterior from time \\(t_2\\) back to \\(t\\) and recover an updated Beta distribution:
 \\[(p_t | x_{t_2} = 1) ∼ Beta(α+δ, β)\\].
+Therefore, after a *successful* quiz, the memory model for this flashcard goes from \\([α, β, t]\\) to \\([α+δ, β, t]\\). Again, \\(δ=t_2/t\\), that is, the ratio between the actual time since the last quiz (or since the flashcard was learned) \\(t_2\\) and the previous model’s time \\(t\\).
+
+> It may be advantageous for the updated memory model not to be back at the pre-update time \\(t\\) but some other \\(t'\\), for numerical stability, or for quiz apps that want the memory model to be at the half-life. To do this, [match](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=903451320#Two_unknown_parameters) a Beta distribution to the moments of the posterior: the first two moments of \\(GB1(p; a=t/t', b=1, p=α+δ; q=β)\\) are, per [Wikipedia](https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)),
+> \\[μ = \\frac{B(α+δ + t'/t, β)}{B(α+δ, β)} \\]
+> and
+> \\[σ^2 = \\frac{B(α+δ + 2 t'/t, β)}{B(α+δ, β)} - μ^2\\]
+> where \\(B(\\cdot, \\cdot)\\) is the Beta function. Converting this mean and variance to the best-approximating Beta random variable, and your updated memory model becomes \\([μ (μ(1-μ)/σ^2 - 1), \, (1-μ) (μ(1-μ)/σ^2 - 1), \, t']\\).
+
 
 Now consider the \\(x=0\\) case, for an unsuccessful quiz. The posterior in this case is not conjugate, but we can analytically derive its moments (its mean, its non-central variance, etc.):
 \\[E\\left[(p_{t_2} | x_{t_2} = 0\\right)^n] = \frac{γ_{n+1} - γ_n}{γ_1 - γ_0}.\\]

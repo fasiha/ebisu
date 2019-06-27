@@ -4,7 +4,8 @@ var fs = require('fs');
 var spawnSync = require('child_process').spawnSync;
 var _ = require('lodash');
 
-var lines = fs.readFileSync('README.md', 'utf8').split('\n').map(s => s + '\n');
+var lines =
+    fs.readFileSync('README.md', 'utf8').trim().split('\n').map(s => s + '\n');
 var fencepos =
     lines.map((s, i) => [s, i]).filter(([s, i]) => s.indexOf('```') === 0);
 

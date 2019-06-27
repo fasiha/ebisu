@@ -161,7 +161,7 @@ Replacing the \\(X\\)’s and \\(Y\\)’s with our usual variables, we have the 
 \\[P(p_t^δ) = \frac{p^{(α - δ)/δ} · (1-p^{1/δ})^{β-1}}{δ · B(α, β)}.\\]
 
 [Robert Kern noticed](https://github.com/fasiha/ebisu/issues/5) that this is a [generalized Beta of the first kind](https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)), or GB1, random variable:
-\\[p_t^δ ∼ GB1(p; a=1/δ, b=1, p=α; q=β)\\]
+\\[p_t^δ ∼ GB1(p; 1/δ, 1, α; β)\\]
 When \\(δ=1\\), that is, at exactly the half-life, recall probability is simply the initial Beta we started with.
 
 
@@ -202,8 +202,8 @@ Here, “prior” refers to the GB1 density \\(P(p_t^δ)\\) derived above. \\(Li
 We’ll break up the posterior into two cases, depending on whether the quiz is successful \\(x=1\\), or unsuccessful \\(x=0\\).
 
 For the successful quiz case \\(x=1\\), the posterior is actually conjugate, and felicitously remains a GB1 random variable:
-\\[(p_{t_2} | x_{t_2} = 1) ∼ GB1(p; a=1/δ, b=1, p=α+δ; q=β).\\]
-That is, the third parameter goes from \\(p=α\\) in the prior to \\(p=α+δ\\) in the posterior. (Sorry for using “p” both to mean recall probability and the third parameter of a GB1 distribution.)
+\\[(p_{t_2} | x_{t_2} = 1) ∼ GB1(p; 1/δ, 1, α+δ; β).\\]
+That is, the third parameter goes from \\(p=α\\) in the prior to \\(p=α+δ\\) in the posterior.
 
 The great advantage of the posterior being a GB1 random variable is that we can effortlessly rewind the posterior from time \\(t_2\\) back to \\(t\\) and recover an updated Beta distribution:
 \\[(p_t | x_{t_2} = 1) ∼ Beta(α+δ, β)\\].
@@ -215,8 +215,24 @@ Therefore, after a *successful* quiz, the memory model for this flashcard goes f
 > \\[σ^2 = \\frac{B(α+δ + 2 t'/t, β)}{B(α+δ, β)} - μ^2\\]
 > where \\(B(\\cdot, \\cdot)\\) is the Beta function. Converting this mean and variance to the best-approximating Beta random variable, and your updated memory model becomes \\([μ (μ(1-μ)/σ^2 - 1), \, (1-μ) (μ(1-μ)/σ^2 - 1), \, t']\\).
 
+Next, consider the case for unsuccessful quizzes, \\(x=0\\). The posterior in this case is not conjugate, but we can analytically derive it:
+\\[
+P(p|x=0) = \frac{Prior(p) (1-p)}{\int_0^1 Prior(p) (1-p) \\, dp} = \frac{Prior(p) (1-p)}{1-\frac{B(α+δ, β)}{B(α, β)}},
+\\]
+where \\(Prior(p) = GB1(p; 1/δ, 1, α, β)=\frac{p^{(α - δ)/δ} · (1-p^{1/δ})^{β-1}}{δ · B(α, β)}\\). Here we switch back to no subscripts since the recall probability and quiz both happened at time \\(t_2\\).
 
-Now consider the \\(x=0\\) case, for an unsuccessful quiz. The posterior in this case is not conjugate, but we can analytically derive its moments (its mean, its non-central variance, etc.):
+Now we could moment-match this distribution to a GB1 distribution, and then rewind the posterior from \\(t_2\\) back to \\(t\\) (or even some other \\(t'\\) as above), but it turns out the entire posterior can be transformed analytically from time \\(t_2\\) to any other time \\(t'\\), just like we did in the section above called [Moving Beta distributions through time](#moving-beta-distributions-through-time), except instead of moving a Beta through time, we move this analytic posterior. Just like we have \\(δ=t_2/t\\), let \\(ε=t_2/t'\\). Then,
+\\[
+  P(p_{t'} | x_{t_2}=0) = \frac{ε}{δ} \frac{p^{εα/δ-1} (1-p^{ε/δ})^{β-1} - p^{ε/δ(δ+α)-1}(1-p^{ε/δ})^{β-1}}{B(α,β)-B(α+δ, β)}.
+\\]
+This posterior may look fearsome, but has analytically tractable moments! Letting
+\begin{align}
+  m_n \\&= \frac{B(α + n ⋅ δ / ε , β) - B(α + δ / ε (ε+n), β) }{B(α, β) - B(α + δ, β)}, \\\\
+  μ \\&= m_1, \\\\
+  σ^2 \\&= m_2 - μ^2. \\\\
+\end{align}
+
+moments (its mean, its non-central variance, etc.):
 \\[E\\left[(p_{t_2} | x_{t_2} = 0\\right)^n] = \frac{γ_{n+1} - γ_n}{γ_1 - γ_0}.\\]
 Recall that \\(γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)\\), for the \\(α, β, δ=t_2/t\\) from the prior.
 

@@ -20,7 +20,7 @@
 - [The math](#the-math)
 	- [Bernoulli quizzes](#bernoulli-quizzes)
 	- [Moving Beta distributions through time](#moving-beta-distributions-through-time)
-	- [Mean and variance of the recall probability right now](#mean-and-variance-of-the-recall-probability-right-now)
+	- [Recall probability right now](#recall-probability-right-now)
 	- [Choice of initial model parameters](#choice-of-initial-model-parameters)
 	- [Updating the posterior with quiz results](#updating-the-posterior-with-quiz-results)
 - [Source code](#source-code)
@@ -172,11 +172,9 @@ We will use the density of \\(p_t^δ\\) to reach our two most important goals:
 ### Recall probability right now
 
 Let’s see how to get the recall probability right now. Recall that we started out with a prior on the recall probabilities \\(t\\) days after the last review, \\(p_t ∼ Beta(α, β)\\). Letting \\(δ = t_{now} / t\\), where \\(t_{now}\\) is the time currently elapsed since the last review, we saw above that \\(p_t^δ\\) is GB1-distributed. [Wikipedia](https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)) kindly gives us an expression for the expected recall probability right now, in terms of the Beta function, which we may as well simplify to Gamma function evaluations:
-\begin{align}
-E[p_t^δ] \\&= \frac{Γ(α + β)}{Γ(α)} · \frac{Γ(α + δ)}{Γ(α + β + δ)} \\\\
-         \\&= γ_1 / γ_0,
-\end{align}
-where \\(γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)\\).
+\[
+E[p_t^δ] = \frac{B(α+δ, β)}{B(α,β)} = \frac{Γ(α + β)}{Γ(α)} · \frac{Γ(α + δ)}{Γ(α + β + δ)}
+\\]
 
 A quiz app can calculate the average current recall probability for each fact using this formula, and thus find the fact most at risk of being forgotten.
 
@@ -203,11 +201,13 @@ We’ll break up the posterior into two cases, depending on whether the quiz is 
 
 For the successful quiz case \\(x=1\\), the posterior is actually conjugate, and felicitously remains a GB1 random variable:
 \\[(p_{t_2} | x_{t_2} = 1) ∼ GB1(p; 1/δ, 1, α+δ; β).\\]
-That is, the third parameter goes from \\(p=α\\) in the prior to \\(p=α+δ\\) in the posterior.
+That is, the third GB1 parameter goes from \\(α\\) in the prior to \\(α+δ\\) in the posterior.
 
-The great advantage of the posterior being a GB1 random variable is that we can effortlessly rewind the posterior from time \\(t_2\\) back to \\(t\\) and recover an updated Beta distribution:
+The great advantage of the posterior being GB1-distributed is that we can effortlessly rewind the posterior from time \\(t_2\\) back to \\(t\\) and recover an updated Beta distribution:
 \\[(p_t | x_{t_2} = 1) ∼ Beta(α+δ, β)\\].
-Therefore, after a *successful* quiz, the memory model for this flashcard goes from \\([α, β, t]\\) to \\([α+δ, β, t]\\). Again, \\(δ=t_2/t\\), that is, the ratio between the actual time since the last quiz (or since the flashcard was learned) \\(t_2\\) and the previous model’s time \\(t\\).
+To see why, just recall how we moved a \\(Beta(α, β)\\) distrubtion at time \\(t\\) to time \\(t_2\\) and got a \\(GB1(1/δ, 1, α, β)\\) distribution—and so moving the posterior \\(GB1(p; 1/δ, 1, α+δ; β)\\) from time \\(t_2\\) back to \\(t\\) would yield \\(Beta(α+δ, β)\\).
+
+Summarizing the case of a *successful* quiz, the memory model for this flashcard goes from \\([α, β, t]\\) to \\([α+δ, β, t]\\). Again, \\(δ=t_2/t\\), that is, the ratio between the actual time since the last quiz (or since the flashcard was learned) \\(t_2\\) and the previous model’s time \\(t\\).
 
 > It may be advantageous for the updated memory model not to be back at the pre-update time \\(t\\) but some other \\(t'\\), for numerical stability, or for quiz apps that want the memory model to be at the half-life. To do this, [match](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=903451320#Two_unknown_parameters) a Beta distribution to the moments of the posterior: the first two moments of \\(GB1(p; a=t/t', b=1, p=α+δ; q=β)\\) are, per [Wikipedia](https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)),
 > \\[μ = \\frac{B(α+δ + t'/t, β)}{B(α+δ, β)} \\]
@@ -219,45 +219,34 @@ Next, consider the case for unsuccessful quizzes, \\(x=0\\). The posterior in th
 \\[
 P(p|x=0) = \frac{Prior(p) (1-p)}{\int_0^1 Prior(p) (1-p) \\, dp} = \frac{Prior(p) (1-p)}{1-\frac{B(α+δ, β)}{B(α, β)}},
 \\]
-where \\(Prior(p) = GB1(p; 1/δ, 1, α, β)=\frac{p^{(α - δ)/δ} · (1-p^{1/δ})^{β-1}}{δ · B(α, β)}\\). Here we switch back to no subscripts since the recall probability and quiz both happened at time \\(t_2\\).
+where \\(Prior(p) = GB1(p; 1/δ, 1, α, β)=\frac{p^{(α - δ)/δ} · (1-p^{1/δ})^{β-1}}{δ · B(α, β)}\\). (All recall probability and quiz variables have subscript \\(t_2\\).)
 
-Now we could moment-match this distribution to a GB1 distribution, and then rewind the posterior from \\(t_2\\) back to \\(t\\) (or even some other \\(t'\\) as above), but it turns out the entire posterior can be transformed analytically from time \\(t_2\\) to any other time \\(t'\\), just like we did in the section above called [Moving Beta distributions through time](#moving-beta-distributions-through-time), except instead of moving a Beta through time, we move this analytic posterior. Just like we have \\(δ=t_2/t\\), let \\(ε=t_2/t'\\). Then,
+Now we could moment-match this distribution, but it turns out the entire posterior can be transformed analytically from time \\(t_2\\) to any other time \\(t'\\), just like we did in the [Moving Beta distributions through time](#moving-beta-distributions-through-time) section above, except instead of moving a Beta through time, we move this analytic posterior. Just like we have \\(δ=t_2/t\\), let \\(ε=t_2/t'\\). Then,
 \\[
   P(p_{t'} | x_{t_2}=0) = \frac{ε}{δ} \frac{p^{εα/δ-1} (1-p^{ε/δ})^{β-1} - p^{ε/δ(δ+α)-1}(1-p^{ε/δ})^{β-1}}{B(α,β)-B(α+δ, β)}.
 \\]
-This posterior may look fearsome, but has analytically tractable moments! Letting
-\begin{align}
-  m_n \\&= \frac{B(α + n ⋅ δ / ε , β) - B(α + δ / ε (ε+n), β) }{B(α, β) - B(α + δ, β)}, \\\\
-  μ \\&= m_1, \\\\
-  σ^2 \\&= m_2 - μ^2. \\\\
-\end{align}
+This posterior may look fearsome, but has analytically tractable moments!:
+\\[m_n = \frac{B(α + n ⋅ δ / ε , β) - B(α + δ / ε (ε+n), β) }{B(α, β) - B(α + δ, β)},\\]
+Letting \\(μ = m_1\\) and \\(σ^2 = m_2 - μ^2\\), we can express our updated memory model as \\([μ (μ(1-μ)/σ^2 - 1), \, (1-μ) (μ(1-μ)/σ^2 - 1), \, t']\\).
 
-moments (its mean, its non-central variance, etc.):
-\\[E\\left[(p_{t_2} | x_{t_2} = 0\\right)^n] = \frac{γ_{n+1} - γ_n}{γ_1 - γ_0}.\\]
-Recall that \\(γ_n = Γ(α + n·δ) / Γ(α+β+n·δ)\\), for the \\(α, β, δ=t_2/t\\) from the prior.
+To summarize the update step: you started with a flashcard whose memory model was \\([α, β, t]\\), meaning the prior on recall probability \\(t\\) time units after the previous test (or initially learning) is \\(Beta(α, β)\\).
+- For a successful quiz after \\(t_2\\) time units, the updated model is
+    - \\([α+δ, β, t]\\), or, if you don’t want to have a memory model for \\(t\\) time units,
+    - \\([μ (μ(1-μ)/σ^2 - 1), \, (1-μ) (μ(1-μ)/σ^2 - 1), \, t']\\) for any other time \\(t'\\), for
+        - \\(δ = t_2/t\\),
+        - \\(ε=t_2/t'\\),
+        - \\(m_n = \frac{B(α + δ / ε (n+ε) , β)}{B(α, β)}\\), where
+        - \\(μ = m_1\\), and
+        - \\(σ^2 = m_2 - μ^2\\).
+- For the unsuccessful quiz after \\(t_2\\) time units, the new model is still \\([μ (μ(1-μ)/σ^2 - 1), \, (1-μ) (μ(1-μ)/σ^2 - 1), \, t']\\) for any time \\(t'\\), i.e., the same as the above sub-bullet except with
+    - \\(m_n = \frac{B(α + n ⋅ δ / ε , β) - B(α + δ / ε (ε+n), β) }{B(α, β) - B(α + δ, β)}\\) and
+    - \\(μ\\), \\(σ^2\\), \\(δ\\), and \\(ε\\) as above.
 
-With this you *could* [fit](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) a new Beta using the mean \\(E\\left[p_{t_2} | x_{t_2} = 0\\right]\\) and variance \\(E\\left[(p_{t_2} | x_{t_2} = 0\\right)^2] - E\\left[p_{t_2} | x_{t_2} = 0\\right]^2\\) but it is much more effective to instead fit it to another GB1 density, because GB1 allows us to travel back in time and express the posterior at the original prior’s time \\(t\\) instead of \\(t_2\\). I am delighted to acknowledge Robert Kern as the source of this insight.
+Being expressed like this I feel reveals the many pleasing symmetries present here.
 
-The downside is that there appears to be no *analytical* way to fit a GB1 distribution to \\(p_{t_2} | x_{t_2} = 0\\), but a simple two-parameter numerical optimization suffices in all the cases I’ve looked at: find \\({β', δ'}\\) such that the least-squares error
-\\[ \left( m_1 - \frac{B(α + δ', β')}{B(α, β')} \right)^2 + 
-    \left( m_2 - \frac{B(α + 2 δ', β')}{B(α, β')} \right)^2, 
-\\]
-is ***minimized***. Here \\(m_1 = E\\left[p_{t_2} | x_{t_2} = 0\\right]\\) and \\(m_2 = E\\left[(p_{t_2} | x_{t_2} = 0\\right)^2]\\) are the first and second moments of the posterior for the failed quiz (see above), and \\(B(x,y)\\) is the [Beta](https://en.wikipedia.org/w/index.php?title=Beta_function&oldid=896304233#Relationship_between_gamma_function_and_beta_function) function. This numerical optimization is simply fitting the first two moments of the true posterior to the first two moments of candidate GB1 distributions, and trying to find the best GB1.
-
-Having found such \\({β', δ'}\\), the posterior is approximately
-\\[(p_{t_2} | x_{t_2} = 0) ≈ GB1(p_{t_2}; a=1/δ', b=1, p=α, q=β'),\\]
-and we can time-travel this distribution backwards just like we did with the \\(x=1\\) case above, but not back to \\(t\\), but \\(t' = t_2 / δ'\\):
-\\[(p_{t'} | x_{t_2} = 0) ≈ Beta(α, β').\\]
-
-To summarize the update step: you started with a flashcard whose prior on recall at time \\(t\\) was \\(Beta(α, β)\\).
-- For a successful quiz at time \\(t_2\\), set the new prior (the updated posterior) to \\(Beta(α + t_2/t, β)\\), at time \\(t\\) in the future.
-- For the unsuccessful quiz, the new prior becomes \\(Beta(α, β')\\) at time \\(t_2 / δ'\\) in the future, where \\(β'\\) and \\(δ'\\) come from a two-dimensional numerical optimization above.
-
-> **Note 1** To verify the failed quiz’s posterior moments in Mathematica: `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p)*p^n, {p,0,1},  Assumptions -> a > 1 && b>1 && t>0 && n>=1]` gives the moment up to normalization by the marginal, that is, the numerator.
+> **Note 1** It's actually quite straightforward to derive both the expression for \\(P(p_{t'} | x_{t_2}=0)\\) above as well as its moments by repeatedly applying the expression for the moments of the GB1 distribution. I must have used the fact that \\(\int_0^1 p^{a⋅d-1}(1-p^d)^{b-1} p^n \, dp = B(a+n/d, b)\\) more than ten times.
 >
-> `Integrate[p^((a - t)/t)*(1 - p^(1/t))^(b - 1)*(1-p), p]` and simplifying gives you the denominator (the marginal) of the moments. This also verifies that the previous integral works for the `n=0` case.
->
-> **Note 2** Something we should note now is that the gamma function is a generalization of factorial—it’s a rapidly-growing function. With double-precision floats, \\(Γ(19) ≈ 6·10^{15}\\) has lost precision to the ones place, that is, `np.spacing(gamma(19)) == 1.0`). In this regime, which we regularly encounter particularly when over- and under-reviewing, addition and subtraction are risky. Ebisu takes care to factor these expressions to allow the use of log-gamma, [`expm1`](https://docs.scipy.org/doc/numpy/reference/generated/numpy.expm1.html), and [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html), in order to minimize loss of precision.
+> **Note 2** The Beta function \\(B(a,b)=Γ(a) Γ(b) / \Gamma(a+b)\\), being a function of a rapidly-growing function like the Gamma function (it is a generalization of factorial), may lose precision in the above expressions for unusual α and β and δ and ε. Addition and subtraction are risky when dealing with floating point numbers that have lost much of their precision. Ebisu takes care to use [log-Beta](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.betaln.html) and [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html) to minimize loss of precision.
 
 ## Source code
 
@@ -292,11 +281,11 @@ Let’s present our Python implementation of the core Ebisu functions, `predictR
 
 > **Important** Note how none of these functions deal with *timestamps*. All time is captured in “time since last review”, and your external application has to assign units and store timestamps (as illustrated in the [Ebisu Jupyter Notebook](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb)). This is a deliberate choice! Ebisu wants to know as *little* about your facts as possible.
 
-In the [math section](#mean-and-variance-of-the-recall-probability-right-now) above we derived the mean recall probability at time \\(t_{now} = t · δ\\) given a model \\(α, β, t\\): \\(E[p_t^δ] = Γ(α + β) · Γ(α + δ) / (Γ(α) · Γ(α + β + δ))\\). There are no sums-of-gammas here, so this is readily computed using log-gamma routine (`gammaln` in Scipy) to avoid overflowing and precision-loss in `predictRecall` (🍏 below).
+In the [math section](#recall-probability-right-now) above we derived the mean recall probability at time \\(t_2 = t · δ\\) given a model \\(α, β, t\\): \\(E[p_t^δ] = B(α+δ, β)/B(α,β)\\), which is readily computed using Scipy’s log-beta to avoid overflowing and precision-loss in `predictRecall` (🍏 below).
 
 Two computational speedups are allowed for:
-- we can skip the final `exp` that converts from the log-domain to the linear domain as long as we don’t need an actual probability (i.e., a number between 0 and 1). The output of the function will then be a “pseudo-probability” and can be compared to other “pseudo-probabilities” are returned by the function. Taking advantage of this can, for a representative case I have here, reduce the runtime from 5.69 µs (± 158 ns) to 4.01 µs (± 215 ns), a 1.4× speedup.
-- \\(Γ(α + β) - Γ(α)\\) is independent of \\(t_{now}\\) and can be precomputed, for example, when the prior is first established. If this value is passed in, the runtime further reduces to 2.47 µs (± 162 ns), giving a total speedup of 2.3×, with no loss of accuracy. A helper function `cacheIndependent` is provided: 🥥 below.
+- we can skip the final `exp` that converts from the log-domain to the linear domain as long as we don’t need an actual probability (i.e., a number between 0 and 1). The output of the function will then be a “pseudo-probability” and can be compared to other “pseudo-probabilities” are returned by the function to rank forgetfulness. Taking advantage of this can, for one example, reduce the runtime from 5.69 µs (± 158 ns) to 4.01 µs (± 215 ns), a 1.4× speedup.
+- \\(B(α,β)\\) is independent of \\(t_2\\) and could be precomputed. If this value is passed in, the runtime further reduces to 2.47 µs (± 162 ns), giving a total speedup of 2.3×, with no loss of accuracy. A helper function `cacheIndependent` is provided: 🥥 below.
 
 ```py
 # export ebisu/ebisu.py #
@@ -321,9 +310,9 @@ def predictRecall(prior, tnow, exact=False, independent=None):
   from numpy import exp
   alpha, beta, t = prior
   if not independent:
-    independent = gammaln(alpha + beta) - gammaln(alpha)
+    independent = cacheIndependent(prior)
   dt = tnow / t
-  ret = gammaln(alpha + dt) - gammaln(alpha + beta + dt) + independent
+  ret = betaln(a+dt, b) - independent
   return exp(ret) if exact else ret
 
 
@@ -332,28 +321,22 @@ def cacheIndependent(prior):
 
   Send the output of this function to `predictRecall`'s `independent` keyword argument.
   """
-  from scipy.special import gammaln
+  from scipy.special import betaln
   alpha, beta, t = prior
-  return gammaln(alpha + beta) - gammaln(alpha)
+  return betaln(alpha, beta)
 ```
 
 Next is the implementation of `updateRecall` (🍌), which accepts
 - a `model` (as above, represents the Beta prior on recall probability at one specific time since the fact’s last review),
-- a quiz `result`: a truthy value meaning “passed quiz” and a false-ish value meaning “failed quiz”, and
-- `tnow`, the actual time since last quiz that this quiz was administered.
+- a quiz `result`: a truthy value meaning “passed quiz” and a false-ish value meaning “failed quiz”,
+- `tnow`, the actual time since last quiz that this quiz was administered, and
+- optionally `tback`, the time horizon for the updated model (defaults to `tnow`).
 
-and returns a *new* model, representing an updated Beta prior on recall probability, this time after `tnow` time has elapsed since a fact was quizzed.
-
-**In case of successful quiz** `updateRecall` analytically computes the true posterior, which is GB1-distributed, and then exactly transforms these into a Beta distribution to yield the new model.
-
-**In case of unsuccessful quiz**, `updateRecall` numerically fits a GB1 to the true posterior by matching the two distributions’ moments (via non-linear least squares). This approximate GB1 distribution is then exactly transformed back to a Beta distribution to yield the new model. Three helper functions are used:
-- `gb1Moments`, which computes the moments of an arbitrary GB1 random variable,
-- `failureMoments`, which computes the moments of the posterior upon a failed quiz, and
-- `gb1ToBeta`, which translates a GB1 distribution on recall probability back in time to a pure Beta distribution.
+and returns a *new* model, representing an updated Beta prior on recall probability, after `tback` time has elapsed since the fact was quizzed. It uses [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html), which seeks to mitigate loss of precision when subtract in the log-domain, but wraps it inside a helper function `_sub`. Another helper function finds the Beta distribution that best match a given mean and variance, `_meanVarToBeta`.
 
 ```py
 # export ebisu/ebisu.py #
-def updateRecall(prior, result, tnow):
+def updateRecall(prior, result, tnow, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
@@ -366,16 +349,41 @@ def updateRecall(prior, result, tnow):
   being used to update.
 
   Returns a new object (like `prior`) describing the posterior distribution of
-  recall probability at `tnow`.
+  recall probability at `tback` (which is an optional input, defaults to `tnow`).
   """
+  dt = tnow / t
+  if tback is None: tback = t
+  et = tnow / tback
+
   if result:
     (alpha, beta, t) = prior
-    dt = tnow / t
-    gb1 = (1.0 / dt, 1.0, alpha + dt, beta, tnow)
-    return gb1ToBeta(gb1)
-  else:
-    return [*xformUpdate(prior, tnow), prior[2]]
 
+    if tback==t: return alpha + dt, beta, t
+
+    from scipy.special import logsumexp
+    from numpy import exp
+    
+    denominator = betaln(alpha, beta)
+    m1numerator = betaln(alpha+dt/et*(1+et), beta)
+    m2numerator = betaln(alpha+dt/et*(2+et), beta)
+    logmean = m1numerator - denominator
+    logvar = _sub(m2numerator - denominator, 2 * mean)
+
+  else:
+    
+    denominator = _sub(betaln(alpha, beta), betaln(alpha+dt, beta))
+    logmean = _sub(betaln(alpha + dt / et , beta) - denominator, betaln(alpha + dt / et * (et + 1), beta) - denominator)
+    m2 = _sub(betaln(alpha + 2*dt / et, beta) - denominator, betaln(alpha + dt / et * (et + 2), beta) - denominator)
+    logvar = _sub(m2, 2*logmean)
+
+  newAlpha, newBeta = _meanVarToBeta(exp(logmean), exp(logvar))
+  return newAlpha, newBeta, tback
+
+def _sub(a, b):
+  """Subtract two numbers in the log-domain, returning in log-domain
+  """
+  from scipy.special import logsumexp
+  return logsumexp([a, b], b=[1, -1])
 
 def _meanVarToBeta(mean, var):
   """Fit a Beta distribution to a mean and variance. 🏈"""
@@ -384,69 +392,6 @@ def _meanVarToBeta(mean, var):
   alpha = mean * tmp
   beta = (1 - mean) * tmp
   return alpha, beta
-
-
-def xformUpdate(prior, tnow):
-  a, b, t0 = prior
-  t = tnow / t0
-  import mpmath as mp
-  mp.mp.dps = 100
-  B = mp.beta
-  bab = B(a, b)
-  memo = dict()
-
-  def mp(n):
-    if n in memo:
-      return memo[n]
-    res = B(a + n * t, b) / bab
-    memo[n] = res
-    return res
-
-  marg = 1 - mp(1)
-  mean = (B(a + 1, b) - B(a + t + 1, b)) / (marg * bab)
-  m2 = (B(a + 2, b) - B(a + t + 2, b)) / (marg * bab)
-  var = m2 - mean**2
-  import numpy as np
-  return _meanVarToBeta(float(mean), float(var))
-
-
-def gb1ToBeta(gb1):
-  """Convert a GB1 model (five parameters: four GB1 parameters, time) to a Beta model
-  
-  `gb1: Tuple[float, float, float, float, float]`
-  """
-  return (gb1[2], gb1[3], gb1[4] * gb1[0])
-
-
-def failureMoments(model, tnow, num=4, returnLog=True):
-  """Moments of the posterior on recall at time `tnow` upon quiz failure
-  
-  - `model: Tuple[float, float, float]`
-  - `tnow: float`
-  - `num: int`
-  - `returnLog: bool`
-  """
-  a, b, t0 = model
-  t = tnow / t0
-  from scipy.special import gammaln, logsumexp
-  from numpy import exp
-  s = [gammaln(a + n * t) - gammaln(a + b + n * t) for n in range(num + 2)]
-  marginal = logsumexp([s[0], s[1]], b=[1, -1])
-  ret = [(logsumexp([s[n], s[n + 1]], b=[1, -1]) - marginal) for n in range(1, num + 1)]
-  return ret if returnLog else [exp(x) for x in ret]
-
-
-def gb1Moments(a, b, p, q, num=2, returnLog=True):
-  """Raw moments of GB1, via Wikipedia
-  
-  `a: float, b: float, p: float, q: float, num: int, returnLog: bool`
-  """
-  from scipy.special import betaln
-  import numpy as np
-  bpq = betaln(p, q)
-  logb = np.log(b)
-  ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
-  return ret if returnLog else [np.exp(x) for x in ret]
 ```
 
 Finally we have a couple more helper functions in the main `ebisu` namespace.
@@ -522,7 +467,7 @@ def defaultModel(t, alpha=3.0, beta=None):
 
 I would expect all the functions above to be present in all implementations of Ebisu:
 - `predictRecall`, aided by a public helper function `cacheIndependent`,
-- `updateRecall`, aided by private helper functions `gb1ToBeta`, `failureMoments`, and `gb1Moments`,
+- `updateRecall`, aided by private helper functions `_sub` and `_meanVarToBeta`,
 - `modelToPercentileDecay`, and
 - `defaultModel`.
 

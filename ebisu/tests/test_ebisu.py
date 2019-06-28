@@ -105,10 +105,44 @@ class TestEbisu(unittest.TestCase):
       for t in map(lambda dt: dt * t0, dts):
         msg = 'a={},b={},t0={},t={}'.format(a, b, t0, t)
         ts = np.vectorize(lambda p: modelToPercentileDecay((a, b, t), p))(percentiles)
-        self.assertTrue(np.all(np.diff(ts) < 0), msg=msg + ' ts={}'.format(ts))
+        self.assertTrue(monotonicDecreasing(ts), msg=msg + ' ts={}'.format(ts))
 
     inner(3.3, 4.4, 1., [0.1, 1., 9.5])
     inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+
+  def test_asymptotic(self):
+    """Failing quizzes in far future shouldn't modify model when updating.
+    Passing quizzes right away shouldn't modify model when updating.
+    """
+
+    def inner(a, b):
+      prior = (a, b, 1.0)
+      hl = modelToPercentileDecay(prior)
+      ts = np.linspace(.001, 1000, 101)
+      passhl = np.vectorize(lambda tnow: modelToPercentileDecay(
+          updateRecall(prior, True, tnow, 1.0)))(
+              ts)
+      failhl = np.vectorize(lambda tnow: modelToPercentileDecay(
+          updateRecall(prior, False, tnow, 1.0)))(
+              ts)
+      self.assertTrue(monotonicIncreasing(passhl))
+      self.assertTrue(monotonicIncreasing(failhl))
+      # Passing should only increase halflife
+      self.assertTrue(np.all(passhl >= hl * .999))
+      # Failing should only decrease halflife
+      self.assertTrue(np.all(failhl <= hl * 1.001))
+
+    for a in [2., 20, 200]:
+      for b in [2., 20, 200]:
+        inner(a, b)
+
+
+def monotonicIncreasing(v):
+  return np.all(np.diff(v) >= -np.spacing(1.) * 1e8)
+
+
+def monotonicDecreasing(v):
+  return np.all(np.diff(v) <= np.spacing(1.) * 1e8)
 
 
 if __name__ == '__main__':

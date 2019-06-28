@@ -1,12 +1,6 @@
 # -*- coding: utf-8 -*-
 
-def _meanVarToBeta(mean, var):
-  """Fit a Beta distribution to a mean and variance. 🏈"""
-  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
-  tmp = mean * (1 - mean) / var - 1
-  alpha = mean * tmp
-  beta = (1 - mean) * tmp
-  return alpha, beta
+from .ebisu import _meanVarToBeta, _sub
 import numpy as np
 
 
@@ -81,7 +75,7 @@ def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
       median=np.median(tnowPrior),
       mode=bincenters[freqs.argmax()],
       var=np.var(tnowPrior))
-def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
+def updateRecallMonteCarlo(prior, result, tnow, tback=None, N=10 * 1000 * 1000):
   """Update recall probability with quiz result via Monte Carlo simulation.
 
   Same arguments as `ebisu.updateRecall`, see that docstring for details.
@@ -92,6 +86,8 @@ def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
   # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
   # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
   import scipy.stats as stats
+  if tback is None:
+    tback = tnow
 
   alpha, beta, t = prior
 

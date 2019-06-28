@@ -306,13 +306,13 @@ def predictRecall(prior, tnow, exact=False, independent=None):
 
   See README for derivation.
   """
-  from scipy.special import gammaln
+  from scipy.special import betaln
   from numpy import exp
-  alpha, beta, t = prior
+  a, b, t = prior
   if not independent:
     independent = cacheIndependent(prior)
   dt = tnow / t
-  ret = betaln(a+dt, b) - independent
+  ret = betaln(a + dt, b) - independent
   return exp(ret) if exact else ret
 
 
@@ -351,39 +351,47 @@ def updateRecall(prior, result, tnow, tback=None):
   Returns a new object (like `prior`) describing the posterior distribution of
   recall probability at `tback` (which is an optional input, defaults to `tnow`).
   """
+  from scipy.special import betaln
+  from numpy import exp
+
+  (alpha, beta, t) = prior
+  if tback is None:
+    tback = t
   dt = tnow / t
-  if tback is None: tback = t
   et = tnow / tback
 
   if result:
-    (alpha, beta, t) = prior
 
-    if tback==t: return alpha + dt, beta, t
+    if tback == t:
+      return alpha + dt, beta, t
 
-    from scipy.special import logsumexp
-    from numpy import exp
-    
     denominator = betaln(alpha, beta)
-    m1numerator = betaln(alpha+dt/et*(1+et), beta)
-    m2numerator = betaln(alpha+dt/et*(2+et), beta)
+    m1numerator = betaln(alpha + dt / et * (1 + et), beta)
+    m2numerator = betaln(alpha + dt / et * (2 + et), beta)
     logmean = m1numerator - denominator
-    logvar = _sub(m2numerator - denominator, 2 * mean)
+    logvar = _sub(m2numerator - denominator, 2 * logmean)
 
   else:
-    
-    denominator = _sub(betaln(alpha, beta), betaln(alpha+dt, beta))
-    logmean = _sub(betaln(alpha + dt / et , beta) - denominator, betaln(alpha + dt / et * (et + 1), beta) - denominator)
-    m2 = _sub(betaln(alpha + 2*dt / et, beta) - denominator, betaln(alpha + dt / et * (et + 2), beta) - denominator)
-    logvar = _sub(m2, 2*logmean)
+
+    denominator = _sub(betaln(alpha, beta), betaln(alpha + dt, beta))
+    logmean = _sub(
+        betaln(alpha + dt / et, beta) - denominator,
+        betaln(alpha + dt / et * (et + 1), beta) - denominator)
+    m2 = _sub(
+        betaln(alpha + 2 * dt / et, beta) - denominator,
+        betaln(alpha + dt / et * (et + 2), beta) - denominator)
+    logvar = _sub(m2, 2 * logmean)
 
   newAlpha, newBeta = _meanVarToBeta(exp(logmean), exp(logvar))
   return newAlpha, newBeta, tback
+
 
 def _sub(a, b):
   """Subtract two numbers in the log-domain, returning in log-domain
   """
   from scipy.special import logsumexp
   return logsumexp([a, b], b=[1, -1])
+
 
 def _meanVarToBeta(mean, var):
   """Fit a Beta distribution to a mean and variance. 🏈"""
@@ -580,7 +588,8 @@ def updateRecallMonteCarlo(prior, result, tnow, tback=None, N=10 * 1000 * 1000):
   # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
   # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
   import scipy.stats as stats
-  if tback is None: tback = tnow
+  if tback is None:
+    tback = tnow
 
   alpha, beta, t = prior
 
@@ -636,6 +645,7 @@ def updateRecallGb1(prior, result, tnow, tback):
     var = sub(m2, 2 * mean)
     return [*_meanVarToBeta(exp(mean), exp(var)), tback]
 
+
 def gb1Moments(a, b, p, q, num=2, returnLog=True):
   """Raw moments of GB1, via Wikipedia
 
@@ -647,6 +657,7 @@ def gb1Moments(a, b, p, q, num=2, returnLog=True):
   logb = np.log(b)
   ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
   return ret if returnLog else [np.exp(x) for x in ret]
+
 
 def gb1ToBeta(gb1):
   """Convert a GB1 model (five parameters: four GB1 parameters, time) to a Beta model
@@ -797,27 +808,37 @@ class TestEbisu(unittest.TestCase):
     """Failing quizzes in far future shouldn't modify model when updating.
     Passing quizzes right away shouldn't modify model when updating.
     """
-    def inner(a,b):
-      prior = (a,b,1.0)
+
+    def inner(a, b):
+      prior = (a, b, 1.0)
       hl = modelToPercentileDecay(prior)
-      ts = np.linspace(.001, 1000, 1001)
-      passhl = np.vectorize(lambda tnow: modelToPercentileDecay(updateRecall(prior, True, tnow, 1.0)))
-      failhl = np.vectorize(lambda tnow: modelToPercentileDecay(updateRecall(prior, False, tnow, 1.0)))
+      ts = np.linspace(.001, 1000, 101)
+      passhl = np.vectorize(lambda tnow: modelToPercentileDecay(
+          updateRecall(prior, True, tnow, 1.0)))(
+              ts)
+      failhl = np.vectorize(lambda tnow: modelToPercentileDecay(
+          updateRecall(prior, False, tnow, 1.0)))(
+              ts)
       self.assertTrue(monotonicIncreasing(passhl))
       self.assertTrue(monotonicIncreasing(failhl))
       # Passing should only increase halflife
-      self.assertTrue(np.all(passhl >= hl))
+      self.assertTrue(np.all(passhl >= hl * .999))
       # Failing should only decrease halflife
-      self.assertTrue(np.all(failhl <= hl))
-    for a in [2., 20, 200, 2000]:
-      for b in [2., 20, 200, 2000]:
-        inner(a,b)
+      self.assertTrue(np.all(failhl <= hl * 1.001))
+
+    for a in [2., 20, 200]:
+      for b in [2., 20, 200]:
+        inner(a, b)
 
 
 def monotonicIncreasing(v):
-  return np.all(np.diff(v) > 0)
+  return np.all(np.diff(v) >= -np.spacing(1.) * 1e8)
+
+
 def monotonicDecreasing(v):
-  return np.all(np.diff(v) < 0)
+  return np.all(np.diff(v) <= np.spacing(1.) * 1e8)
+
+
 if __name__ == '__main__':
   unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(TestEbisu()))
 
@@ -992,8 +1013,3 @@ Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/3
 Many thanks also to Drew Benedetti for reviewing this manuscript.
 
 John Otander’s [Modest CSS](http://markdowncss.github.io/modest/) is used to style the Markdown output.
-
-
-
-
-

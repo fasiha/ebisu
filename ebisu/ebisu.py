@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-
 def predictRecall(prior, tnow, exact=False, independent=None):
   """Expected recall probability now, given a prior distribution on it. 🍏
 
@@ -18,13 +17,13 @@ def predictRecall(prior, tnow, exact=False, independent=None):
 
   See README for derivation.
   """
-  from scipy.special import gammaln
+  from scipy.special import betaln
   from numpy import exp
-  alpha, beta, t = prior
+  a, b, t = prior
   if not independent:
-    independent = gammaln(alpha + beta) - gammaln(alpha)
+    independent = cacheIndependent(prior)
   dt = tnow / t
-  ret = gammaln(alpha + dt) - gammaln(alpha + beta + dt) + independent
+  ret = betaln(a + dt, b) - independent
   return exp(ret) if exact else ret
 
 
@@ -33,12 +32,10 @@ def cacheIndependent(prior):
 
   Send the output of this function to `predictRecall`'s `independent` keyword argument.
   """
-  from scipy.special import gammaln
+  from scipy.special import betaln
   alpha, beta, t = prior
-  return gammaln(alpha + beta) - gammaln(alpha)
-
-
-def updateRecall(prior, result, tnow, tback=None, useBeta=True):
+  return betaln(alpha, beta)
+def updateRecall(prior, result, tnow, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
@@ -51,38 +48,48 @@ def updateRecall(prior, result, tnow, tback=None, useBeta=True):
   being used to update.
 
   Returns a new object (like `prior`) describing the posterior distribution of
-  recall probability at `tnow`.
+  recall probability at `tback` (which is an optional input, defaults to `tnow`).
   """
+  from scipy.special import betaln
+  from numpy import exp
+
   (alpha, beta, t) = prior
   if tback is None:
     tback = t
+  dt = tnow / t
+  et = tnow / tback
+
   if result:
-    dt = tnow / t
-    gb1 = (1.0 / dt, 1.0, alpha + dt, beta, tnow)
-    updated = gb1ToBeta(gb1)
 
     if tback == t:
-      return updated
+      return alpha + dt, beta, t
 
-    m1, m2 = gb1Moments(updated[2] / tback, 1., updated[0], updated[1], num=2, returnLog=True)
-    var = sub(m2, 2 * m1)
-    import numpy as np
-    return [*_meanVarToBeta(np.exp(m1), np.exp(var)), tback]
+    denominator = betaln(alpha, beta)
+    m1numerator = betaln(alpha + dt / et * (1 + et), beta)
+    m2numerator = betaln(alpha + dt / et * (2 + et), beta)
+    logmean = m1numerator - denominator
+    logvar = _sub(m2numerator - denominator, 2 * logmean)
+
   else:
-    return [*xformUpdateBack(prior, tnow, tback), tback]
+
+    denominator = _sub(betaln(alpha, beta), betaln(alpha + dt, beta))
+    logmean = _sub(
+        betaln(alpha + dt / et, beta) - denominator,
+        betaln(alpha + dt / et * (et + 1), beta) - denominator)
+    m2 = _sub(
+        betaln(alpha + 2 * dt / et, beta) - denominator,
+        betaln(alpha + dt / et * (et + 2), beta) - denominator)
+    logvar = _sub(m2, 2 * logmean)
+
+  newAlpha, newBeta = _meanVarToBeta(exp(logmean), exp(logvar))
+  return newAlpha, newBeta, tback
 
 
-def gb1Moments(a, b, p, q, num=2, returnLog=True):
-  """Raw moments of GB1, via Wikipedia
-
-  `a: float, b: float, p: float, q: float, num: int, returnLog: bool`
+def _sub(a, b):
+  """Subtract two numbers in the log-domain, returning in log-domain
   """
-  from scipy.special import betaln
-  import numpy as np
-  bpq = betaln(p, q)
-  logb = np.log(b)
-  ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
-  return ret if returnLog else [np.exp(x) for x in ret]
+  from scipy.special import logsumexp
+  return logsumexp([a, b], b=[1, -1])
 
 
 def _meanVarToBeta(mean, var):
@@ -92,62 +99,6 @@ def _meanVarToBeta(mean, var):
   alpha = mean * tmp
   beta = (1 - mean) * tmp
   return alpha, beta
-
-
-def sub(a, b):
-  from scipy.special import logsumexp
-  return logsumexp([a, b], b=[1, -1])
-
-
-def xformUpdate(prior, tnow, useBeta=True):
-  a, b, t0 = prior
-  t = tnow / t0
-  from scipy.special import betaln, gammaln
-  from numpy import exp
-  B = betaln
-
-  if useBeta:
-    denominator = sub(B(a, b), B(a + t, b))
-    mean = sub(B(a + 1, b), B(a + t + 1, b)) - denominator
-    m2 = sub(B(a + 2, b), B(a + t + 2, b)) - denominator
-  else:
-    denominator = sub(gammaln(a) - gammaln(a + b), gammaln(a + t) - gammaln(a + t + b))
-    mean = sub(
-        gammaln(a + 1) - gammaln(a + 1 + b) - denominator,
-        gammaln(a + t + 1) - gammaln(a + t + 1 + b) - denominator)
-    m2 = sub(
-        gammaln(a + 2) - gammaln(a + 2 + b) - denominator,
-        gammaln(a + t + 2) - gammaln(a + t + 2 + b) - denominator)
-  var = sub(m2, 2 * mean)
-  return _meanVarToBeta(exp(mean), exp(var))
-
-
-def xformUpdateBack(prior, tnow, tback):
-  a, b, t0 = prior
-  d = tnow / t0
-  e = tnow / tback
-
-  from scipy.special import betaln
-  from numpy import exp
-  B = betaln
-
-  denominator = sub(B(a, b), B(a + d, b))
-
-  mean = sub(B(a + d / e * 1, b) - denominator, B(a + d / e * (1 + e), b) - denominator)
-  m2 = sub(B(a + d / e * 2, b) - denominator, B(a + d / e * (e + 2), b) - denominator)
-
-  var = sub(m2, 2 * mean)
-  return _meanVarToBeta(exp(mean), exp(var))
-
-
-def gb1ToBeta(gb1):
-  """Convert a GB1 model (five parameters: four GB1 parameters, time) to a Beta model
-  
-  `gb1: Tuple[float, float, float, float, float]`
-  """
-  return (gb1[2], gb1[3], gb1[4] * gb1[0])
-
-
 def modelToPercentileDecay(model, percentile=0.5):
   """When will memory decay to a given percentile? 🏀
   

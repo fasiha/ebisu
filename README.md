@@ -474,25 +474,16 @@ I would expect all the functions above to be present in all implementations of E
 The functions in the following section are either for illustrative or debugging purposes.
 
 ### Miscellaneous functions
-I wrote a number of other functions that help provide insight or help debug the above functions in the main `ebisu` workspace but are not necessary for an actual implementation. These are in the `ebisu.alternate` submodule and not nearly as much time has been spent on polish or optimization as the above core functions.
+I wrote a number of other functions that help provide insight or help debug the above functions in the main `ebisu` workspace but are not necessary for an actual implementation. These are in the `ebisu.alternate` submodule and not nearly as much time has been spent on polish or optimization as the above core functions. However they are very helpfun in unit tests.
 
-First, a helper function that fits a Beta random variable to a mean and variance.
 ```py
 # export ebisu/alternate.py #
-def _meanVarToBeta(mean, var):
-  """Fit a Beta distribution to a mean and variance. 🏈"""
-  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
-  tmp = mean * (1 - mean) / var - 1
-  alpha = mean * tmp
-  beta = (1 - mean) * tmp
-  return alpha, beta
+from .ebisu import _meanVarToBeta, _sub
 ```
 
-`predictRecallMode` and `predictRecallMedian` return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variance \\(p_t^δ\\) whose mean is returned by `predictRecall` (🍏 above). Recall that \\(δ = t / t_{now}\\).
+`predictRecallMode` and `predictRecallMedian` return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variable \\(p_t^δ\\) whose mean is returned by `predictRecall` (🍏 above). Recall that \\(δ = t / t_{now}\\).
 
-The mode has an analytical expression, and while it is more meaningful than the mean, the distribution can blow up to infinity at 0 or 1 when \\(δ\\) is either much smaller or much larger than 1, in which case the analytical expression may yield nonsense, so a number of not-very-rigorous checks are in place to attempt to detect this.
-
-I could not find a closed-form expression for the median of \\(p_t^δ\\), so I use a bracketed root search (Brent’s algorithm) on the cumulative distribution function (the CDF), for which Wolfram Alpha can yield an analytical expression. This can get numerically burdensome, which is unacceptable because one may need to predict the recall probability for thousands of facts. For these reasons, although I would have preferred to make `predictRecall` evaluate the mode or median, I made it return the mean.
+Both median and mode, like the mean, have analytical expressions. The mode is a little dangerous: the distribution can blow up to infinity at 0 or 1 when \\(δ\\) is either much smaller or much larger than 1, in which case the analytical expression for mode may yield nonsense—I have a number of not-very-rigorous checks to attempt to detect this. The median is computed with a inverse incomplete Beta function ([`betaincinv`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.betaincinv.html)), and could replace the mean as `predictRecall`’s return value in a future version of Ebisu.
 
 `predictRecallMonteCarlo` is the simplest function. It evaluates the mean, variance, mode (via histogram), and median of \\(p_t^δ\\) by drawing samples from the Beta prior on \\(p_t\\) and raising them to the \\(δ\\)-power. The unit tests for `predictRecall` and `predictRecallVar` in the next section use this Monte Carlo to test both derivations and implementations. While fool-proof, Monte Carlo simulation is obviously far too computationally-burdensome for regular use.
 
@@ -574,11 +565,11 @@ def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
       var=np.var(tnowPrior))
 ```
 
-Next we have a Monte Carlo approache to `updateRecall` (🍌 above), the deceptively-simple `updateRecallMonteCarlo`. Like `predictRecallMonteCarlo` above, it draws samples from the Beta distribution in `model` and propagates them through Ebbinghaus’ forgetting curve to the time specified. To model the likelihood update from the quiz result, it assigns weights to each sample—each weight is that sample’s probability according to the Bernoulli likelihood. (This is equivalent to multiplying the prior with the likelihood—and we needn’t bother with the marginal because it’s just a normalizing factor which would scale all weights equally. I am grateful to [mxwsn](https://stats.stackexchange.com/q/273221/31187) for suggesting this elegant approach.) Since our real GB1-based `updateRecall` above returns posteriors at potentially different times, `updateRecallMonteCarlo` optionally takes a `tback` time to rewind or forward-wind the Monte Carlo ensemble, again through Ebbinghaus’ exponential decay curve. Finally, the ensemble is collapsed to a weighted mean and variance and converted to a Beta distribution.
+Next we have a Monte Carlo approach to `updateRecall` (🍌 above), the deceptively-simple `updateRecallMonteCarlo`. Like `predictRecallMonteCarlo` above, it draws samples from the Beta distribution in `model` and propagates them through Ebbinghaus’ forgetting curve to the time specified. To model the likelihood update from the quiz result, it assigns weights to each sample—each weight is that sample’s probability according to the Bernoulli likelihood. (This is equivalent to multiplying the prior with the likelihood—and we needn’t bother with the marginal because it’s just a normalizing factor which would scale all weights equally. I am grateful to [mxwsn](https://stats.stackexchange.com/q/273221/31187) for suggesting this elegant approach.) It then applies Ebbinghaus again to move the distribution to `tback`. Finally, the ensemble is collapsed to a weighted mean and variance to be converted to a Beta distribution.
 
 ```py
 # export ebisu/alternate.py #
-def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
+def updateRecallMonteCarlo(prior, result, tnow, tback=None, N=10 * 1000 * 1000):
   """Update recall probability with quiz result via Monte Carlo simulation.
 
   Same arguments as `ebisu.updateRecall`, see that docstring for details.
@@ -589,6 +580,7 @@ def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
   # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
   # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
   import scipy.stats as stats
+  if tback is None: tback = tnow
 
   alpha, beta, t = prior
 
@@ -609,6 +601,59 @@ def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
   newAlpha, newBeta = _meanVarToBeta(weightedMean, weightedVar)
 
   return newAlpha, newBeta, tback
+```
+
+In the derivations above, I was able to simplify a number of expressions that come from moments of GB1 random variables. This function, `updateRecallGb1`, is a drop-in replacement for `updateRecall` and should yield exactly the same results (to machine precision).
+```py
+def updateRecallGb1(prior, result, tnow, tback):
+  """Like `updateRecall`, but uses fewer simplifications."""
+  (a, b, t) = prior
+  if tback is None:
+    tback = t
+  e = tnow / tback
+  d = tnow / t
+  if result:
+    gb1 = (1.0 / d, 1.0, a + d, b, tnow)
+    updated = gb1ToBeta(gb1)
+
+    if tback == t:
+      return updated
+
+    m1, m2 = gb1Moments(updated[2] / tback, 1., updated[0], updated[1], num=2, returnLog=True)
+    var = _sub(m2, 2 * m1)
+    import numpy as np
+    return [*_meanVarToBeta(np.exp(m1), np.exp(var)), tback]
+  else:
+    from scipy.special import betaln
+    from numpy import exp
+    B = betaln
+
+    denominator = sub(B(a, b), B(a + d, b))
+
+    mean = sub(B(a + d / e * 1, b) - denominator, B(a + d / e * (1 + e), b) - denominator)
+    m2 = sub(B(a + d / e * 2, b) - denominator, B(a + d / e * (e + 2), b) - denominator)
+
+    var = sub(m2, 2 * mean)
+    return [*_meanVarToBeta(exp(mean), exp(var)), tback]
+
+def gb1Moments(a, b, p, q, num=2, returnLog=True):
+  """Raw moments of GB1, via Wikipedia
+
+  `a: float, b: float, p: float, q: float, num: int, returnLog: bool`
+  """
+  from scipy.special import betaln
+  import numpy as np
+  bpq = betaln(p, q)
+  logb = np.log(b)
+  ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
+  return ret if returnLog else [np.exp(x) for x in ret]
+
+def gb1ToBeta(gb1):
+  """Convert a GB1 model (five parameters: four GB1 parameters, time) to a Beta model
+  
+  `gb1: Tuple[float, float, float, float, float]`
+  """
+  return (gb1[2], gb1[3], gb1[4] * gb1[0])
 ```
 
 That’s it—that’s all the code in the `ebisu` module!

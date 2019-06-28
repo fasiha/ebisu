@@ -2932,17 +2932,10 @@ def defaultModel(t, alpha=3.0, beta=None):
 </ul>
 <p>The functions in the following section are either for illustrative or debugging purposes.</p>
 <h3 id="miscellaneous-functions">Miscellaneous functions</h3>
-<p>I wrote a number of other functions that help provide insight or help debug the above functions in the main <code>ebisu</code> workspace but are not necessary for an actual implementation. These are in the <code>ebisu.alternate</code> submodule and not nearly as much time has been spent on polish or optimization as the above core functions.</p>
-<p>First, a helper function that fits a Beta random variable to a mean and variance.</p>
+<p>I wrote a number of other functions that help provide insight or help debug the above functions in the main <code>ebisu</code> workspace but are not necessary for an actual implementation. These are in the <code>ebisu.alternate</code> submodule and not nearly as much time has been spent on polish or optimization as the above core functions. However they are very helpfun in unit tests.</p>
 <pre class="py"><code># export ebisu/alternate.py #
-def _meanVarToBeta(mean, var):
-  """Fit a Beta distribution to a mean and variance. 🏈"""
-  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters
-  tmp = mean * (1 - mean) / var - 1
-  alpha = mean * tmp
-  beta = (1 - mean) * tmp
-  return alpha, beta</code></pre>
-<p><code>predictRecallMode</code> and <code>predictRecallMedian</code> return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variance <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-159-Title">
+from .ebisu import _meanVarToBeta, _sub</code></pre>
+<p><code>predictRecallMode</code> and <code>predictRecallMedian</code> return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variable <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-159-Title">
 <title id="MathJax-SVG-159-Title">p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
@@ -2966,35 +2959,27 @@ def _meanVarToBeta(mean, var):
 </g>
 </g>
 </svg></span>.</p>
-<p>The mode has an analytical expression, and while it is more meaningful than the mean, the distribution can blow up to infinity at 0 or 1 when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-161-Title">
+<p>Both median and mode, like the mean, have analytical expressions. The mode is a little dangerous: the distribution can blow up to infinity at 0 or 1 when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-161-Title">
 <title id="MathJax-SVG-161-Title">δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
 </g>
-</svg></span> is either much smaller or much larger than 1, in which case the analytical expression may yield nonsense, so a number of not-very-rigorous checks are in place to attempt to detect this.</p>
-<p>I could not find a closed-form expression for the median of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-162-Title">
+</svg></span> is either much smaller or much larger than 1, in which case the analytical expression for mode may yield nonsense—I have a number of not-very-rigorous checks to attempt to detect this. The median is computed with a inverse incomplete Beta function (<a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.betaincinv.html"><code>betaincinv</code></a>), and could replace the mean as <code>predictRecall</code>’s return value in a future version of Ebisu.</p>
+<p><code>predictRecallMonteCarlo</code> is the simplest function. It evaluates the mean, variance, mode (via histogram), and median of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-162-Title">
 <title id="MathJax-SVG-162-Title">p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
 </g>
-</svg></span>, so I use a bracketed root search (Brent’s algorithm) on the cumulative distribution function (the CDF), for which Wolfram Alpha can yield an analytical expression. This can get numerically burdensome, which is unacceptable because one may need to predict the recall probability for thousands of facts. For these reasons, although I would have preferred to make <code>predictRecall</code> evaluate the mode or median, I made it return the mean.</p>
-<p><code>predictRecallMonteCarlo</code> is the simplest function. It evaluates the mean, variance, mode (via histogram), and median of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-163-Title">
-<title id="MathJax-SVG-163-Title">p_t^δ</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
- <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
-</g>
-</svg></span> by drawing samples from the Beta prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-164-Title">
-<title id="MathJax-SVG-164-Title">p_t</title>
+</svg></span> by drawing samples from the Beta prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-163-Title">
+<title id="MathJax-SVG-163-Title">p_t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-213"></use>
 </g>
-</svg></span> and raising them to the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-165-Title">
-<title id="MathJax-SVG-165-Title">δ</title>
+</svg></span> and raising them to the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-164-Title">
+<title id="MathJax-SVG-164-Title">δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
 </g>
@@ -3074,9 +3059,9 @@ def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
       median=np.median(tnowPrior),
       mode=bincenters[freqs.argmax()],
       var=np.var(tnowPrior))</code></pre>
-<p>Next we have a Monte Carlo approache to <code>updateRecall</code> (🍌 above), the deceptively-simple <code>updateRecallMonteCarlo</code>. Like <code>predictRecallMonteCarlo</code> above, it draws samples from the Beta distribution in <code>model</code> and propagates them through Ebbinghaus’ forgetting curve to the time specified. To model the likelihood update from the quiz result, it assigns weights to each sample—each weight is that sample’s probability according to the Bernoulli likelihood. (This is equivalent to multiplying the prior with the likelihood—and we needn’t bother with the marginal because it’s just a normalizing factor which would scale all weights equally. I am grateful to <a href="https://stats.stackexchange.com/q/273221/31187">mxwsn</a> for suggesting this elegant approach.) Since our real GB1-based <code>updateRecall</code> above returns posteriors at potentially different times, <code>updateRecallMonteCarlo</code> optionally takes a <code>tback</code> time to rewind or forward-wind the Monte Carlo ensemble, again through Ebbinghaus’ exponential decay curve. Finally, the ensemble is collapsed to a weighted mean and variance and converted to a Beta distribution.</p>
+<p>Next we have a Monte Carlo approach to <code>updateRecall</code> (🍌 above), the deceptively-simple <code>updateRecallMonteCarlo</code>. Like <code>predictRecallMonteCarlo</code> above, it draws samples from the Beta distribution in <code>model</code> and propagates them through Ebbinghaus’ forgetting curve to the time specified. To model the likelihood update from the quiz result, it assigns weights to each sample—each weight is that sample’s probability according to the Bernoulli likelihood. (This is equivalent to multiplying the prior with the likelihood—and we needn’t bother with the marginal because it’s just a normalizing factor which would scale all weights equally. I am grateful to <a href="https://stats.stackexchange.com/q/273221/31187">mxwsn</a> for suggesting this elegant approach.) It then applies Ebbinghaus again to move the distribution to <code>tback</code>. Finally, the ensemble is collapsed to a weighted mean and variance to be converted to a Beta distribution.</p>
 <pre class="py"><code># export ebisu/alternate.py #
-def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
+def updateRecallMonteCarlo(prior, result, tnow, tback=None, N=10 * 1000 * 1000):
   """Update recall probability with quiz result via Monte Carlo simulation.
 
   Same arguments as `ebisu.updateRecall`, see that docstring for details.
@@ -3087,6 +3072,7 @@ def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
   # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&amp;oldid=770608018#Mathematical_definition
   # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&amp;oldid=770608018#Weighted_sample_variance
   import scipy.stats as stats
+  if tback is None: tback = tnow
 
   alpha, beta, t = prior
 
@@ -3107,6 +3093,56 @@ def updateRecallMonteCarlo(prior, result, tnow, tback, N=10 * 1000 * 1000):
   newAlpha, newBeta = _meanVarToBeta(weightedMean, weightedVar)
 
   return newAlpha, newBeta, tback</code></pre>
+<p>In the derivations above, I was able to simplify a number of expressions that come from moments of GB1 random variables. This function, <code>updateRecallGb1</code>, is a drop-in replacement for <code>updateRecall</code> and should yield exactly the same results (to machine precision).</p>
+<pre class="py"><code>def updateRecallGb1(prior, result, tnow, tback):
+  """Like `updateRecall`, but uses fewer simplifications."""
+  (a, b, t) = prior
+  if tback is None:
+    tback = t
+  e = tnow / tback
+  d = tnow / t
+  if result:
+    gb1 = (1.0 / d, 1.0, a + d, b, tnow)
+    updated = gb1ToBeta(gb1)
+
+    if tback == t:
+      return updated
+
+    m1, m2 = gb1Moments(updated[2] / tback, 1., updated[0], updated[1], num=2, returnLog=True)
+    var = _sub(m2, 2 * m1)
+    import numpy as np
+    return [*_meanVarToBeta(np.exp(m1), np.exp(var)), tback]
+  else:
+    from scipy.special import betaln
+    from numpy import exp
+    B = betaln
+
+    denominator = sub(B(a, b), B(a + d, b))
+
+    mean = sub(B(a + d / e * 1, b) - denominator, B(a + d / e * (1 + e), b) - denominator)
+    m2 = sub(B(a + d / e * 2, b) - denominator, B(a + d / e * (e + 2), b) - denominator)
+
+    var = sub(m2, 2 * mean)
+    return [*_meanVarToBeta(exp(mean), exp(var)), tback]
+
+def gb1Moments(a, b, p, q, num=2, returnLog=True):
+  """Raw moments of GB1, via Wikipedia
+
+  `a: float, b: float, p: float, q: float, num: int, returnLog: bool`
+  """
+  from scipy.special import betaln
+  import numpy as np
+  bpq = betaln(p, q)
+  logb = np.log(b)
+  ret = [(h * logb + betaln(p + h / a, q) - bpq) for h in np.arange(1.0, num + 1)]
+  return ret if returnLog else [np.exp(x) for x in ret]
+
+def gb1ToBeta(gb1):
+  """Convert a GB1 model (five parameters: four GB1 parameters, time) to a Beta model
+  
+  `gb1: Tuple[float, float, float, float, float]`
+  """
+  return (gb1[2], gb1[3], gb1[4] * gb1[0])</code></pre>
 <p>That’s it—that’s all the code in the <code>ebisu</code> module!</p>
 <h3 id="test-code">Test code</h3>
 <p>I use the built-in <code>unittest</code>, and I can run all the tests from Atom via Hydrogen/Jupyter but for historic reasons I don’t want Jupyter to deal with the <code>ebisu</code> namespace, just functions (since most of these functions and tests existed before the module’s layout was decided). So the following is in its own fenced code block that I don’t evaluate in Atom.</p>
@@ -3120,8 +3156,8 @@ from ebisu.alternate import *</code></pre>
 </ul>
 <p>I also want to make sure that <code>predictRecall</code> and <code>updateRecall</code> both produce sane values when extremely under- and over-reviewing, i.e., immediately after review as well as far into the future. And we should also exercise <code>modelToPercentileDecay</code>.</p>
 <p>For testing <code>updateRecall</code>, since all functions return a Beta distribution, I compare the resulting distributions in terms of <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Quantities_of_information_.28entropy.29">Kullback–Leibler divergence</a> (actually, the symmetric distance version), which is a nice way to measure the difference between two probability distributions. There is also a little unit test for my implementation for the KL divergence on Beta distributions.</p>
-<p>For testing <code>predictRecall</code>, I compare means using relative error, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.231ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4404.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-166-Title">
-<title id="MathJax-SVG-166-Title">|x-y| / |y|</title>
+<p>For testing <code>predictRecall</code>, I compare means using relative error, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.231ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4404.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-165-Title">
+<title id="MathJax-SVG-165-Title">|x-y| / |y|</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-7C" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-78" x="278" y="0"></use>
@@ -3134,8 +3170,8 @@ from ebisu.alternate import *</code></pre>
  <use xlink:href="#MJMAIN-7C" x="4126" y="0"></use>
 </g>
 </svg></span>.</p>
-<p>For both sets of functions, a range of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-167-Title">
-<title id="MathJax-SVG-167-Title">δ = t_{now} / t</title>
+<p>For both sets of functions, a range of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-166-Title">
+<title id="MathJax-SVG-166-Title">δ = t_{now} / t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
@@ -3354,8 +3390,8 @@ plt.savefig('figures/forgetting-curve.png', dpi=300)
 plt.show()</code></pre>
 <p><img src="figures/forgetting-curve.png" alt="figures/forgetting-curve.png"></p>
 <p>This plot shows <code>predictRecall</code>’s fully analytical solution for two separate models over time as well as this approximation: model A has half-life of eleven days while model B has half-life of 7.9 days. We see that the approximation diverges a bit from the true solution.</p>
-<p>This also indicates that placing a prior on recall probabilities and propagating that prior through time via Ebbinghaus results in a <em>different</em> curve than Ebbinghaus’ exponential decay curve. This surprising result can be seen as a consequence of <a href="https://en.wikipedia.org/wiki/Jensen%27s_inequality">Jensen’s inequality</a>, which says that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.752ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7643.1 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-168-Title">
-<title id="MathJax-SVG-168-Title">E[f(p)] ≥ f(E[p])</title>
+<p>This also indicates that placing a prior on recall probabilities and propagating that prior through time via Ebbinghaus results in a <em>different</em> curve than Ebbinghaus’ exponential decay curve. This surprising result can be seen as a consequence of <a href="https://en.wikipedia.org/wiki/Jensen%27s_inequality">Jensen’s inequality</a>, which says that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.752ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7643.1 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-167-Title">
+<title id="MathJax-SVG-167-Title">E[f(p)] ≥ f(E[p])</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
@@ -3373,13 +3409,13 @@ plt.show()</code></pre>
  <use xlink:href="#MJMAIN-5D" x="6975" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="7253" y="0"></use>
 </g>
-</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.279ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 550.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-169-Title">
-<title id="MathJax-SVG-169-Title">f</title>
+</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.279ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 550.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-168-Title">
+<title id="MathJax-SVG-168-Title">f</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-66" x="0" y="0"></use>
 </g>
-</svg></span> is convex, and that the opposite is true if it is concave. In our case, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.487ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 4084.9 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-170-Title">
-<title id="MathJax-SVG-170-Title">f(p) = p^δ</title>
+</svg></span> is convex, and that the opposite is true if it is concave. In our case, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.487ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 4084.9 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-169-Title">
+<title id="MathJax-SVG-169-Title">f(p) = p^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-66" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-28" x="550" y="0"></use>

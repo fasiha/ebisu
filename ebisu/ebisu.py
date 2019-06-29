@@ -142,13 +142,19 @@ def _meanVarToBeta(mean, var):
 def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   """When will memory decay to a given percentile? 🏀
   
-  Use a root-finding routine in log-delta space to find the delta that
-  will cause the GB1 distribution to have a mean of the requested quantile.
-  Because we are using well-behaved normalized deltas instead of times, and
-  owing to the monotonicity of the expectation with respect to delta, we can
-  quickly scan for a rough estimate of the scale of delta, then do a finishing
-  optimization to get the right value.
+  Given a memory `model` of the kind consumed by `predictRecall`,
+  etc., and optionally a `percentile` (defaults to 0.5, the
+  half-life), find the time it takes for memory to decay to
+  `percentile`. If `coarse`, the returned time (in the same units as
+  `model`) is approximate.
   """
+  # Use a root-finding routine in log-delta space to find the delta that
+  # will cause the GB1 distribution to have a mean of the requested quantile.
+  # Because we are using well-behaved normalized deltas instead of times, and
+  # owing to the monotonicity of the expectation with respect to delta, we can
+  # quickly scan for a rough estimate of the scale of delta, then do a finishing
+  # optimization to get the right value.
+
   assert (percentile > 0 and percentile < 1)
   from scipy.special import betaln
   from scipy.optimize import root_scalar

@@ -204,7 +204,7 @@ For the successful quiz case \\(x=1\\), the posterior is actually conjugate, and
 That is, the third GB1 parameter goes from \\(α\\) in the prior to \\(α+δ\\) in the posterior.
 
 The great advantage of the posterior being GB1-distributed is that we can effortlessly rewind the posterior from time \\(t_2\\) back to \\(t\\) and recover an updated Beta distribution:
-\\[(p_t | x_{t_2} = 1) ∼ Beta(α+δ, β)\\].
+\\[(p_t | x_{t_2} = 1) ∼ Beta(α+δ, β).\\]
 To see why, just recall how we moved a \\(Beta(α, β)\\) distrubtion at time \\(t\\) to time \\(t_2\\) and got a \\(GB1(1/δ, 1, α, β)\\) distribution—and so moving the posterior \\(GB1(p; 1/δ, 1, α+δ; β)\\) from time \\(t_2\\) back to \\(t\\) would yield \\(Beta(α+δ, β)\\).
 
 Summarizing the case of a *successful* quiz, the memory model for this flashcard goes from \\([α, β, t]\\) to \\([α+δ, β, t]\\). Again, \\(δ=t_2/t\\), that is, the ratio between the actual time since the last quiz (or since the flashcard was learned) \\(t_2\\) and the previous model’s time \\(t\\).

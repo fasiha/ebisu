@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-def predictRecall(prior, tnow, exact=False, independent=None):
+def predictRecall(prior, tnow, exact=False):
   """Expected recall probability now, given a prior distribution on it. 🍏
 
   `prior` is a tuple representing the prior distribution on recall probability
@@ -11,30 +11,40 @@ def predictRecall(prior, tnow, exact=False, independent=None):
 
   `tnow` is the *actual* time elapsed since this fact's most recent review.
 
-  Optional keyword paramter `exact` makes the return value a probability, specifically, the expected recall probability `tnow` after the last review: a number between 0 and 1. If `exact` is false (the default), some calculations are skipped and the return value won't be a probability, but can still be compared against other values returned by this function. That is, if `predictRecall(prior1, tnow1, exact=True) < predictRecall(prior2, tnow2, exact=True)`, then it is guaranteed that `predictRecall(prior1, tnow1, exact=False) < predictRecall(prior2, tnow2, exact=False)`. The default is set to false for computational reasons.
+  Optional keyword paramter `exact` makes the return value a probability,
+  specifically, the expected recall probability `tnow` after the last review: a
+  number between 0 and 1. If `exact` is false (the default), some calculations
+  are skipped and the return value won't be a probability, but can still be
+  compared against other values returned by this function. That is, if
+  
+  > predictRecall(prior1, tnow1, exact=True) < predictRecall(prior2, tnow2, exact=True)
 
-  Optional keyword parameter `independent` is a precalculated number that is only dependent on `prior` and independent of `tnow`, allowing some computational speedup if cached ahead of time. It can be obtained with `ebisu.cacheIndependent`.
+  then it is guaranteed that
+
+  > predictRecall(prior1, tnow1, exact=False) < predictRecall(prior2, tnow2, exact=False)
+  
+  The default is set to false for computational reasons.
 
   See README for derivation.
   """
   from scipy.special import betaln
   from numpy import exp
   a, b, t = prior
-  if not independent:
-    independent = cacheIndependent(prior)
   dt = tnow / t
-  ret = betaln(a + dt, b) - independent
+  ret = betaln(a + dt, b) - _cachedBetaln(a, b)
   return exp(ret) if exact else ret
 
 
-def cacheIndependent(prior):
-  """Precompute a value to speed up `predictRecall`. 🥥
+BETALNCACHE = {}
 
-  Send the output of this function to `predictRecall`'s `independent` keyword argument.
-  """
+
+def _cachedBetaln(a, b):
+  if (a, b) in BETALNCACHE:
+    return BETALNCACHE[(a, b)]
   from scipy.special import betaln
-  alpha, beta, t = prior
-  return betaln(alpha, beta)
+  x = betaln(a, b)
+  BETALNCACHE[(a, b)] = x
+  return x
 def updateRecall(prior, result, tnow, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 

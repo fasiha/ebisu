@@ -181,9 +181,9 @@ A quiz app can calculate the average current recall probability for each fact us
 ### Choice of initial model parameters
 Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple \\([α, β, t]\\) initially, for example when the student has first learned a fact.
 
-Set \\(t\\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \\(t\\) to four hours or a day, respectively.
+Set \\(t\\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \\(t\\) to four hours or a day, respectively. In my apps, I set initial \\(t\\) to a quarter-hour (fifteen minutes).
 
-Then, pick \\(α = β > 1\\). First, for \\(t\\) to be a half-life, \\(α = β\\). Second, a higher value for \\(α = β\\) means *higher* confidence that the true half-life is indeed \\(t\\), which in turn makes the model *less* sensitive to quiz results—this is, after all, a Bayesian prior. A good default is \\(α = β = 3\\), which lets the algorithm aggressively change the half-life in response to quiz results. Refer to the plot [above](#how-it-works) contrasting the aggressive \\(α = β = 3\\) model to the conservative \\(α = β = 12\\) model.
+Then, pick \\(α = β > 1\\). First, for \\(t\\) to be a half-life, \\(α = β\\). Second, a higher value for \\(α = β\\) means *higher* confidence that the true half-life is indeed \\(t\\), which in turn makes the model *less* sensitive to quiz results—this is, after all, a Bayesian prior. A **good default** is \\(α = β = 3\\), which lets the algorithm aggressively change the half-life in response to quiz results.
 
 Quiz apps that allow a students to indicate initial familiarity (or lack thereof) with a flashcard should modify the initial half-life \\(t\\). It remains an open question whether quiz apps should vary initial \\(α = β\\) for different flashcards.
 

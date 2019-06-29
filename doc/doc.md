@@ -4,7 +4,15 @@
 
 ## Functions
 
-##### `defaultModel(t, alpha=4.0, beta=None)` 
+##### `cacheIndependent(prior)` 
+
+> Precompute a value to speed up `predictRecall`. 🥥
+> 
+>   Send the output of this function to `predictRecall`'s `independent` keyword argument.
+
+
+
+##### `defaultModel(t, alpha=3.0, beta=None)` 
 
 > Convert recall probability prior's raw parameters into a model object. 🍗
 > 
@@ -20,7 +28,20 @@
 
 
 
-##### `predictRecall(prior, tnow)` 
+##### `modelToPercentileDecay(model, percentile=0.5)` 
+
+> When will memory decay to a given percentile? 🏀
+> 
+>   Use a root-finding routine in log-delta space to find the delta that
+>   will cause the GB1 distribution to have a mean of the requested quantile.
+>   Because we are using well-behaved normalized deltas instead of times, and
+>   owing to the monotonicity of the expectation with respect to delta, we can
+>   quickly scan for a rough estimate of the scale of delta, then do a finishing
+>   optimization to get the right value.
+
+
+
+##### `predictRecall(prior, tnow, exact=False, independent=None)` 
 
 > Expected recall probability now, given a prior distribution on it. 🍏
 > 
@@ -32,31 +53,15 @@
 > 
 >   `tnow` is the *actual* time elapsed since this fact's most recent review.
 > 
->   Returns the expectation of the recall probability `tnow` after last review, a
->   float between 0 and 1.
+>   Optional keyword paramter `exact` makes the return value a probability, specifically, the expected recall probability `tnow` after the last review: a number between 0 and 1. If `exact` is false (the default), some calculations are skipped and the return value won't be a probability, but can still be compared against other values returned by this function. That is, if `predictRecall(prior1, tnow1, exact=True) < predictRecall(prior2, tnow2, exact=True)`, then it is guaranteed that `predictRecall(prior1, tnow1, exact=False) < predictRecall(prior2, tnow2, exact=False)`. The default is set to false for computational reasons.
 > 
->   See documentation for derivation.
-
-
-
-##### `predictRecallVar(prior, tnow)` 
-
-> Variance of recall probability now. 🍋
+>   Optional keyword parameter `independent` is a precalculated number that is only dependent on `prior` and independent of `tnow`, allowing some computational speedup if cached ahead of time. It can be obtained with `ebisu.cacheIndependent`.
 > 
->   This function returns the variance of the distribution whose mean is given by
->   `ebisu.predictRecall`. See it's documentation for details.
-> 
->   Returns a float.
+>   See README for derivation.
 
 
 
-##### `priorToHalflife(prior, percentile=0.5, maxt=100, mint=0.001)` 
-
-> Find the half-life corresponding to a time-based prior on recall. 🏀
-
-
-
-##### `updateRecall(prior, result, tnow)` 
+##### `updateRecall(prior, result, tnow, tback=None)` 
 
 > Update a prior on recall probability with a quiz result and time. 🍌
 > 
@@ -70,6 +75,6 @@
 >   being used to update.
 > 
 >   Returns a new object (like `prior`) describing the posterior distribution of
->   recall probability at `tnow`.
+>   recall probability at `tback` (which is an optional input, defaults to `tnow`).
 
 

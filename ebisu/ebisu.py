@@ -64,32 +64,50 @@ def updateRecall(prior, result, tnow, tback=None):
     if tback == t:
       return alpha + dt, beta, t
 
-    denominator = betaln(alpha, beta)
+    logDenominator = betaln(alpha, beta)
     m1numerator = betaln(alpha + dt / et * (1 + et), beta)
     m2numerator = betaln(alpha + dt / et * (2 + et), beta)
-    logmean = m1numerator - denominator
-    logvar = _sub(m2numerator - denominator, 2 * logmean)
+    logmean = m1numerator - logDenominator
+    mean = exp(logmean)
+    var = _subexp(m2numerator - logDenominator, 2 * logmean)
 
   else:
 
-    denominator = _sub(betaln(alpha, beta), betaln(alpha + dt, beta))
-    logmean = _sub(
-        betaln(alpha + dt / et, beta) - denominator,
-        betaln(alpha + dt / et * (et + 1), beta) - denominator)
-    m2 = _sub(
-        betaln(alpha + 2 * dt / et, beta) - denominator,
-        betaln(alpha + dt / et * (et + 2), beta) - denominator)
-    logvar = _sub(m2, 2 * logmean)
+    logDenominator = _logsubexp(betaln(alpha, beta), betaln(alpha + dt, beta))
+    mean = _subexp(
+        betaln(alpha + dt / et, beta) - logDenominator,
+        betaln(alpha + dt / et * (et + 1), beta) - logDenominator)
+    m2 = _subexp(
+        betaln(alpha + 2 * dt / et, beta) - logDenominator,
+        betaln(alpha + dt / et * (et + 2), beta) - logDenominator)
+    assert m2 > 0
+    var = m2 - mean**2
 
-  newAlpha, newBeta = _meanVarToBeta(exp(logmean), exp(logvar))
+  assert mean > 0
+  assert var > 0
+  newAlpha, newBeta = _meanVarToBeta(mean, var)
   return newAlpha, newBeta, tback
 
 
-def _sub(a, b):
-  """Subtract two numbers in the log-domain, returning in log-domain
+def _logsubexp(a, b):
+  """Evaluate `log(exp(a) - exp(b))` preserving accuracy.
+  
+  Subtract log-domain numbers and return in the log-domain.
+  Wraps `scipy.special.logsumexp`.
   """
   from scipy.special import logsumexp
   return logsumexp([a, b], b=[1, -1])
+
+
+def _subexp(x, y):
+  """Evaluates `exp(x) - exp(y)` a bit more accurately than that. ⚾️
+
+  Subtract log-domain numbers and return in the *linear* domain.
+  Similar to `scipy.special.logsumexp` except without the final `log`.
+  """
+  from numpy import exp, maximum
+  maxval = maximum(x, y)
+  return exp(maxval) * (exp(x - maxval) - exp(y - maxval))
 
 
 def _meanVarToBeta(mean, var):

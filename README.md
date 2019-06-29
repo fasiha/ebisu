@@ -60,7 +60,7 @@ Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other sch
 
 Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like Beta-distributed random variables, conjugate priors, and marginalization, this is for you. You’ll also find the key formulas that implement `predictRecall` and `updateRecall` here.
 
-> Nerdy details in a nutshell: Ebisu begins by positing a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probabilities. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it requires only a few [gamma function](http://mathworld.wolfram.com/GammaFunction.html) evaluations to predict the current recall probability. Next, a *quiz* is modeled as a [Bernoulli trial](https://en.wikipedia.org/wiki/Bernoulli_distribution) whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the true non-standard posterior with a new Beta distribution by matching its mean and variance. This mean and variance are analytically tractable, and again require a few evaluations of the gamma function.
+> Nerdy details in a nutshell: Ebisu begins by positing a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probability at a certain time. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it requires only a few [Beta function](http://mathworld.wolfram.com/BetaFunction.html) evaluations to predict the current recall probability. Next, a *quiz* is modeled as a [Bernoulli trial](https://en.wikipedia.org/wiki/Bernoulli_distribution) whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the non-standard posterior with a new Beta distribution by matching its mean and variance, which are also analytically tractable, and require a few evaluations of the Beta function.
 
 Finally, the [Source Code](#source-code) section presents the literate source of the library, including several tests to validate the math.
 
@@ -74,9 +74,9 @@ Finally, the [Source Code](#source-code) section presents the literate source of
 
 **Update a fact’s model with quiz results** `ebisu.updateRecall(prior: tuple, result: bool, tnow: float) -> tuple` where `prior` and `tnow` are as above, and where `result` is true if the student successfully answered the quiz, false otherwise. The returned value is this fact’s new prior model—the old one can be discarded.
 
-**IPython Notebook crash course** For a conversational introduction to the API in the context of a mocked quiz app, see this [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb).
+**IPython Notebook crash course** For a conversational introduction to the API in the context of a mocked quiz app, see this [IPython Notebook crash course](./EbisuHowto.ipynb).
 
-**Further information** [Module docstrings](https://github.com/fasiha/ebisu/blob/gh-pages/doc/doc.md) in a pinch but full details plus literate source below, under [Source code](#source-code).
+**Further information** [Module docstrings](./doc/doc.md) in a pinch but full details plus literate source below, under [Source code](#source-code).
 
 **Alternative implementations** [Ebisu.js](https://fasiha.github.io/ebisu.js/) is a JavaScript port for browser and Node.js. [ebisu-java](https://github.com/fasiha/ebisu-java) is for Java and JVM languages.
 
@@ -181,11 +181,11 @@ A quiz app can calculate the average current recall probability for each fact us
 ### Choice of initial model parameters
 Mentioning a quiz app reminds me—you may be wondering how to pick the prior triple \\([α, β, t]\\) initially, for example when the student has first learned a fact.
 
-Set \(t\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \(t\) to four hours or a day, respectively.
+Set \\(t\\) equal to your best guess of the fact’s half-life. In Memrise, the first quiz occurs four hours after first learning a fact; in Anki, it’s a day after. To mimic these, set \\(t\\) to four hours or a day, respectively.
 
-Then, pick \(α = β > 1\). First, for \(t\) to be a half-life, \(α = β\). Second, a higher value for \(α = β\) means *higher* confidence that the true half-life is indeed \(t\), which in turn makes the model *less* sensitive to quiz results—this is, after all, a Bayesian prior. A good default is \(α = β = 3\), which lets the algorithm aggressively change the half-life in response to quiz results. Refer to the plot [above](#how-it-works) contrasting the aggressive \(α = β = 3\) model to the conservative \(α = β = 12\) model.
+Then, pick \\(α = β > 1\\). First, for \\(t\\) to be a half-life, \\(α = β\\). Second, a higher value for \\(α = β\\) means *higher* confidence that the true half-life is indeed \\(t\\), which in turn makes the model *less* sensitive to quiz results—this is, after all, a Bayesian prior. A good default is \\(α = β = 3\\), which lets the algorithm aggressively change the half-life in response to quiz results. Refer to the plot [above](#how-it-works) contrasting the aggressive \\(α = β = 3\\) model to the conservative \\(α = β = 12\\) model.
 
-Quiz apps that allow a students to indicate initial familiarity (or lack thereof) with a flashcard should modify the initial half-life \(t\). It remains an open question whether quiz apps should vary initial \(α = β\) for different flashcards.
+Quiz apps that allow a students to indicate initial familiarity (or lack thereof) with a flashcard should modify the initial half-life \\(t\\). It remains an open question whether quiz apps should vary initial \\(α = β\\) for different flashcards.
 
 Now, let us turn to the final piece of the math, how to update our prior on a fact’s recall probability when a quiz result arrives.
 
@@ -365,32 +365,50 @@ def updateRecall(prior, result, tnow, tback=None):
     if tback == t:
       return alpha + dt, beta, t
 
-    denominator = betaln(alpha, beta)
+    logDenominator = betaln(alpha, beta)
     m1numerator = betaln(alpha + dt / et * (1 + et), beta)
     m2numerator = betaln(alpha + dt / et * (2 + et), beta)
-    logmean = m1numerator - denominator
-    logvar = _sub(m2numerator - denominator, 2 * logmean)
+    logmean = m1numerator - logDenominator
+    mean = exp(logmean)
+    var = _subexp(m2numerator - logDenominator, 2 * logmean)
 
   else:
 
-    denominator = _sub(betaln(alpha, beta), betaln(alpha + dt, beta))
-    logmean = _sub(
-        betaln(alpha + dt / et, beta) - denominator,
-        betaln(alpha + dt / et * (et + 1), beta) - denominator)
-    m2 = _sub(
-        betaln(alpha + 2 * dt / et, beta) - denominator,
-        betaln(alpha + dt / et * (et + 2), beta) - denominator)
-    logvar = _sub(m2, 2 * logmean)
+    logDenominator = _logsubexp(betaln(alpha, beta), betaln(alpha + dt, beta))
+    mean = _subexp(
+        betaln(alpha + dt / et, beta) - logDenominator,
+        betaln(alpha + dt / et * (et + 1), beta) - logDenominator)
+    m2 = _subexp(
+        betaln(alpha + 2 * dt / et, beta) - logDenominator,
+        betaln(alpha + dt / et * (et + 2), beta) - logDenominator)
+    assert m2 > 0
+    var = m2 - mean**2
 
-  newAlpha, newBeta = _meanVarToBeta(exp(logmean), exp(logvar))
+  assert mean > 0
+  assert var > 0
+  newAlpha, newBeta = _meanVarToBeta(mean, var)
   return newAlpha, newBeta, tback
 
 
-def _sub(a, b):
-  """Subtract two numbers in the log-domain, returning in log-domain
+def _logsubexp(a, b):
+  """Evaluate `log(exp(a) - exp(b))` preserving accuracy.
+  
+  Subtract log-domain numbers and return in the log-domain.
+  Wraps `scipy.special.logsumexp`.
   """
   from scipy.special import logsumexp
   return logsumexp([a, b], b=[1, -1])
+
+
+def _subexp(x, y):
+  """Evaluates `exp(x) - exp(y)` a bit more accurately than that. ⚾️
+
+  Subtract log-domain numbers and return in the *linear* domain.
+  Similar to `scipy.special.logsumexp` except without the final `log`.
+  """
+  from numpy import exp, maximum
+  maxval = maximum(x, y)
+  return exp(maxval) * (exp(x - maxval) - exp(y - maxval))
 
 
 def _meanVarToBeta(mean, var):
@@ -486,7 +504,7 @@ I wrote a number of other functions that help provide insight or help debug the 
 
 ```py
 # export ebisu/alternate.py #
-from .ebisu import _meanVarToBeta, _sub
+from .ebisu import _meanVarToBeta, _logsubexp
 ```
 
 `predictRecallMode` and `predictRecallMedian` return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variable \\(p_t^δ\\) whose mean is returned by `predictRecall` (🍏 above). Recall that \\(δ = t / t_{now}\\).

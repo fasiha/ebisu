@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from .ebisu import _meanVarToBeta, _sub
+from .ebisu import _meanVarToBeta, _logsubexp
 import numpy as np
 
 

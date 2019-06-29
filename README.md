@@ -209,7 +209,7 @@ To see why, just recall how we moved a \\(Beta(α, β)\\) distrubtion at time \\
 
 Summarizing the case of a *successful* quiz, the memory model for this flashcard goes from \\([α, β, t]\\) to \\([α+δ, β, t]\\). Again, \\(δ=t_2/t\\), that is, the ratio between the actual time since the last quiz (or since the flashcard was learned) \\(t_2\\) and the previous model’s time \\(t\\).
 
-> It may be advantageous for the updated memory model not to be back at the pre-update time \\(t\\) but some other \\(t'\\), for numerical stability, or for quiz apps that want the memory model to be at the half-life. To do this, [match](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=903451320#Two_unknown_parameters) a Beta distribution to the moments of the posterior: the first two moments of \\(GB1(p; a=t/t', b=1, p=α+δ; q=β)\\) are, per [Wikipedia](https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)),
+> It may be advantageous for the updated memory model not to be back at the pre-update time \\(t\\) but some other \\(t'\\), for numerical stability, or for quiz apps that want the memory model to be at the half-life. To do this, [match](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=903451320#Two_unknown_parameters) a Beta distribution to the moments of the posterior: the first two moments of \\(GB1(p; t/t', 1, α+δ; β)\\) are, per [Wikipedia](https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)),
 > \\[μ = \\frac{B(α+δ + t'/t, β)}{B(α+δ, β)} \\]
 > and
 > \\[σ^2 = \\frac{B(α+δ + 2 t'/t, β)}{B(α+δ, β)} - μ^2\\]
@@ -324,29 +324,33 @@ def predictRecall(prior, tnow, exact=False):
   return exp(ret) if exact else ret
 
 
-BETALNCACHE = {}
+_BETALNCACHE = {}
 
 
 def _cachedBetaln(a, b):
-  if (a, b) in BETALNCACHE:
-    return BETALNCACHE[(a, b)]
+  "Caches `betaln(a, b)` calls in the `_BETALNCACHE` dictionary."
+  if (a, b) in _BETALNCACHE:
+    return _BETALNCACHE[(a, b)]
   from scipy.special import betaln
   x = betaln(a, b)
-  BETALNCACHE[(a, b)] = x
+  _BETALNCACHE[(a, b)] = x
   return x
 ```
 
 Next is the implementation of `updateRecall` (🍌), which accepts
 - a `model` (as above, represents the Beta prior on recall probability at one specific time since the fact’s last review),
-- a quiz `result`: a truthy value meaning “passed quiz” and a false-ish value meaning “failed quiz”,
-- `tnow`, the actual time since last quiz that this quiz was administered, and
-- optionally `tback`, the time horizon for the updated model (defaults to `tnow`).
+- a quiz `result`: a truthy value meaning “passed quiz” and a false-ish value meaning “failed quiz”, and
+- `tnow`, the actual time since last quiz that this quiz was administered,
 
-and returns a *new* model, representing an updated Beta prior on recall probability, after `tback` time has elapsed since the fact was quizzed. It uses [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html), which seeks to mitigate loss of precision when subtract in the log-domain, but wraps it inside a helper function `_logsubexp`. Sometimes though we have two log-domain values and we want to carefully subtract them but get the result in the linear domain: helper function `_subexp` uses the same trick as `logsumexp` but skips the final `log` to keep the result in the linear domain. Another helper function finds the Beta distribution that best match a given mean and variance, `_meanVarToBeta`.
+and returns a *new* model, representing an updated Beta prior on recall probability over some new time horizon. The function implements the update equations above, with an extra rebalancing stage at the end: if the updated α and β are unbalanced (meaning one is more than twice the other), find the half-life of the proposed update and rerun the update for that half-life. At the half-life, the two parameters of the Beta distribution, α and β, will be equal. (To save a few computations, the half-life is calculated via a coarse search, so the rebalanced α and β will likely not be exactly equal.) To facilitate this final rebalancing step, two additional keyword arguments are needed: the time horizon for the update `tback`, and a `rebalance` flag to forbid more than one level of rebalancing, and all rebalancing is done in a `_rebalance` helper function.
+
+(The half-life-finding function is described in more detail below.)
+
+ The function uses [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html), which seeks to mitigate loss of precision when subtract in the log-domain, but wraps it inside a helper function `_logsubexp`. Sometimes though we have two log-domain values and we want to carefully subtract them but get the result in the linear domain: helper function `_subexp` uses the same trick as `logsumexp` but skips the final `log` to keep the result in the linear domain. Another helper function finds the Beta distribution that best match a given mean and variance, `_meanVarToBeta`.
 
 ```py
 # export ebisu/ebisu.py #
-def updateRecall(prior, result, tnow, tback=None):
+def updateRecall(prior, result, tnow, rebalance=True, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
@@ -357,6 +361,8 @@ def updateRecall(prior, result, tnow, tback=None):
 
   `tnow` is the time elapsed between this fact's last review and the review
   being used to update.
+
+  (The keyword arguments `rebalance` and `tback` are intended for internal use.)
 
   Returns a new object (like `prior`) describing the posterior distribution of
   recall probability at `tback` (which is an optional input, defaults to `tnow`).
@@ -373,14 +379,14 @@ def updateRecall(prior, result, tnow, tback=None):
   if result:
 
     if tback == t:
-      return alpha + dt, beta, t
+      proposed = alpha + dt, beta, t
+      return _rebalace(prior, result, tnow, proposed) if rebalance else proposed
 
-    logDenominator = betaln(alpha, beta)
-    m1numerator = betaln(alpha + dt / et * (1 + et), beta)
-    m2numerator = betaln(alpha + dt / et * (2 + et), beta)
-    logmean = m1numerator - logDenominator
+    logDenominator = betaln(alpha + dt, beta)
+    logmean = betaln(alpha + dt / et * (1 + et), beta) - logDenominator
+    logm2 = betaln(alpha + dt / et * (2 + et), beta) - logDenominator
     mean = exp(logmean)
-    var = _subexp(m2numerator - logDenominator, 2 * logmean)
+    var = _subexp(logm2, 2 * logmean)
 
   else:
 
@@ -397,7 +403,16 @@ def updateRecall(prior, result, tnow, tback=None):
   assert mean > 0
   assert var > 0
   newAlpha, newBeta = _meanVarToBeta(mean, var)
-  return newAlpha, newBeta, tback
+  proposed = newAlpha, newBeta, tback
+  return _rebalace(prior, result, tnow, proposed) if rebalance else proposed
+
+
+def _rebalace(prior, result, tnow, proposed):
+  newAlpha, newBeta, _ = proposed
+  if (newAlpha > 2 * newBeta or newBeta > 2 * newAlpha):
+    roughHalflife = modelToPercentileDecay(proposed, coarse=True)
+    return updateRecall(prior, result, tnow, rebalance=False, tback=roughHalflife)
+  return proposed
 
 
 def _logsubexp(a, b):
@@ -432,13 +447,13 @@ def _meanVarToBeta(mean, var):
 
 Finally we have a couple more helper functions in the main `ebisu` namespace.
 
-It is often useful to find out how much time has to elapse for memory to decay to a given recall probability. The time for memory to decay to 50% recall probability is the half-life. A quiz app might store the time when each quiz’s recall probability reaches 50%, 5%, 0.05%, …, as a computationally-efficient approximation to the exact recall probability. I am grateful to Robert Kern for contributing the `modelToPercentileDecay` function (🏀 below).
+Although our update function above explicitly computes an approximate-half-life for a memory model, it may be very useful to predict when a given memory model expects recall to decay to an arbitrary percentile, not just 50% (i.e., half-life). Besides feedback to users, a quiz app might store the time when each quiz’s recall probability reaches 50%, 5%, 0.05%, …, as a computationally-efficient approximation to the exact recall probability. I am grateful to Robert Kern for contributing the `modelToPercentileDecay` function (🏀 below). It takes a model, and optionally a `percentile` keyword (a number between 0 and 1), as well as a `coarse` flag. The full half-life search does a coarse grid search and then refines that result with numerical optimization. When `coarse=True` (as in the `updateRecall` function above), the final finishing optimization is skipped.
 
 The least important function from a usage point of view is also the most important function for someone getting started with Ebisu: I call it `defaultModel` (🍗 below) and it simply creates a “model” object (a 3-tuple) out of the arguments it’s given. It’s included in the `ebisu` namespace to help developers who totally lack confidence in picking parameters: the only information it absolutely needs is an expected half-life, e.g., four hours or twenty-four hours or however long you expect a newly-learned fact takes to decay to 50% recall.
 
 ```py
 # export ebisu/ebisu.py #
-def modelToPercentileDecay(model, percentile=0.5):
+def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   """When will memory decay to a given percentile? 🏀
   
   Use a root-finding routine in log-delta space to find the delta that
@@ -448,6 +463,7 @@ def modelToPercentileDecay(model, percentile=0.5):
   quickly scan for a rough estimate of the scale of delta, then do a finishing
   optimization to get the right value.
   """
+  assert (percentile > 0 and percentile < 1)
   from scipy.special import betaln
   from scipy.optimize import root_scalar
   import numpy as np
@@ -460,7 +476,7 @@ def modelToPercentileDecay(model, percentile=0.5):
     return logMean - logPercentile
 
   # Scan for a bracket.
-  bracket_width = 6.0
+  bracket_width = 1.0 if coarse else 6.0
   blow = -bracket_width / 2.0
   bhigh = bracket_width / 2.0
   flow = f(blow)
@@ -479,6 +495,9 @@ def modelToPercentileDecay(model, percentile=0.5):
     flow = f(blow)
 
   assert flow > 0 and fhigh < 0
+
+  if coarse:
+    return (np.exp(blow) + np.exp(bhigh)) / 2 * t0
 
   sol = root_scalar(f, bracket=[blow, bhigh])
   t1 = np.exp(sol.root) * t0
@@ -502,8 +521,8 @@ def defaultModel(t, alpha=3.0, beta=None):
 ```
 
 I would expect all the functions above to be present in all implementations of Ebisu:
-- `predictRecall`, aided by a public helper function `cacheIndependent`,
-- `updateRecall`, aided by private helper functions `_sub` and `_meanVarToBeta`,
+- `predictRecall`, aided by a private helper function `_cachedBetaln`,
+- `updateRecall`, aided by private helper functions `_rebalace`, `_logsubexp`, `_subexp`, and `_meanVarToBeta`,
 - `modelToPercentileDecay`, and
 - `defaultModel`.
 

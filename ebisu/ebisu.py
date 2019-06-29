@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+
 def predictRecall(prior, tnow, exact=False):
   """Expected recall probability now, given a prior distribution on it. 🍏
 
@@ -45,7 +46,9 @@ def _cachedBetaln(a, b):
   x = betaln(a, b)
   BETALNCACHE[(a, b)] = x
   return x
-def updateRecall(prior, result, tnow, tback=None):
+
+
+def updateRecall(prior, result, tnow, rebalance=True, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
@@ -72,14 +75,14 @@ def updateRecall(prior, result, tnow, tback=None):
   if result:
 
     if tback == t:
-      return alpha + dt, beta, t
+      proposed = alpha + dt, beta, t
+      return _rebalace(prior, result, tnow, proposed) if rebalance else proposed
 
-    logDenominator = betaln(alpha, beta)
-    m1numerator = betaln(alpha + dt / et * (1 + et), beta)
-    m2numerator = betaln(alpha + dt / et * (2 + et), beta)
-    logmean = m1numerator - logDenominator
+    logDenominator = betaln(alpha + dt, beta)
+    logmean = betaln(alpha + dt / et * (1 + et), beta) - logDenominator
+    logm2 = betaln(alpha + dt / et * (2 + et), beta) - logDenominator
     mean = exp(logmean)
-    var = _subexp(m2numerator - logDenominator, 2 * logmean)
+    var = _subexp(logm2, 2 * logmean)
 
   else:
 
@@ -96,7 +99,16 @@ def updateRecall(prior, result, tnow, tback=None):
   assert mean > 0
   assert var > 0
   newAlpha, newBeta = _meanVarToBeta(mean, var)
-  return newAlpha, newBeta, tback
+  proposed = newAlpha, newBeta, tback
+  return _rebalace(prior, result, tnow, proposed) if rebalance else proposed
+
+
+def _rebalace(prior, result, tnow, proposed):
+  newAlpha, newBeta, _ = proposed
+  if (newAlpha > 2 * newBeta or newBeta > 2 * newAlpha):
+    roughHalflife = modelToPercentileDecay(proposed, coarse=False)
+    return updateRecall(prior, result, tnow, rebalance=False, tback=roughHalflife)
+  return proposed
 
 
 def _logsubexp(a, b):
@@ -127,7 +139,9 @@ def _meanVarToBeta(mean, var):
   alpha = mean * tmp
   beta = (1 - mean) * tmp
   return alpha, beta
-def modelToPercentileDecay(model, percentile=0.5):
+
+
+def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   """When will memory decay to a given percentile? 🏀
   
   Use a root-finding routine in log-delta space to find the delta that
@@ -149,7 +163,7 @@ def modelToPercentileDecay(model, percentile=0.5):
     return logMean - logPercentile
 
   # Scan for a bracket.
-  bracket_width = 6.0
+  bracket_width = 1.0 if coarse else 6.0
   blow = -bracket_width / 2.0
   bhigh = bracket_width / 2.0
   flow = f(blow)
@@ -169,6 +183,8 @@ def modelToPercentileDecay(model, percentile=0.5):
 
   assert flow > 0 and fhigh < 0
 
+  if coarse:
+    return (np.exp(blow) + np.exp(bhigh)) / 2 * t0
   sol = root_scalar(f, bracket=[blow, bhigh])
   t1 = np.exp(sol.root) * t0
   return t1

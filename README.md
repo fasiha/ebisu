@@ -130,6 +130,8 @@ The [Beta distribution](https://en.wikipedia.org/wiki/Beta_distribution) happens
 for specific \\(α_t\\) and \\(β_t\\), then observing the quiz result updates our belief about the recall probability to be:
 \\[p_t | x_t ∼ Beta(α_t + x_t, β_t + 1 - x_t).\\]
 
+> **Aside 0** If you see a gibberish above instead of a mathematical equation (it can be hard to tell the difference sometimes…), you’re probably reading this on GitHub instead of the [main Ebisu website](https://fasiha.github.io/ebisu/#bernoulli-quizzes) which has typeset all equations with MathJax. Read this document [there](https://fasiha.github.io/ebisu/#bernoulli-quizzes).
+>
 > **Aside 1** Notice that since \\(x_t\\) is either 1 or 0, the updated parameters \\((α + x_t, β + 1 - x_t)\\) are \\((α + 1, β)\\) when the student correctly answered the quiz, and \\((α, β + 1)\\) when she answered incorrectly.
 >
 > **Aside 2** Even if you’re familiar with Bayesian statistics, if you’ve never worked with priors on probabilities, the meta-ness here might confuse you. What the above means is that, before we flipped our \\(p_t\\)-weighted coin (before we administered the quiz), we had a specific probability distribution representing the coin’s weighting \\(p_t\\), *not* just a scalar number. After we observed the result of the coin flip, we updated our belief about the coin’s weighting—it *still* makes total sense to talk about the probability of something happening after it happens. Said another way, since we’re being Bayesian, something actually happening doesn’t preclude us from maintaining beliefs about what *could* have happened.

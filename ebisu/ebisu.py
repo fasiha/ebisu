@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-
 def predictRecall(prior, tnow, exact=False):
   """Expected recall probability now, given a prior distribution on it. 🍏
 
@@ -36,18 +35,17 @@ def predictRecall(prior, tnow, exact=False):
   return exp(ret) if exact else ret
 
 
-BETALNCACHE = {}
+_BETALNCACHE = {}
 
 
 def _cachedBetaln(a, b):
-  if (a, b) in BETALNCACHE:
-    return BETALNCACHE[(a, b)]
+  "Caches `betaln(a, b)` calls in the `_BETALNCACHE` dictionary."
+  if (a, b) in _BETALNCACHE:
+    return _BETALNCACHE[(a, b)]
   from scipy.special import betaln
   x = betaln(a, b)
-  BETALNCACHE[(a, b)] = x
+  _BETALNCACHE[(a, b)] = x
   return x
-
-
 def updateRecall(prior, result, tnow, rebalance=True, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
@@ -59,6 +57,8 @@ def updateRecall(prior, result, tnow, rebalance=True, tback=None):
 
   `tnow` is the time elapsed between this fact's last review and the review
   being used to update.
+
+  (The keyword arguments `rebalance` and `tback` are intended for internal use.)
 
   Returns a new object (like `prior`) describing the posterior distribution of
   recall probability at `tback` (which is an optional input, defaults to `tnow`).
@@ -106,7 +106,7 @@ def updateRecall(prior, result, tnow, rebalance=True, tback=None):
 def _rebalace(prior, result, tnow, proposed):
   newAlpha, newBeta, _ = proposed
   if (newAlpha > 2 * newBeta or newBeta > 2 * newAlpha):
-    roughHalflife = modelToPercentileDecay(proposed, coarse=False)
+    roughHalflife = modelToPercentileDecay(proposed, coarse=True)
     return updateRecall(prior, result, tnow, rebalance=False, tback=roughHalflife)
   return proposed
 
@@ -139,8 +139,6 @@ def _meanVarToBeta(mean, var):
   alpha = mean * tmp
   beta = (1 - mean) * tmp
   return alpha, beta
-
-
 def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   """When will memory decay to a given percentile? 🏀
   
@@ -151,6 +149,7 @@ def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   quickly scan for a rough estimate of the scale of delta, then do a finishing
   optimization to get the right value.
   """
+  assert (percentile > 0 and percentile < 1)
   from scipy.special import betaln
   from scipy.optimize import root_scalar
   import numpy as np
@@ -185,6 +184,7 @@ def modelToPercentileDecay(model, percentile=0.5, coarse=False):
 
   if coarse:
     return (np.exp(blow) + np.exp(bhigh)) / 2 * t0
+
   sol = root_scalar(f, bracket=[blow, bhigh])
   t1 = np.exp(sol.root) * t0
   return t1

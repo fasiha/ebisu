@@ -342,7 +342,7 @@ Next is the implementation of `updateRecall` (🍌), which accepts
 - `tnow`, the actual time since last quiz that this quiz was administered, and
 - optionally `tback`, the time horizon for the updated model (defaults to `tnow`).
 
-and returns a *new* model, representing an updated Beta prior on recall probability, after `tback` time has elapsed since the fact was quizzed. It uses [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html), which seeks to mitigate loss of precision when subtract in the log-domain, but wraps it inside a helper function `_sub`. Another helper function finds the Beta distribution that best match a given mean and variance, `_meanVarToBeta`.
+and returns a *new* model, representing an updated Beta prior on recall probability, after `tback` time has elapsed since the fact was quizzed. It uses [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html), which seeks to mitigate loss of precision when subtract in the log-domain, but wraps it inside a helper function `_logsubexp`. Sometimes though we have two log-domain values and we want to carefully subtract them but get the result in the linear domain: helper function `_subexp` uses the same trick as `logsumexp` but skips the final `log` to keep the result in the linear domain. Another helper function finds the Beta distribution that best match a given mean and variance, `_meanVarToBeta`.
 
 ```py
 # export ebisu/ebisu.py #

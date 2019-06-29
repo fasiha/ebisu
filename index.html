@@ -2821,10 +2821,8 @@ from . import alternate</code></pre>
  <use xlink:href="#MJMAIN-29" x="11733" y="0"></use>
 </g>
 </svg></span>, which is readily computed using Scipy’s log-beta to avoid overflowing and precision-loss in <code>predictRecall</code> (🍏 below).</p>
-<p>Two computational speedups are allowed for:</p>
-<ul>
-<li>we can skip the final <code>exp</code> that converts from the log-domain to the linear domain as long as we don’t need an actual probability (i.e., a number between 0 and 1). The output of the function will then be a “pseudo-probability” and can be compared to other “pseudo-probabilities” are returned by the function to rank forgetfulness. Taking advantage of this can, for one example, reduce the runtime from 5.69 µs (± 158 ns) to 4.01 µs (± 215 ns), a 1.4× speedup.</li>
-<li><span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="7.411ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 3190.7 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-169-Title">
+<p>As a computational speedup, we can skip the final <code>exp</code> that converts the probability from the log-domain to the linear domain as long as we don’t need an actual probability (i.e., a number between 0 and 1). The output of the function will then be a “pseudo-probability” and can be compared to other “pseudo-probabilities” are returned by the function to rank forgetfulness. Taking advantage of this can, for one example, reduce the runtime from 5.69 µs (± 158 ns) to 4.01 µs (± 215 ns), a 1.4× speedup.</p>
+<p>Another computational speedup is that we can cache calls to <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="7.411ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 3190.7 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-169-Title">
 <title id="MathJax-SVG-169-Title">B(α,β)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-42" x="0" y="0"></use>
@@ -2834,16 +2832,9 @@ from . import alternate</code></pre>
  <use xlink:href="#MJMATHI-3B2" x="2234" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="2801" y="0"></use>
 </g>
-</svg></span> is independent of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.894ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 815.4 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-170-Title">
-<title id="MathJax-SVG-170-Title">t_2</title>
-<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
- <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
- <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
-</g>
-</svg></span> and could be precomputed. If this value is passed in, the runtime further reduces to 2.47 µs (± 162 ns), giving a total speedup of 2.3×, with no loss of accuracy. A helper function <code>cacheIndependent</code> is provided: 🥥 below.</li>
-</ul>
+</svg></span>, which don’t change when the function is called for same quiz repeatedly, as might happen if a quiz app repeatedly asks for the latest recall probability for its flashcards. When the cache is hit, the number of calls to <code>betaln</code> drops from two to one.</p>
 <pre class="py"><code># export ebisu/ebisu.py #
-def predictRecall(prior, tnow, exact=False, independent=None):
+def predictRecall(prior, tnow, exact=False):
   """Expected recall probability now, given a prior distribution on it. 🍏
 
   `prior` is a tuple representing the prior distribution on recall probability
@@ -2854,30 +2845,40 @@ def predictRecall(prior, tnow, exact=False, independent=None):
 
   `tnow` is the *actual* time elapsed since this fact's most recent review.
 
-  Optional keyword paramter `exact` makes the return value a probability, specifically, the expected recall probability `tnow` after the last review: a number between 0 and 1. If `exact` is false (the default), some calculations are skipped and the return value won't be a probability, but can still be compared against other values returned by this function. That is, if `predictRecall(prior1, tnow1, exact=True) &lt; predictRecall(prior2, tnow2, exact=True)`, then it is guaranteed that `predictRecall(prior1, tnow1, exact=False) &lt; predictRecall(prior2, tnow2, exact=False)`. The default is set to false for computational reasons.
+  Optional keyword paramter `exact` makes the return value a probability,
+  specifically, the expected recall probability `tnow` after the last review: a
+  number between 0 and 1. If `exact` is false (the default), some calculations
+  are skipped and the return value won't be a probability, but can still be
+  compared against other values returned by this function. That is, if
+  
+  &gt; predictRecall(prior1, tnow1, exact=True) &lt; predictRecall(prior2, tnow2, exact=True)
 
-  Optional keyword parameter `independent` is a precalculated number that is only dependent on `prior` and independent of `tnow`, allowing some computational speedup if cached ahead of time. It can be obtained with `ebisu.cacheIndependent`.
+  then it is guaranteed that
+
+  &gt; predictRecall(prior1, tnow1, exact=False) &lt; predictRecall(prior2, tnow2, exact=False)
+  
+  The default is set to false for computational reasons.
 
   See README for derivation.
   """
   from scipy.special import betaln
   from numpy import exp
   a, b, t = prior
-  if not independent:
-    independent = cacheIndependent(prior)
   dt = tnow / t
-  ret = betaln(a + dt, b) - independent
+  ret = betaln(a + dt, b) - _cachedBetaln(a, b)
   return exp(ret) if exact else ret
 
 
-def cacheIndependent(prior):
-  """Precompute a value to speed up `predictRecall`. 🥥
+BETALNCACHE = {}
 
-  Send the output of this function to `predictRecall`'s `independent` keyword argument.
-  """
+
+def _cachedBetaln(a, b):
+  if (a, b) in BETALNCACHE:
+    return BETALNCACHE[(a, b)]
   from scipy.special import betaln
-  alpha, beta, t = prior
-  return betaln(alpha, beta)</code></pre>
+  x = betaln(a, b)
+  BETALNCACHE[(a, b)] = x
+  return x</code></pre>
 <p>Next is the implementation of <code>updateRecall</code> (🍌), which accepts</p>
 <ul>
 <li>a <code>model</code> (as above, represents the Beta prior on recall probability at one specific time since the fact’s last review),</li>
@@ -2885,7 +2886,7 @@ def cacheIndependent(prior):
 <li><code>tnow</code>, the actual time since last quiz that this quiz was administered, and</li>
 <li>optionally <code>tback</code>, the time horizon for the updated model (defaults to <code>tnow</code>).</li>
 </ul>
-<p>and returns a <em>new</em> model, representing an updated Beta prior on recall probability, after <code>tback</code> time has elapsed since the fact was quizzed. It uses <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html"><code>logsumexp</code></a>, which seeks to mitigate loss of precision when subtract in the log-domain, but wraps it inside a helper function <code>_sub</code>. Another helper function finds the Beta distribution that best match a given mean and variance, <code>_meanVarToBeta</code>.</p>
+<p>and returns a <em>new</em> model, representing an updated Beta prior on recall probability, after <code>tback</code> time has elapsed since the fact was quizzed. It uses <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html"><code>logsumexp</code></a>, which seeks to mitigate loss of precision when subtract in the log-domain, but wraps it inside a helper function <code>_logsubexp</code>. Sometimes though we have two log-domain values and we want to carefully subtract them but get the result in the linear domain: helper function <code>_subexp</code> uses the same trick as <code>logsumexp</code> but skips the final <code>log</code> to keep the result in the linear domain. Another helper function finds the Beta distribution that best match a given mean and variance, <code>_meanVarToBeta</code>.</p>
 <pre class="py"><code># export ebisu/ebisu.py #
 def updateRecall(prior, result, tnow, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
@@ -2932,13 +2933,14 @@ def updateRecall(prior, result, tnow, tback=None):
     m2 = _subexp(
         betaln(alpha + 2 * dt / et, beta) - logDenominator,
         betaln(alpha + dt / et * (et + 2), beta) - logDenominator)
+    assert m2 &gt; 0
     var = m2 - mean**2
 
   assert mean &gt; 0
-  assert m2 &gt; 0
   assert var &gt; 0
   newAlpha, newBeta = _meanVarToBeta(mean, var)
   return newAlpha, newBeta, tback
+
 
 def _logsubexp(a, b):
   """Evaluate `log(exp(a) - exp(b))` preserving accuracy.
@@ -2949,6 +2951,7 @@ def _logsubexp(a, b):
   from scipy.special import logsumexp
   return logsumexp([a, b], b=[1, -1])
 
+
 def _subexp(x, y):
   """Evaluates `exp(x) - exp(y)` a bit more accurately than that. ⚾️
 
@@ -2958,6 +2961,7 @@ def _subexp(x, y):
   from numpy import exp, maximum
   maxval = maximum(x, y)
   return exp(maxval) * (exp(x - maxval) - exp(y - maxval))
+
 
 def _meanVarToBeta(mean, var):
   """Fit a Beta distribution to a mean and variance. 🏈"""
@@ -3043,15 +3047,15 @@ def defaultModel(t, alpha=3.0, beta=None):
 <p>I wrote a number of other functions that help provide insight or help debug the above functions in the main <code>ebisu</code> workspace but are not necessary for an actual implementation. These are in the <code>ebisu.alternate</code> submodule and not nearly as much time has been spent on polish or optimization as the above core functions. However they are very helpfun in unit tests.</p>
 <pre class="py"><code># export ebisu/alternate.py #
 from .ebisu import _meanVarToBeta, _logsubexp</code></pre>
-<p><code>predictRecallMode</code> and <code>predictRecallMedian</code> return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variable <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-171-Title">
-<title id="MathJax-SVG-171-Title">p_t^δ</title>
+<p><code>predictRecallMode</code> and <code>predictRecallMedian</code> return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variable <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-170-Title">
+<title id="MathJax-SVG-170-Title">p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
 </g>
-</svg></span> whose mean is returned by <code>predictRecall</code> (🍏 above). Recall that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-172-Title">
-<title id="MathJax-SVG-172-Title">δ = t / t_{now}</title>
+</svg></span> whose mean is returned by <code>predictRecall</code> (🍏 above). Recall that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-171-Title">
+<title id="MathJax-SVG-171-Title">δ = t / t_{now}</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
@@ -3067,27 +3071,27 @@ from .ebisu import _meanVarToBeta, _logsubexp</code></pre>
 </g>
 </g>
 </svg></span>.</p>
-<p>Both median and mode, like the mean, have analytical expressions. The mode is a little dangerous: the distribution can blow up to infinity at 0 or 1 when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-173-Title">
-<title id="MathJax-SVG-173-Title">δ</title>
+<p>Both median and mode, like the mean, have analytical expressions. The mode is a little dangerous: the distribution can blow up to infinity at 0 or 1 when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-172-Title">
+<title id="MathJax-SVG-172-Title">δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
 </g>
 </svg></span> is either much smaller or much larger than 1, in which case the analytical expression for mode may yield nonsense—I have a number of not-very-rigorous checks to attempt to detect this. The median is computed with a inverse incomplete Beta function (<a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.betaincinv.html"><code>betaincinv</code></a>), and could replace the mean as <code>predictRecall</code>’s return value in a future version of Ebisu.</p>
-<p><code>predictRecallMonteCarlo</code> is the simplest function. It evaluates the mean, variance, mode (via histogram), and median of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-174-Title">
-<title id="MathJax-SVG-174-Title">p_t^δ</title>
+<p><code>predictRecallMonteCarlo</code> is the simplest function. It evaluates the mean, variance, mode (via histogram), and median of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-173-Title">
+<title id="MathJax-SVG-173-Title">p_t^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="712" y="498"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-395"></use>
 </g>
-</svg></span> by drawing samples from the Beta prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-175-Title">
-<title id="MathJax-SVG-175-Title">p_t</title>
+</svg></span> by drawing samples from the Beta prior on <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.085ex" height="2.009ex" style="vertical-align: -0.671ex; margin-left: -0.089ex;" viewBox="-38.5 -576.1 897.6 865.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-174-Title">
+<title id="MathJax-SVG-174-Title">p_t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMATHI-74" x="712" y="-213"></use>
 </g>
-</svg></span> and raising them to the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-176-Title">
-<title id="MathJax-SVG-176-Title">δ</title>
+</svg></span> and raising them to the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.049ex" height="2.343ex" style="vertical-align: -0.338ex; margin-right: -0.016ex;" viewBox="0 -863.1 451.5 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-175-Title">
+<title id="MathJax-SVG-175-Title">δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
 </g>
@@ -3267,8 +3271,8 @@ from ebisu.alternate import *</code></pre>
 </ul>
 <p>I also want to make sure that <code>predictRecall</code> and <code>updateRecall</code> both produce sane values when extremely under- and over-reviewing, i.e., immediately after review as well as far into the future. And we should also exercise <code>modelToPercentileDecay</code>.</p>
 <p>For testing <code>updateRecall</code>, since all functions return a Beta distribution, I compare the resulting distributions in terms of <a href="https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Quantities_of_information_.28entropy.29">Kullback–Leibler divergence</a> (actually, the symmetric distance version), which is a nice way to measure the difference between two probability distributions. There is also a little unit test for my implementation for the KL divergence on Beta distributions.</p>
-<p>For testing <code>predictRecall</code>, I compare means using relative error, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.231ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4404.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-177-Title">
-<title id="MathJax-SVG-177-Title">|x-y| / |y|</title>
+<p>For testing <code>predictRecall</code>, I compare means using relative error, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.231ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4404.9 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-176-Title">
+<title id="MathJax-SVG-176-Title">|x-y| / |y|</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMAIN-7C" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-78" x="278" y="0"></use>
@@ -3281,8 +3285,8 @@ from ebisu.alternate import *</code></pre>
  <use xlink:href="#MJMAIN-7C" x="4126" y="0"></use>
 </g>
 </svg></span>.</p>
-<p>For both sets of functions, a range of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-178-Title">
-<title id="MathJax-SVG-178-Title">δ = t_{now} / t</title>
+<p>For both sets of functions, a range of <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="10.165ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 4376.6 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-177-Title">
+<title id="MathJax-SVG-177-Title">δ = t_{now} / t</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-3D" x="722" y="0"></use>
@@ -3535,8 +3539,8 @@ plt.savefig('figures/forgetting-curve.png', dpi=300)
 plt.show()</code></pre>
 <p><img src="figures/forgetting-curve.png" alt="figures/forgetting-curve.png"></p>
 <p>This plot shows <code>predictRecall</code>’s fully analytical solution for two separate models over time as well as this approximation: model A has half-life of eleven days while model B has half-life of 7.9 days. We see that the approximation diverges a bit from the true solution.</p>
-<p>This also indicates that placing a prior on recall probabilities and propagating that prior through time via Ebbinghaus results in a <em>different</em> curve than Ebbinghaus’ exponential decay curve. This surprising result can be seen as a consequence of <a href="https://en.wikipedia.org/wiki/Jensen%27s_inequality">Jensen’s inequality</a>, which says that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.752ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7643.1 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-179-Title">
-<title id="MathJax-SVG-179-Title">E[f(p)] ≥ f(E[p])</title>
+<p>This also indicates that placing a prior on recall probabilities and propagating that prior through time via Ebbinghaus results in a <em>different</em> curve than Ebbinghaus’ exponential decay curve. This surprising result can be seen as a consequence of <a href="https://en.wikipedia.org/wiki/Jensen%27s_inequality">Jensen’s inequality</a>, which says that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.752ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7643.1 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-178-Title">
+<title id="MathJax-SVG-178-Title">E[f(p)] ≥ f(E[p])</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-45" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-5B" x="764" y="0"></use>
@@ -3554,13 +3558,13 @@ plt.show()</code></pre>
  <use xlink:href="#MJMAIN-5D" x="6975" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="7253" y="0"></use>
 </g>
-</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.279ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 550.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-180-Title">
-<title id="MathJax-SVG-180-Title">f</title>
+</svg></span> when <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.279ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 550.5 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-179-Title">
+<title id="MathJax-SVG-179-Title">f</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-66" x="0" y="0"></use>
 </g>
-</svg></span> is convex, and that the opposite is true if it is concave. In our case, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.487ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 4084.9 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-181-Title">
-<title id="MathJax-SVG-181-Title">f(p) = p^δ</title>
+</svg></span> is convex, and that the opposite is true if it is concave. In our case, <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="9.487ex" height="3.176ex" style="vertical-align: -0.838ex;" viewBox="0 -1006.6 4084.9 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-180-Title">
+<title id="MathJax-SVG-180-Title">f(p) = p^δ</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-66" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-28" x="550" y="0"></use>

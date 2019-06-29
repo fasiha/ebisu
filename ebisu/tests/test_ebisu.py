@@ -39,7 +39,7 @@ class TestEbisu(unittest.TestCase):
     model0 = (4.0, 4.0, 1.0)
     model1 = updateRecall(model0, False, 1.0)
     model2 = updateRecall(model1, True, 0.01)
-    ts = np.linspace(0.01, 4.0, 81.0)
+    ts = np.linspace(0.01, 4.0, 81)
     qs = (0.05, 0.25, 0.5, 0.75, 0.95)
     for t in ts:
       for q in qs:

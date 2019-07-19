@@ -90,6 +90,7 @@
 <li><a href="https://github.com/fasiha/ebisu">GitHub repo</a></li>
 <li><a href="https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb">IPython Notebook crash course</a></li>
 <li><a href="https://pypi.python.org/pypi/ebisu/">PyPI package</a></li>
+<li><a href="https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md">Changelog</a></li>
 <li><a href="https://fasiha.github.io/#contact">Contact</a></li>
 </ul>
 <h3 id="table-of-contents">Table of contents</h3>
@@ -3423,7 +3424,7 @@ class TestEbisu(unittest.TestCase):
     model0 = (4.0, 4.0, 1.0)
     model1 = updateRecall(model0, False, 1.0)
     model2 = updateRecall(model1, True, 0.01)
-    ts = np.linspace(0.01, 4.0, 81.0)
+    ts = np.linspace(0.01, 4.0, 81)
     qs = (0.05, 0.25, 0.5, 0.75, 0.95)
     for t in ts:
       for q in qs:

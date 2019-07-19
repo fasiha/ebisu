@@ -6,6 +6,7 @@
 - [GitHub repo](https://github.com/fasiha/ebisu)
 - [IPython Notebook crash course](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb)
 - [PyPI package](https://pypi.python.org/pypi/ebisu/)
+- [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md)
 - [Contact](https://fasiha.github.io/#contact)
 
 ### Table of contents

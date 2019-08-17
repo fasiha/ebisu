@@ -238,7 +238,7 @@ To summarize the update step: you started with a flashcard whose memory model wa
     - \\([μ (μ(1-μ)/σ^2 - 1), \, (1-μ) (μ(1-μ)/σ^2 - 1), \, t']\\) for any other time \\(t'\\), for
         - \\(δ = t_2/t\\),
         - \\(ε=t_2/t'\\),
-        - \\(m_n = \frac{B(α + δ / ε (n+ε) , β)}{B(α, β)}\\), where
+        - \\(m_n = \frac{B(α + δ / ε (n+ε) , β)}{B(α + δ, β)}\\), where
         - \\(μ = m_1\\), and
         - \\(σ^2 = m_2 - μ^2\\).
 - For the unsuccessful quiz after \\(t_2\\) time units, the new model is still \\([μ (μ(1-μ)/σ^2 - 1), \, (1-μ) (μ(1-μ)/σ^2 - 1), \, t']\\) for any time \\(t'\\), i.e., the same as the above sub-bullet except with

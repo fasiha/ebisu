@@ -1064,6 +1064,8 @@ plt.show()
 
 ## Acknowledgments
 
+A huge thank you to [bug reporters and math experts](https://github.com/fasiha/ebisu/issues?utf8=%E2%9C%93&q=is%3Aissue) and [contributors](https://github.com/fasiha/ebisu/graphs/contributors)!
+
 Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/31187) as well as [jth](https://stats.stackexchange.com/q/272834/31187) for their advice and patience with my statistical incompetence.
 
 Many thanks also to Drew Benedetti for reviewing this manuscript.

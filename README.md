@@ -114,7 +114,7 @@ Under either of these models of recall probability, we can ask Ebisu what the ex
 
 If the student correctly answers the quiz, Ebisu expects the new half-life to be greater than a week. If the student answers correctly after just a day, the half-life rises a little bit, since we expected the student to remember this fact that soon after reviewing it. If the student surprises us by *failing* the quiz just a day after they last reviewed it, the projected half-life drops. The more tentative “α=β=3” model aggressively adjusts the half-life, while the more assured “α=β=12” model is more conservative in its update. (Each fact has an α and β associated with it and I explain what they mean mathematically in the next section. Also, the code for these two charts is [below](#demo-codes).)
 
-Similarly, if the student fails the quiz after a whole month of not reviewing it, this isn’t a surprise—the half-life drops a bit from the initial half-life of a week. If she does surprise us, passing the quiz after a month of not studying it, then Ebisu boosts its expectated half-life—by a lot for the “α=β=3” model, less for the “α=β=12” one.
+Similarly, if the student fails the quiz after a whole month of not reviewing it, this isn’t a surprise—the half-life drops a bit from the initial half-life of a week. If she does surprise us, passing the quiz after a month of not studying it, then Ebisu boosts its expected half-life—by a lot for the “α=β=3” model, less for the “α=β=12” one.
 
 > Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how facts are related the way Duolingo can with its sentences. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.
 
@@ -303,7 +303,7 @@ def predictRecall(prior, tnow, exact=False):
 
   `tnow` is the *actual* time elapsed since this fact's most recent review.
 
-  Optional keyword paramter `exact` makes the return value a probability,
+  Optional keyword parameter `exact` makes the return value a probability,
   specifically, the expected recall probability `tnow` after the last review: a
   number between 0 and 1. If `exact` is false (the default), some calculations
   are skipped and the return value won't be a probability, but can still be
@@ -315,7 +315,7 @@ def predictRecall(prior, tnow, exact=False):
 
   > predictRecall(prior1, tnow1, exact=False) < predictRecall(prior2, tnow2, exact=False)
   
-  The default is set to false for computational reasons.
+  The default is set to false for computational efficiency.
 
   See README for derivation.
   """
@@ -340,9 +340,9 @@ def _cachedBetaln(a, b):
   return x
 ```
 
-Next is the implementation of `updateRecall` (🍌), which accepts
+Next is the implementation of `updateRecall` (🍌 below), which accepts
 - a `model` (as above, represents the Beta prior on recall probability at one specific time since the fact’s last review),
-- a quiz `result`: a truthy value meaning “passed quiz” and a false-ish value meaning “failed quiz”, and
+- a quiz `result`: a truthy value meaning “passed quiz” and a falsy value meaning “failed quiz”, and
 - `tnow`, the actual time since last quiz that this quiz was administered,
 
 and returns a *new* model, representing an updated Beta prior on recall probability over some new time horizon. The function implements the update equations above, with an extra rebalancing stage at the end: if the updated α and β are unbalanced (meaning one is more than twice the other), find the half-life of the proposed update and rerun the update for that half-life. At the half-life, the two parameters of the Beta distribution, α and β, will be equal. (To save a few computations, the half-life is calculated via a coarse search, so the rebalanced α and β will likely not be exactly equal.) To facilitate this final rebalancing step, two additional keyword arguments are needed: the time horizon for the update `tback`, and a `rebalance` flag to forbid more than one level of rebalancing, and all rebalancing is done in a `_rebalance` helper function.
@@ -360,7 +360,7 @@ def updateRecall(prior, result, tnow, rebalance=True, tback=None):
   representing a prior distribution on recall probability at some specific time
   after a fact's most recent review.
 
-  `result` is truthy for a successful quiz, false-ish otherwise.
+  `result` is truthy for a successful quiz, falsy otherwise.
 
   `tnow` is the time elapsed between this fact's last review and the review
   being used to update.
@@ -440,7 +440,7 @@ def _subexp(x, y):
 
 
 def _meanVarToBeta(mean, var):
-  """Fit a Beta distribution to a mean and variance. 🏈"""
+  """Fit a Beta distribution to a mean and variance."""
   # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
   tmp = mean * (1 - mean) / var - 1
   alpha = mean * tmp
@@ -538,7 +538,7 @@ I would expect all the functions above to be present in all implementations of E
 The functions in the following section are either for illustrative or debugging purposes.
 
 ### Miscellaneous functions
-I wrote a number of other functions that help provide insight or help debug the above functions in the main `ebisu` workspace but are not necessary for an actual implementation. These are in the `ebisu.alternate` submodule and not nearly as much time has been spent on polish or optimization as the above core functions. However they are very helpfun in unit tests.
+I wrote a number of other functions that help provide insight or help debug the above functions in the main `ebisu` workspace but are not necessary for an actual implementation. These are in the `ebisu.alternate` submodule and not nearly as much time has been spent on polish or optimization as the above core functions. However they are very helpful in unit tests.
 
 ```py
 # export ebisu/alternate.py #
@@ -748,7 +748,7 @@ For both sets of functions, a range of \\(δ = t_{now} / t\\) and both outcomes 
 
 Often the unit tests fails because the tolerances are a little tight, and the random number generator seed is variable, which leads to errors exceeding thresholds. I actually prefer to see these occasional test failures because it gives me confidence that the thresholds are where I want them to be (if I set the thresholds too loose, and I somehow accidentally greatly improved accuracy, I might never know). However, I realize it can be annoying for automated tests or continuous integration systems, so I am open to fixing a seed and fixing the error threshold for it.
 
-One note: the unit tests udpate a global database of `testpoints` being tested, which can be dumped to a JSON file for comparison against other implementations.
+One note: the unit tests update a global database of `testpoints` being tested, which can be dumped to a JSON file for comparison against other implementations.
 
 ```py
 # export ebisu/tests/test_ebisu.py
@@ -903,7 +903,7 @@ if __name__ == '__main__':
     out.write(json.dumps(testpoints))
 ```
 
-That `if __name__ == '__main__'` is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., `python3 -m nose` (which is wrapped in an npm script: if you look in `package.json` you’ll see that `npm test` will run the eqivalent of `node md2code.js && python3 -m "nose"`: this Markdown file is untangled into Python source files first, and then nose is invoked).
+That `if __name__ == '__main__'` is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., `python3 -m nose` (which is wrapped in an npm script: if you look in `package.json` you’ll see that `npm test` will run the equivalent of `node md2code.js && python3 -m "nose"`: this Markdown file is untangled into Python source files first, and then nose is invoked).
 
 ## Demo codes
 
@@ -971,7 +971,7 @@ plt.show()
 
 ### Why we work with random variables
 
-This second snippet addresses a potential approximation which isn’t too accurate but might be useful in some situations. The function `predictRecall` (🍏 above) in exaxct mode evaluates the log-gamma function four times and an `exp` once. One may ask, why not use the half-life returned by `modelToPercentileDecay` and Ebbinghaus’ forgetting curve, thereby approximating the current recall probability for a fact as `2 ** (-tnow / modelToPercentileDecay(model))`? While this is likely more computationally efficient (after computing the half-life up-front), it is also less precise:
+This second snippet addresses a potential approximation which isn’t too accurate but might be useful in some situations. The function `predictRecall` (🍏 above) in exact mode evaluates the log-gamma function four times and an `exp` once. One may ask, why not use the half-life returned by `modelToPercentileDecay` and Ebbinghaus’ forgetting curve, thereby approximating the current recall probability for a fact as `2 ** (-tnow / modelToPercentileDecay(model))`? While this is likely more computationally efficient (after computing the half-life up-front), it is also less precise:
 
 ```py
 ts = np.linspace(1, 41)
@@ -1062,7 +1062,7 @@ plt.show()
 
 **Implementation ideas** Lua, Erlang, Elixir, Red, F#, OCaml, Reason, PureScript, JS, TypeScript, Rust, … Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …
 
-## Acknowledgements
+## Acknowledgments
 
 Many thanks to [mxwsn and commenters](https://stats.stackexchange.com/q/273221/31187) as well as [jth](https://stats.stackexchange.com/q/272834/31187) for their advice and patience with my statistical incompetence.
 

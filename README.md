@@ -71,7 +71,7 @@ Finally, the [Source Code](#source-code) section presents the literate source of
 
 **Data model** For each fact in your quiz app, you store a model representing a prior distribution. This is a 3-tuple: `(alpha, beta, t)` and you can create a default model for all newly learned facts with `ebisu.defaultModel`. (As detailed in the [Choice of initial model parameters](#choice-of-initial-model-parameters) section, `alpha` and `beta` define a Beta distribution on this fact’s recall probability `t` time units after it’s most recent review.)
 
-**Predict a fact’s current recall probability** `ebisu.predictRecall(prior: tuple, tnow: float) -> float` where `prior` is this fact’s model, `tnow` is the current time elapsed since this fact’s most recent review, and the returned value is a probability between 0 and 1.
+**Predict a fact’s current recall probability** `ebisu.predictRecall(prior: tuple, tnow: float) -> float` where `prior` is this fact’s model and `tnow` is the current time elapsed since this fact’s most recent review. `tnow` may be any unit of time, as long as it is consistent with the half life's unit of time. The value returned by `predictRecall` is a probability between 0 and 1.
 
 **Update a fact’s model with quiz results** `ebisu.updateRecall(prior: tuple, result: bool, tnow: float) -> tuple` where `prior` and `tnow` are as above, and where `result` is true if the student successfully answered the quiz, false otherwise. The returned value is this fact’s new prior model—the old one can be discarded.
 

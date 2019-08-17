@@ -151,7 +151,7 @@
 <h2 id="quickstart">Quickstart</h2>
 <p><strong>Install</strong> <code>pip install ebisu</code> (both Python3 and Python2 ok 🤠).</p>
 <p><strong>Data model</strong> For each fact in your quiz app, you store a model representing a prior distribution. This is a 3-tuple: <code>(alpha, beta, t)</code> and you can create a default model for all newly learned facts with <code>ebisu.defaultModel</code>. (As detailed in the <a href="#choice-of-initial-model-parameters">Choice of initial model parameters</a> section, <code>alpha</code> and <code>beta</code> define a Beta distribution on this fact’s recall probability <code>t</code> time units after it’s most recent review.)</p>
-<p><strong>Predict a fact’s current recall probability</strong> <code>ebisu.predictRecall(prior: tuple, tnow: float) -&gt; float</code> where <code>prior</code> is this fact’s model, <code>tnow</code> is the current time elapsed since this fact’s most recent review, and the returned value is a probability between 0 and 1.</p>
+<p><strong>Predict a fact’s current recall probability</strong> <code>ebisu.predictRecall(prior: tuple, tnow: float) -&gt; float</code> where <code>prior</code> is this fact’s model and <code>tnow</code> is the current time elapsed since this fact’s most recent review. <code>tnow</code> may be any unit of time, as long as it is consistent with the half life's unit of time. The value returned by <code>predictRecall</code> is a probability between 0 and 1.</p>
 <p><strong>Update a fact’s model with quiz results</strong> <code>ebisu.updateRecall(prior: tuple, result: bool, tnow: float) -&gt; tuple</code> where <code>prior</code> and <code>tnow</code> are as above, and where <code>result</code> is true if the student successfully answered the quiz, false otherwise. The returned value is this fact’s new prior model—the old one can be discarded.</p>
 <p><strong>IPython Notebook crash course</strong> For a conversational introduction to the API in the context of a mocked quiz app, see this <a href="./EbisuHowto.ipynb">IPython Notebook crash course</a>.</p>
 <p><strong>Further information</strong> <a href="./doc/doc.md">Module docstrings</a> in a pinch but full details plus literate source below, under <a href="#source-code">Source code</a>.</p>
@@ -204,7 +204,7 @@
 <p>Under either of these models of recall probability, we can ask Ebisu what the expected half-life is after the student is quizzed on this fact a day, a week, or a month after their last review, and whether they passed or failed the quiz:</p>
 <p><img src="figures/halflife.png" alt="figures/halflife.png"></p>
 <p>If the student correctly answers the quiz, Ebisu expects the new half-life to be greater than a week. If the student answers correctly after just a day, the half-life rises a little bit, since we expected the student to remember this fact that soon after reviewing it. If the student surprises us by <em>failing</em> the quiz just a day after they last reviewed it, the projected half-life drops. The more tentative “α=β=3” model aggressively adjusts the half-life, while the more assured “α=β=12” model is more conservative in its update. (Each fact has an α and β associated with it and I explain what they mean mathematically in the next section. Also, the code for these two charts is <a href="#demo-codes">below</a>.)</p>
-<p>Similarly, if the student fails the quiz after a whole month of not reviewing it, this isn’t a surprise—the half-life drops a bit from the initial half-life of a week. If she does surprise us, passing the quiz after a month of not studying it, then Ebisu boosts its expectated half-life—by a lot for the “α=β=3” model, less for the “α=β=12” one.</p>
+<p>Similarly, if the student fails the quiz after a whole month of not reviewing it, this isn’t a surprise—the half-life drops a bit from the initial half-life of a week. If she does surprise us, passing the quiz after a month of not studying it, then Ebisu boosts its expected half-life—by a lot for the “α=β=3” model, less for the “α=β=12” one.</p>
 <blockquote>
 <p>Currently, Ebisu treats each fact as independent, very much like Ebbinghaus’ nonsense syllables: it does not understand how facts are related the way Duolingo can with its sentences. However, Ebisu can be used in combination with other techniques to accommodate extra information about relationships between facts.</p>
 </blockquote>
@@ -2904,7 +2904,7 @@ def predictRecall(prior, tnow, exact=False):
 
   `tnow` is the *actual* time elapsed since this fact's most recent review.
 
-  Optional keyword paramter `exact` makes the return value a probability,
+  Optional keyword parameter `exact` makes the return value a probability,
   specifically, the expected recall probability `tnow` after the last review: a
   number between 0 and 1. If `exact` is false (the default), some calculations
   are skipped and the return value won't be a probability, but can still be
@@ -2916,7 +2916,7 @@ def predictRecall(prior, tnow, exact=False):
 
   &gt; predictRecall(prior1, tnow1, exact=False) &lt; predictRecall(prior2, tnow2, exact=False)
   
-  The default is set to false for computational reasons.
+  The default is set to false for computational efficiency.
 
   See README for derivation.
   """
@@ -2939,10 +2939,10 @@ def _cachedBetaln(a, b):
   x = betaln(a, b)
   _BETALNCACHE[(a, b)] = x
   return x</code></pre>
-<p>Next is the implementation of <code>updateRecall</code> (🍌), which accepts</p>
+<p>Next is the implementation of <code>updateRecall</code> (🍌 below), which accepts</p>
 <ul>
 <li>a <code>model</code> (as above, represents the Beta prior on recall probability at one specific time since the fact’s last review),</li>
-<li>a quiz <code>result</code>: a truthy value meaning “passed quiz” and a false-ish value meaning “failed quiz”, and</li>
+<li>a quiz <code>result</code>: a truthy value meaning “passed quiz” and a falsy value meaning “failed quiz”, and</li>
 <li><code>tnow</code>, the actual time since last quiz that this quiz was administered,</li>
 </ul>
 <p>and returns a <em>new</em> model, representing an updated Beta prior on recall probability over some new time horizon. The function implements the update equations above, with an extra rebalancing stage at the end: if the updated α and β are unbalanced (meaning one is more than twice the other), find the half-life of the proposed update and rerun the update for that half-life. At the half-life, the two parameters of the Beta distribution, α and β, will be equal. (To save a few computations, the half-life is calculated via a coarse search, so the rebalanced α and β will likely not be exactly equal.) To facilitate this final rebalancing step, two additional keyword arguments are needed: the time horizon for the update <code>tback</code>, and a <code>rebalance</code> flag to forbid more than one level of rebalancing, and all rebalancing is done in a <code>_rebalance</code> helper function.</p>
@@ -2956,7 +2956,7 @@ def updateRecall(prior, result, tnow, rebalance=True, tback=None):
   representing a prior distribution on recall probability at some specific time
   after a fact's most recent review.
 
-  `result` is truthy for a successful quiz, false-ish otherwise.
+  `result` is truthy for a successful quiz, falsy otherwise.
 
   `tnow` is the time elapsed between this fact's last review and the review
   being used to update.
@@ -3036,7 +3036,7 @@ def _subexp(x, y):
 
 
 def _meanVarToBeta(mean, var):
-  """Fit a Beta distribution to a mean and variance. 🏈"""
+  """Fit a Beta distribution to a mean and variance."""
   # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&amp;oldid=774237683#Two_unknown_parameters
   tmp = mean * (1 - mean) / var - 1
   alpha = mean * tmp
@@ -3126,7 +3126,7 @@ def defaultModel(t, alpha=3.0, beta=None):
 </ul>
 <p>The functions in the following section are either for illustrative or debugging purposes.</p>
 <h3 id="miscellaneous-functions">Miscellaneous functions</h3>
-<p>I wrote a number of other functions that help provide insight or help debug the above functions in the main <code>ebisu</code> workspace but are not necessary for an actual implementation. These are in the <code>ebisu.alternate</code> submodule and not nearly as much time has been spent on polish or optimization as the above core functions. However they are very helpfun in unit tests.</p>
+<p>I wrote a number of other functions that help provide insight or help debug the above functions in the main <code>ebisu</code> workspace but are not necessary for an actual implementation. These are in the <code>ebisu.alternate</code> submodule and not nearly as much time has been spent on polish or optimization as the above core functions. However they are very helpful in unit tests.</p>
 <pre class="py"><code># export ebisu/alternate.py #
 from .ebisu import _meanVarToBeta, _logsubexp</code></pre>
 <p><code>predictRecallMode</code> and <code>predictRecallMedian</code> return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variable <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="2.221ex" height="3.176ex" style="vertical-align: -1.005ex; margin-left: -0.089ex;" viewBox="-38.5 -934.9 956.3 1367.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-170-Title">
@@ -3385,7 +3385,7 @@ from ebisu.alternate import *</code></pre>
 </g>
 </svg></span> and both outcomes of quiz results (true and false) are tested to ensure they all produce the same answers.</p>
 <p>Often the unit tests fails because the tolerances are a little tight, and the random number generator seed is variable, which leads to errors exceeding thresholds. I actually prefer to see these occasional test failures because it gives me confidence that the thresholds are where I want them to be (if I set the thresholds too loose, and I somehow accidentally greatly improved accuracy, I might never know). However, I realize it can be annoying for automated tests or continuous integration systems, so I am open to fixing a seed and fixing the error threshold for it.</p>
-<p>One note: the unit tests udpate a global database of <code>testpoints</code> being tested, which can be dumped to a JSON file for comparison against other implementations.</p>
+<p>One note: the unit tests update a global database of <code>testpoints</code> being tested, which can be dumped to a JSON file for comparison against other implementations.</p>
 <pre class="py"><code># export ebisu/tests/test_ebisu.py
 import unittest
 import numpy as np
@@ -3536,7 +3536,7 @@ if __name__ == '__main__':
   with open("test.json", "w") as out:
     import json
     out.write(json.dumps(testpoints))</code></pre>
-<p>That <code>if __name__ == '__main__'</code> is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., <code>python3 -m nose</code> (which is wrapped in an npm script: if you look in <code>package.json</code> you’ll see that <code>npm test</code> will run the eqivalent of <code>node md2code.js &amp;&amp; python3 -m "nose"</code>: this Markdown file is untangled into Python source files first, and then nose is invoked).</p>
+<p>That <code>if __name__ == '__main__'</code> is for running the test suite in Atom via Hydrogen/Jupyter. I actually use nose to run the tests, e.g., <code>python3 -m nose</code> (which is wrapped in an npm script: if you look in <code>package.json</code> you’ll see that <code>npm test</code> will run the equivalent of <code>node md2code.js &amp;&amp; python3 -m "nose"</code>: this Markdown file is untangled into Python source files first, and then nose is invoked).</p>
 <h2 id="demo-codes">Demo codes</h2>
 <p>The code snippets here are intended to demonstrate some Ebisu functionality.</p>
 <h3 id="visualizing-half-lives">Visualizing half-lives</h3>
@@ -3593,7 +3593,7 @@ plt.show()</code></pre>
 <p><img src="figures/models.png" alt="figures/models.png"></p>
 <p><img src="figures/halflife.png" alt="figures/halflife.png"></p>
 <h3 id="why-we-work-with-random-variables">Why we work with random variables</h3>
-<p>This second snippet addresses a potential approximation which isn’t too accurate but might be useful in some situations. The function <code>predictRecall</code> (🍏 above) in exaxct mode evaluates the log-gamma function four times and an <code>exp</code> once. One may ask, why not use the half-life returned by <code>modelToPercentileDecay</code> and Ebbinghaus’ forgetting curve, thereby approximating the current recall probability for a fact as <code>2 ** (-tnow / modelToPercentileDecay(model))</code>? While this is likely more computationally efficient (after computing the half-life up-front), it is also less precise:</p>
+<p>This second snippet addresses a potential approximation which isn’t too accurate but might be useful in some situations. The function <code>predictRecall</code> (🍏 above) in exact mode evaluates the log-gamma function four times and an <code>exp</code> once. One may ask, why not use the half-life returned by <code>modelToPercentileDecay</code> and Ebbinghaus’ forgetting curve, thereby approximating the current recall probability for a fact as <code>2 ** (-tnow / modelToPercentileDecay(model))</code>? While this is likely more computationally efficient (after computing the half-life up-front), it is also less precise:</p>
 <pre class="py"><code>ts = np.linspace(1, 41)
 
 modelA = updateRecall((3., 3., 7.), 1, 15.)
@@ -3705,7 +3705,7 @@ plt.show()</code></pre>
 <li><a href="https://pypi.python.org/pypi/pydoc-markdown">pydoc-markdown</a></li>
 </ul>
 <p><strong>Implementation ideas</strong> Lua, Erlang, Elixir, Red, F#, OCaml, Reason, PureScript, JS, TypeScript, Rust, … Postgres (w/ or w/o GraphQL), SQLite, LevelDB, Redis, Lovefield, …</p>
-<h2 id="acknowledgements">Acknowledgements</h2>
+<h2 id="acknowledgments">Acknowledgments</h2>
 <p>Many thanks to <a href="https://stats.stackexchange.com/q/273221/31187">mxwsn and commenters</a> as well as <a href="https://stats.stackexchange.com/q/272834/31187">jth</a> for their advice and patience with my statistical incompetence.</p>
 <p>Many thanks also to Drew Benedetti for reviewing this manuscript.</p>
 <p>John Otander’s <a href="http://markdowncss.github.io/modest/">Modest CSS</a> is used to style the Markdown output.</p>

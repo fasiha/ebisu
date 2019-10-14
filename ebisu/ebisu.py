@@ -11,7 +11,7 @@ def predictRecall(prior, tnow, exact=False):
 
   `tnow` is the *actual* time elapsed since this fact's most recent review.
 
-  Optional keyword paramter `exact` makes the return value a probability,
+  Optional keyword parameter `exact` makes the return value a probability,
   specifically, the expected recall probability `tnow` after the last review: a
   number between 0 and 1. If `exact` is false (the default), some calculations
   are skipped and the return value won't be a probability, but can still be
@@ -23,7 +23,7 @@ def predictRecall(prior, tnow, exact=False):
 
   > predictRecall(prior1, tnow1, exact=False) < predictRecall(prior2, tnow2, exact=False)
   
-  The default is set to false for computational reasons.
+  The default is set to false for computational efficiency.
 
   See README for derivation.
   """
@@ -49,11 +49,11 @@ def _cachedBetaln(a, b):
 def updateRecall(prior, result, tnow, rebalance=True, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
-  `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
+  `prior` is same as in `ebisu.predictRecall`'s arguments: an object
   representing a prior distribution on recall probability at some specific time
   after a fact's most recent review.
 
-  `result` is truthy for a successful quiz, false-ish otherwise.
+  `result` is truthy for a successful quiz, falsy otherwise.
 
   `tnow` is the time elapsed between this fact's last review and the review
   being used to update.
@@ -133,7 +133,7 @@ def _subexp(x, y):
 
 
 def _meanVarToBeta(mean, var):
-  """Fit a Beta distribution to a mean and variance. 🏈"""
+  """Fit a Beta distribution to a mean and variance."""
   # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
   tmp = mean * (1 - mean) / var - 1
   alpha = mean * tmp

@@ -119,11 +119,11 @@ class TestEbisu(unittest.TestCase):
       prior = (a, b, 1.0)
       hl = modelToPercentileDecay(prior)
       ts = np.linspace(.001, 1000, 101)
-      passhl = np.vectorize(lambda tnow: modelToPercentileDecay(
-          updateRecall(prior, True, tnow, 1.0)))(
+      passhl = np.vectorize(
+          lambda tnow: modelToPercentileDecay(updateRecall(prior, True, tnow, 1.0)))(
               ts)
-      failhl = np.vectorize(lambda tnow: modelToPercentileDecay(
-          updateRecall(prior, False, tnow, 1.0)))(
+      failhl = np.vectorize(
+          lambda tnow: modelToPercentileDecay(updateRecall(prior, False, tnow, 1.0)))(
               ts)
       self.assertTrue(monotonicIncreasing(passhl))
       self.assertTrue(monotonicIncreasing(failhl))

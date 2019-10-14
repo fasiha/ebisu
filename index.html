@@ -2954,7 +2954,7 @@ def _cachedBetaln(a, b):
 def updateRecall(prior, result, tnow, rebalance=True, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
-  `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
+  `prior` is same as in `ebisu.predictRecall`'s arguments: an object
   representing a prior distribution on recall probability at some specific time
   after a fact's most recent review.
 
@@ -3179,7 +3179,7 @@ from .ebisu import _meanVarToBeta, _logsubexp</code></pre>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
 </g>
-</svg></span>-power. The unit tests for <code>predictRecall</code> and <code>predictRecallVar</code> in the next section use this Monte Carlo to test both derivations and implementations. While fool-proof, Monte Carlo simulation is obviously far too computationally-burdensome for regular use.</p>
+</svg></span>-power. The unit tests for <code>predictRecall</code> in the next section use this Monte Carlo to test both derivations and implementations. While fool-proof, Monte Carlo simulation is obviously far too computationally-burdensome for regular use.</p>
 <pre class="py"><code># export ebisu/alternate.py #
 import numpy as np
 
@@ -3350,7 +3350,7 @@ from ebisu import *
 from ebisu.alternate import *</code></pre>
 <p>In these unit tests, I compare</p>
 <ul>
-<li><code>predictRecall</code> and <code>predictRecallVar</code> against <code>predictRecallMonteCarlo</code>, and</li>
+<li><code>predictRecall</code> against <code>predictRecallMonteCarlo</code>, and</li>
 <li><code>updateRecall</code> against <code>updateRecallMonteCarlo</code>.</li>
 </ul>
 <p>I also want to make sure that <code>predictRecall</code> and <code>updateRecall</code> both produce sane values when extremely under- and over-reviewing, i.e., immediately after review as well as far into the future. And we should also exercise <code>modelToPercentileDecay</code>.</p>
@@ -3506,11 +3506,11 @@ class TestEbisu(unittest.TestCase):
       prior = (a, b, 1.0)
       hl = modelToPercentileDecay(prior)
       ts = np.linspace(.001, 1000, 101)
-      passhl = np.vectorize(lambda tnow: modelToPercentileDecay(
-          updateRecall(prior, True, tnow, 1.0)))(
+      passhl = np.vectorize(
+          lambda tnow: modelToPercentileDecay(updateRecall(prior, True, tnow, 1.0)))(
               ts)
-      failhl = np.vectorize(lambda tnow: modelToPercentileDecay(
-          updateRecall(prior, False, tnow, 1.0)))(
+      failhl = np.vectorize(
+          lambda tnow: modelToPercentileDecay(updateRecall(prior, False, tnow, 1.0)))(
               ts)
       self.assertTrue(monotonicIncreasing(passhl))
       self.assertTrue(monotonicIncreasing(failhl))

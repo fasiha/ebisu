@@ -216,7 +216,7 @@ Summarizing the case of a *successful* quiz, the memory model for this flashcard
 > \\[μ = \\frac{B(α+δ + t'/t, β)}{B(α+δ, β)} \\]
 > and
 > \\[σ^2 = \\frac{B(α+δ + 2 t'/t, β)}{B(α+δ, β)} - μ^2\\]
-> where \\(B(\\cdot, \\cdot)\\) is the Beta function. Converting this mean and variance to the best-approximating Beta random variable, and your updated memory model becomes \\([μ (μ(1-μ)/σ^2 - 1), \, (1-μ) (μ(1-μ)/σ^2 - 1), \, t']\\).
+> where \\(B(\\cdot, \\cdot)\\) is the Beta function. Converting this mean and variance to the best-approximating Beta random variable, and your updated memory model becomes \\([μ (μ(1-μ)/σ^2 - 1), \\, (1-μ) (μ(1-μ)/σ^2 - 1), \\, t']\\).
 
 Next, consider the case for unsuccessful quizzes, \\(x=0\\). The posterior in this case is not conjugate, but we can analytically derive it:
 \\[
@@ -230,24 +230,24 @@ Now we could moment-match this distribution, but it turns out the entire posteri
 \\]
 This posterior may look fearsome, but has analytically tractable moments!:
 \\[m_n = \frac{B(α + n ⋅ δ / ε , β) - B(α + δ / ε (ε+n), β) }{B(α, β) - B(α + δ, β)},\\]
-Letting \\(μ = m_1\\) and \\(σ^2 = m_2 - μ^2\\), we can express our updated memory model as \\([μ (μ(1-μ)/σ^2 - 1), \, (1-μ) (μ(1-μ)/σ^2 - 1), \, t']\\).
+Letting \\(μ = m_1\\) and \\(σ^2 = m_2 - μ^2\\), we can express our updated memory model as \\([μ (μ(1-μ)/σ^2 - 1), \\, (1-μ) (μ(1-μ)/σ^2 - 1), \\, t']\\).
 
 To summarize the update step: you started with a flashcard whose memory model was \\([α, β, t]\\), meaning the prior on recall probability \\(t\\) time units after the previous test (or initially learning) is \\(Beta(α, β)\\).
 - For a successful quiz after \\(t_2\\) time units, the updated model is
     - \\([α+δ, β, t]\\), or, if you don’t want to have a memory model for \\(t\\) time units,
-    - \\([μ (μ(1-μ)/σ^2 - 1), \, (1-μ) (μ(1-μ)/σ^2 - 1), \, t']\\) for any other time \\(t'\\), for
+    - \\([μ (μ(1-μ)/σ^2 - 1), \\, (1-μ) (μ(1-μ)/σ^2 - 1), \\, t']\\) for any other time \\(t'\\), for
         - \\(δ = t_2/t\\),
         - \\(ε=t_2/t'\\),
         - \\(m_n = \frac{B(α + δ / ε (n+ε) , β)}{B(α + δ, β)}\\), where
         - \\(μ = m_1\\), and
         - \\(σ^2 = m_2 - μ^2\\).
-- For the unsuccessful quiz after \\(t_2\\) time units, the new model is still \\([μ (μ(1-μ)/σ^2 - 1), \, (1-μ) (μ(1-μ)/σ^2 - 1), \, t']\\) for any time \\(t'\\), i.e., the same as the above sub-bullet except with
+- For the unsuccessful quiz after \\(t_2\\) time units, the new model is still \\([μ (μ(1-μ)/σ^2 - 1), \\, (1-μ) (μ(1-μ)/σ^2 - 1), \\, t']\\) for any time \\(t'\\), i.e., the same as the above sub-bullet except with
     - \\(m_n = \frac{B(α + n ⋅ δ / ε , β) - B(α + δ / ε (ε+n), β) }{B(α, β) - B(α + δ, β)}\\) and
     - \\(μ\\), \\(σ^2\\), \\(δ\\), and \\(ε\\) as above.
 
 Being expressed like this I feel reveals the many pleasing symmetries present here.
 
-> **Note 1** It's actually quite straightforward to derive both the expression for \\(P(p_{t'} | x_{t_2}=0)\\) above as well as its moments by repeatedly applying the expression for the moments of the GB1 distribution. I must have used the fact that \\(\int_0^1 p^{a⋅d-1}(1-p^d)^{b-1} p^n \, dp = B(a+n/d, b)\\) more than ten times.
+> **Note 1** It's actually quite straightforward to derive both the expression for \\(P(p_{t'} | x_{t_2}=0)\\) above as well as its moments by repeatedly applying the expression for the moments of the GB1 distribution. I must have used the fact that \\(\int_0^1 p^{a⋅d-1}(1-p^d)^{b-1} p^n \\, dp = B(a+n/d, b)\\) more than ten times.
 >
 > **Note 2** The Beta function \\(B(a,b)=Γ(a) Γ(b) / \Gamma(a+b)\\), being a function of a rapidly-growing function like the Gamma function (it is a generalization of factorial), may lose precision in the above expressions for unusual α and β and δ and ε. Addition and subtraction are risky when dealing with floating point numbers that have lost much of their precision. Ebisu takes care to use [log-Beta](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.betaln.html) and [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html) to minimize loss of precision.
 
@@ -356,7 +356,7 @@ and returns a *new* model, representing an updated Beta prior on recall probabil
 def updateRecall(prior, result, tnow, rebalance=True, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
-  `prior` is same as for `ebisu.predictRecall` and `predictRecallVar`: an object
+  `prior` is same as in `ebisu.predictRecall`'s arguments: an object
   representing a prior distribution on recall probability at some specific time
   after a fact's most recent review.
 
@@ -549,7 +549,7 @@ from .ebisu import _meanVarToBeta, _logsubexp
 
 Both median and mode, like the mean, have analytical expressions. The mode is a little dangerous: the distribution can blow up to infinity at 0 or 1 when \\(δ\\) is either much smaller or much larger than 1, in which case the analytical expression for mode may yield nonsense—I have a number of not-very-rigorous checks to attempt to detect this. The median is computed with a inverse incomplete Beta function ([`betaincinv`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.betaincinv.html)), and could replace the mean as `predictRecall`’s return value in a future version of Ebisu.
 
-`predictRecallMonteCarlo` is the simplest function. It evaluates the mean, variance, mode (via histogram), and median of \\(p_t^δ\\) by drawing samples from the Beta prior on \\(p_t\\) and raising them to the \\(δ\\)-power. The unit tests for `predictRecall` and `predictRecallVar` in the next section use this Monte Carlo to test both derivations and implementations. While fool-proof, Monte Carlo simulation is obviously far too computationally-burdensome for regular use.
+`predictRecallMonteCarlo` is the simplest function. It evaluates the mean, variance, mode (via histogram), and median of \\(p_t^δ\\) by drawing samples from the Beta prior on \\(p_t\\) and raising them to the \\(δ\\)-power. The unit tests for `predictRecall` in the next section use this Monte Carlo to test both derivations and implementations. While fool-proof, Monte Carlo simulation is obviously far too computationally-burdensome for regular use.
 
 ```py
 # export ebisu/alternate.py #
@@ -735,7 +735,7 @@ from ebisu.alternate import *
 ```
 
 In these unit tests, I compare
-- `predictRecall` and `predictRecallVar` against `predictRecallMonteCarlo`, and
+- `predictRecall` against `predictRecallMonteCarlo`, and
 - `updateRecall` against `updateRecallMonteCarlo`.
 
 I also want to make sure that `predictRecall` and `updateRecall` both produce sane values when extremely under- and over-reviewing, i.e., immediately after review as well as far into the future. And we should also exercise `modelToPercentileDecay`.
@@ -869,11 +869,11 @@ class TestEbisu(unittest.TestCase):
       prior = (a, b, 1.0)
       hl = modelToPercentileDecay(prior)
       ts = np.linspace(.001, 1000, 101)
-      passhl = np.vectorize(lambda tnow: modelToPercentileDecay(
-          updateRecall(prior, True, tnow, 1.0)))(
+      passhl = np.vectorize(
+          lambda tnow: modelToPercentileDecay(updateRecall(prior, True, tnow, 1.0)))(
               ts)
-      failhl = np.vectorize(lambda tnow: modelToPercentileDecay(
-          updateRecall(prior, False, tnow, 1.0)))(
+      failhl = np.vectorize(
+          lambda tnow: modelToPercentileDecay(updateRecall(prior, False, tnow, 1.0)))(
               ts)
       self.assertTrue(monotonicIncreasing(passhl))
       self.assertTrue(monotonicIncreasing(failhl))

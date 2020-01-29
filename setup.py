@@ -13,8 +13,6 @@ setup(name='ebisu',
       license='Unlicense',
       packages=['ebisu'],
       test_suite='nose.collector',
-      tests_require=['nose'],
-      install_requires=[
-          'scipy', 'numpy'
-      ],
+      tests_require=['nose', 'scipy', 'numpy'],
+      install_requires=[],
       zip_safe=True)

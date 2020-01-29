@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+
 def predictRecall(prior, tnow, exact=False):
   """Expected recall probability now, given a prior distribution on it. 🍏
 
@@ -27,25 +28,30 @@ def predictRecall(prior, tnow, exact=False):
 
   See README for derivation.
   """
-  from scipy.special import betaln
-  from numpy import exp
+  from math import exp
   a, b, t = prior
   dt = tnow / t
-  ret = betaln(a + dt, b) - _cachedBetaln(a, b)
+  ret = _betalnRatio(a + dt, a, b)
   return exp(ret) if exact else ret
 
 
-_BETALNCACHE = {}
+from functools import lru_cache
+from .gamma import gammaln
 
 
-def _cachedBetaln(a, b):
-  "Caches `betaln(a, b)` calls in the `_BETALNCACHE` dictionary."
-  if (a, b) in _BETALNCACHE:
-    return _BETALNCACHE[(a, b)]
-  from scipy.special import betaln
-  x = betaln(a, b)
-  _BETALNCACHE[(a, b)] = x
-  return x
+@lru_cache(maxsize=None)
+def _gammalnCached(x):
+  return gammaln(x)
+
+
+def _betalnRatio(a1, a, b):
+  return gammaln(a1) - gammaln(a1 + b) + _gammalnCached(a + b) - _gammalnCached(a)
+
+
+def betaln(a, b):
+  return _gammalnCached(a) + _gammalnCached(b) - _gammalnCached(a + b)
+
+
 def updateRecall(prior, result, tnow, rebalance=True, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
@@ -63,8 +69,7 @@ def updateRecall(prior, result, tnow, rebalance=True, tback=None):
   Returns a new object (like `prior`) describing the posterior distribution of
   recall probability at `tback` (which is an optional input, defaults to `tnow`).
   """
-  from scipy.special import betaln
-  from numpy import exp
+  from math import exp
 
   (alpha, beta, t) = prior
   if tback is None:
@@ -78,9 +83,8 @@ def updateRecall(prior, result, tnow, rebalance=True, tback=None):
       proposed = alpha + dt, beta, t
       return _rebalace(prior, result, tnow, proposed) if rebalance else proposed
 
-    logDenominator = betaln(alpha + dt, beta)
-    logmean = betaln(alpha + dt / et * (1 + et), beta) - logDenominator
-    logm2 = betaln(alpha + dt / et * (2 + et), beta) - logDenominator
+    logmean = _betalnRatio(alpha + dt / et * (1 + et), alpha + dt, beta)
+    logm2 = _betalnRatio(alpha + dt / et * (2 + et), alpha + dt, beta)
     mean = exp(logmean)
     var = _subexp(logm2, 2 * logmean)
 
@@ -117,8 +121,8 @@ def _logsubexp(a, b):
   Subtract log-domain numbers and return in the log-domain.
   Wraps `scipy.special.logsumexp`.
   """
-  from scipy.special import logsumexp
-  return logsumexp([a, b], b=[1, -1])
+  from .logsumexp import logsumexp
+  return logsumexp([a, b], b=[1, -1])[0]
 
 
 def _subexp(x, y):
@@ -127,8 +131,8 @@ def _subexp(x, y):
   Subtract log-domain numbers and return in the *linear* domain.
   Similar to `scipy.special.logsumexp` except without the final `log`.
   """
-  from numpy import exp, maximum
-  maxval = maximum(x, y)
+  from math import exp
+  maxval = max(x, y)
   return exp(maxval) * (exp(x - maxval) - exp(y - maxval))
 
 
@@ -139,6 +143,8 @@ def _meanVarToBeta(mean, var):
   alpha = mean * tmp
   beta = (1 - mean) * tmp
   return alpha, beta
+
+
 def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   """When will memory decay to a given percentile? 🏀
   
@@ -156,15 +162,14 @@ def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   # optimization to get the right value.
 
   assert (percentile > 0 and percentile < 1)
-  from scipy.special import betaln
-  from scipy.optimize import root_scalar
-  import numpy as np
+  from .mingolden import mingolden
+  from math import log, exp
   alpha, beta, t0 = model
   logBab = betaln(alpha, beta)
-  logPercentile = np.log(percentile)
+  logPercentile = log(percentile)
 
   def f(lndelta):
-    logMean = betaln(alpha + np.exp(lndelta), beta) - logBab
+    logMean = betaln(alpha + exp(lndelta), beta) - logBab
     return logMean - logPercentile
 
   # Scan for a bracket.
@@ -189,10 +194,12 @@ def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   assert flow > 0 and fhigh < 0
 
   if coarse:
-    return (np.exp(blow) + np.exp(bhigh)) / 2 * t0
+    return (exp(blow) + exp(bhigh)) / 2 * t0
 
-  sol = root_scalar(f, bracket=[blow, bhigh])
-  t1 = np.exp(sol.root) * t0
+  sol = mingolden(lambda x: abs(f(x)), blow, bhigh)
+  if not sol['converged']:
+    raise ValueError('minimization failed to converge')
+  t1 = exp(sol['argmin']) * t0
   return t1
 
 

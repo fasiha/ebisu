@@ -1,7 +1,17 @@
 # -*- coding: utf-8 -*-
 
-from .ebisu import _meanVarToBeta, _logsubexp
+from .ebisu import _meanVarToBeta
 import numpy as np
+
+
+def _logsubexp(a, b):
+  """Evaluate `log(exp(a) - exp(b))` preserving accuracy.
+
+  Subtract log-domain numbers and return in the log-domain.
+  Wraps `scipy.special.logsumexp`.
+  """
+  from scipy.special import logsumexp
+  return logsumexp([a, b], b=[1, -1])
 
 
 def predictRecallMode(prior, tnow):
@@ -75,7 +85,9 @@ def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
       median=np.median(tnowPrior),
       mode=bincenters[freqs.argmax()],
       var=np.var(tnowPrior))
-def updateRecallMonteCarlo(prior, result, tnow, tback=None, N=10 * 1000 * 1000):
+
+
+def updateRecallMonteCarlo(prior, k, n, tnow, tback=None, N=10 * 1000 * 1000):
   """Update recall probability with quiz result via Monte Carlo simulation.
 
   Same arguments as `ebisu.updateRecall`, see that docstring for details.
@@ -86,6 +98,7 @@ def updateRecallMonteCarlo(prior, result, tnow, tback=None, N=10 * 1000 * 1000):
   # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
   # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
   import scipy.stats as stats
+  from scipy.special import binom
   if tback is None:
     tback = tnow
 
@@ -95,7 +108,7 @@ def updateRecallMonteCarlo(prior, result, tnow, tback=None, N=10 * 1000 * 1000):
   tnowPrior = tPrior**(tnow / t)
 
   # This is the Bernoulli likelihood [bernoulliLikelihood]
-  weights = (tnowPrior)**result * ((1 - tnowPrior)**(1 - result))
+  weights = binom(n, k) * (tnowPrior)**k * ((1 - tnowPrior)**(n - k))
 
   # Now propagate this posterior to the tback
   tbackPrior = tPrior**(tback / t)

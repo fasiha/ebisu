@@ -37,8 +37,8 @@ class TestEbisu(unittest.TestCase):
 
   def test_predictRecallMedian(self):
     model0 = (4.0, 4.0, 1.0)
-    model1 = updateRecall(model0, False, 1.0)
-    model2 = updateRecall(model1, True, 0.01)
+    model1 = updateRecall(model0, 0, 1, 1.0)
+    model2 = updateRecall(model1, 1, 1, 0.01)
     ts = np.linspace(0.01, 4.0, 81)
     qs = (0.05, 0.25, 0.5, 0.75, 0.95)
     for t in ts:
@@ -67,29 +67,29 @@ class TestEbisu(unittest.TestCase):
   def test_posterior(self):
     "Test updateRecall via updateRecallMonteCarlo"
 
-    def inner(a, b, t0, dts):
+    def inner(a, b, t0, dts, n=1):
       global testpoints
       for t in map(lambda dt: dt * t0, dts):
-        for x in [False, True]:
-          msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
-          an = updateRecall((a, b, t0), x, t)
-          mc = updateRecallMonteCarlo((a, b, t0), x, t, an[2], N=100 * 1000)
+        for k in range(n + 1):
+          msg = 'a={},b={},t0={},k={},n={},t={}'.format(a, b, t0, k, n, t)
+          an = updateRecall((a, b, t0), k, n, t)
+          mc = updateRecallMonteCarlo((a, b, t0), k, n, t, an[2], N=1_000_000 * (1 + k))
           self.assertLess(kl(an, mc), 5e-3, msg=msg + ' an={}, mc={}'.format(an, mc))
 
-          testpoints += [['update', [a, b, t0], [x, t], dict(post=an)]]
+          testpoints += [['update', [a, b, t0], [k, n, t], dict(post=an)]]
 
-    inner(3.3, 4.4, 1., [0.1, 1., 9.5])
-    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+    inner(3.3, 4.4, 1., [0.1, 1., 9.5], n=5)
+    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.], n=5)
 
   def test_update_then_predict(self):
     "Ensure #1 is fixed: prediction after update is monotonic"
     future = np.linspace(.01, 1000, 101)
 
-    def inner(a, b, t0, dts):
+    def inner(a, b, t0, dts, n=1):
       for t in map(lambda dt: dt * t0, dts):
-        for x in [False, True]:
-          msg = 'a={},b={},t0={},x={},t={}'.format(a, b, t0, x, t)
-          newModel = updateRecall((a, b, t0), x, t)
+        for k in range(n + 1):
+          msg = 'a={},b={},t0={},k={},n={},t={}'.format(a, b, t0, k, n, t)
+          newModel = updateRecall((a, b, t0), k, n, t)
           predicted = np.vectorize(lambda tnow: predictRecall(newModel, tnow))(future)
           self.assertTrue(
               np.all(np.diff(predicted) < 0), msg=msg + ' predicted={}'.format(predicted))
@@ -115,15 +115,15 @@ class TestEbisu(unittest.TestCase):
     Passing quizzes right away shouldn't modify model when updating.
     """
 
-    def inner(a, b):
+    def inner(a, b, n=1):
       prior = (a, b, 1.0)
       hl = modelToPercentileDecay(prior)
       ts = np.linspace(.001, 1000, 101)
       passhl = np.vectorize(
-          lambda tnow: modelToPercentileDecay(updateRecall(prior, True, tnow, 1.0)))(
+          lambda tnow: modelToPercentileDecay(updateRecall(prior, 1, n, tnow, 1.0)))(
               ts)
       failhl = np.vectorize(
-          lambda tnow: modelToPercentileDecay(updateRecall(prior, False, tnow, 1.0)))(
+          lambda tnow: modelToPercentileDecay(updateRecall(prior, 0, n, tnow, 1.0)))(
               ts)
       self.assertTrue(monotonicIncreasing(passhl))
       self.assertTrue(monotonicIncreasing(failhl))

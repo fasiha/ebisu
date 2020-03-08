@@ -38,25 +38,40 @@ def predictRecall(prior, tnow, exact=False):
 
 _BETALNCACHE = {}
 
+from scipy.special import betaln, logsumexp
+import numpy as np
+
 
 def _cachedBetaln(a, b):
   "Caches `betaln(a, b)` calls in the `_BETALNCACHE` dictionary."
   if (a, b) in _BETALNCACHE:
     return _BETALNCACHE[(a, b)]
-  from scipy.special import betaln
   x = betaln(a, b)
   _BETALNCACHE[(a, b)] = x
   return x
 
 
-def updateRecall(prior, result, tnow, rebalance=True, tback=None):
+def binomln(n, k):
+  "Log of scipy.special.binom calculated entirely in the log domain"
+  return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
+
+
+def updateRecall(prior, k, n, tnow, rebalance=True, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as in `ebisu.predictRecall`'s arguments: an object
   representing a prior distribution on recall probability at some specific time
   after a fact's most recent review.
 
-  `result` is truthy for a successful quiz, falsy otherwise.
+  `k` is the number of times the user *successfully* exercised this memory
+  during this review session, out of `n` attempts. Therefore, `0 <= k <= n` and
+  `1 <= n`.
+
+  If the user was shown this flashcard only once during this review session,
+  then `n=1`. If the quiz was a success, then `k=1`, else `k=0`.
+  
+  If the user was shown this flashcard *multiple* times during the review
+  session (e.g., Duolingo-style), then `n` can be greater than 1.
 
   `tnow` is the time elapsed between this fact's last review and the review
   being used to update.
@@ -65,9 +80,11 @@ def updateRecall(prior, result, tnow, rebalance=True, tback=None):
 
   Returns a new object (like `prior`) describing the posterior distribution of
   recall probability at `tback` (which is an optional input, defaults to `tnow`).
+
+  N.B. This function is tested for numerical stability for small `n < 5`. It may
+  be unstable for much larger `n`.
   """
-  from scipy.special import betaln
-  from numpy import exp
+  assert (0 <= k and k <= n and 1 <= n)
 
   (alpha, beta, t) = prior
   if tback is None:
@@ -75,64 +92,32 @@ def updateRecall(prior, result, tnow, rebalance=True, tback=None):
   dt = tnow / t
   et = tnow / tback
 
-  if result:
-
-    if tback == t:
-      proposed = alpha + dt, beta, t
-      return _rebalace(prior, result, tnow, proposed) if rebalance else proposed
-
-    logDenominator = betaln(alpha + dt, beta)
-    logmean = betaln(alpha + dt / et * (1 + et), beta) - logDenominator
-    logm2 = betaln(alpha + dt / et * (2 + et), beta) - logDenominator
-    mean = exp(logmean)
-    var = _subexp(logm2, 2 * logmean)
-
-  else:
-
-    logDenominator = _logsubexp(betaln(alpha, beta), betaln(alpha + dt, beta))
-    mean = _subexp(
-        betaln(alpha + dt / et, beta) - logDenominator,
-        betaln(alpha + dt / et * (et + 1), beta) - logDenominator)
-    m2 = _subexp(
-        betaln(alpha + 2 * dt / et, beta) - logDenominator,
-        betaln(alpha + dt / et * (et + 2), beta) - logDenominator)
-    assert m2 > 0
-    var = m2 - mean**2
-
+  binomlns = [binomln(n - k, i) for i in range(n - k + 1)]
+  logDenominator, logMeanNum, logM2Num = [
+      logsumexp([
+          binomlns[i] + betaln(beta, alpha + dt * (k + i) + m * dt / et) for i in range(n - k + 1)
+      ],
+                b=[(-1)**i for i in range(n - k + 1)]) for m in range(3)
+  ]
+  mean = np.exp(logMeanNum - logDenominator)
+  m2 = np.exp(logM2Num - logDenominator)
   assert mean > 0
+  assert m2 > 0
+
+  meanSq = np.exp(2 * (logMeanNum - logDenominator))
+  var = m2 - meanSq
   assert var > 0
   newAlpha, newBeta = _meanVarToBeta(mean, var)
   proposed = newAlpha, newBeta, tback
-  return _rebalace(prior, result, tnow, proposed) if rebalance else proposed
+  return _rebalace(prior, k, n, tnow, proposed) if rebalance else proposed
 
 
-def _rebalace(prior, result, tnow, proposed):
+def _rebalace(prior, k, n, tnow, proposed):
   newAlpha, newBeta, _ = proposed
   if (newAlpha > 2 * newBeta or newBeta > 2 * newAlpha):
     roughHalflife = modelToPercentileDecay(proposed, coarse=True)
-    return updateRecall(prior, result, tnow, rebalance=False, tback=roughHalflife)
+    return updateRecall(prior, k, n, tnow, rebalance=False, tback=roughHalflife)
   return proposed
-
-
-def _logsubexp(a, b):
-  """Evaluate `log(exp(a) - exp(b))` preserving accuracy.
-  
-  Subtract log-domain numbers and return in the log-domain.
-  Wraps `scipy.special.logsumexp`.
-  """
-  from scipy.special import logsumexp
-  return logsumexp([a, b], b=[1, -1])
-
-
-def _subexp(x, y):
-  """Evaluates `exp(x) - exp(y)` a bit more accurately than that. ⚾️
-
-  Subtract log-domain numbers and return in the *linear* domain.
-  Similar to `scipy.special.logsumexp` except without the final `log`.
-  """
-  from numpy import exp, maximum
-  maxval = maximum(x, y)
-  return exp(maxval) * (exp(x - maxval) - exp(y - maxval))
 
 
 def _meanVarToBeta(mean, var):
@@ -163,7 +148,6 @@ def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   assert (percentile > 0 and percentile < 1)
   from scipy.special import betaln
   from scipy.optimize import root_scalar
-  import numpy as np
   alpha, beta, t0 = model
   logBab = betaln(alpha, beta)
   logPercentile = np.log(percentile)

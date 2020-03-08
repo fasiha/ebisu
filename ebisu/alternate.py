@@ -85,8 +85,6 @@ def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
       median=np.median(tnowPrior),
       mode=bincenters[freqs.argmax()],
       var=np.var(tnowPrior))
-
-
 def updateRecallMonteCarlo(prior, k, n, tnow, tback=None, N=10 * 1000 * 1000):
   """Update recall probability with quiz result via Monte Carlo simulation.
 

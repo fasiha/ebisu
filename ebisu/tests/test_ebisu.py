@@ -94,8 +94,8 @@ class TestEbisu(unittest.TestCase):
           self.assertTrue(
               np.all(np.diff(predicted) < 0), msg=msg + ' predicted={}'.format(predicted))
 
-    inner(3.3, 4.4, 1., [0.1, 1., 9.5])
-    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+    inner(3.3, 4.4, 1., [0.1, 1., 9.5], n=5)
+    inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.], n=5)
 
   def test_halflife(self):
     "Exercise modelToPercentileDecay"
@@ -120,7 +120,7 @@ class TestEbisu(unittest.TestCase):
       hl = modelToPercentileDecay(prior)
       ts = np.linspace(.001, 1000, 101)
       passhl = np.vectorize(
-          lambda tnow: modelToPercentileDecay(updateRecall(prior, 1, n, tnow, 1.0)))(
+          lambda tnow: modelToPercentileDecay(updateRecall(prior, n, n, tnow, 1.0)))(
               ts)
       failhl = np.vectorize(
           lambda tnow: modelToPercentileDecay(updateRecall(prior, 0, n, tnow, 1.0)))(
@@ -134,7 +134,7 @@ class TestEbisu(unittest.TestCase):
 
     for a in [2., 20, 200]:
       for b in [2., 20, 200]:
-        inner(a, b)
+        inner(a, b, n=1)
 
 
 def monotonicIncreasing(v):

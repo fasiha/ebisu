@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 
+from scipy.special import betaln, logsumexp
+import numpy as np
+
 
 def predictRecall(prior, tnow, exact=False):
   """Expected recall probability now, given a prior distribution on it. 🍏
@@ -28,7 +31,6 @@ def predictRecall(prior, tnow, exact=False):
 
   See README for derivation.
   """
-  from scipy.special import betaln
   from numpy import exp
   a, b, t = prior
   dt = tnow / t
@@ -38,9 +40,6 @@ def predictRecall(prior, tnow, exact=False):
 
 _BETALNCACHE = {}
 
-from scipy.special import betaln, logsumexp
-import numpy as np
-
 
 def _cachedBetaln(a, b):
   "Caches `betaln(a, b)` calls in the `_BETALNCACHE` dictionary."
@@ -49,29 +48,28 @@ def _cachedBetaln(a, b):
   x = betaln(a, b)
   _BETALNCACHE[(a, b)] = x
   return x
-
-
 def binomln(n, k):
   "Log of scipy.special.binom calculated entirely in the log domain"
   return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
 
 
-def updateRecall(prior, k, n, tnow, rebalance=True, tback=None):
+def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as in `ebisu.predictRecall`'s arguments: an object
   representing a prior distribution on recall probability at some specific time
   after a fact's most recent review.
 
-  `k` is the number of times the user *successfully* exercised this memory
-  during this review session, out of `n` attempts. Therefore, `0 <= k <= n` and
-  `1 <= n`.
+  `successes` is the number of times the user *successfully* exercised this
+  memory during this review session, out of `n` attempts. Therefore, `0 <=
+  successes <= total` and `1 <= total`.
 
   If the user was shown this flashcard only once during this review session,
-  then `n=1`. If the quiz was a success, then `k=1`, else `k=0`.
+  then `total=1`. If the quiz was a success, then `successes=1`, else
+  `successes=0`.
   
   If the user was shown this flashcard *multiple* times during the review
-  session (e.g., Duolingo-style), then `n` can be greater than 1.
+  session (e.g., Duolingo-style), then `total` can be greater than 1.
 
   `tnow` is the time elapsed between this fact's last review and the review
   being used to update.
@@ -79,37 +77,53 @@ def updateRecall(prior, k, n, tnow, rebalance=True, tback=None):
   (The keyword arguments `rebalance` and `tback` are intended for internal use.)
 
   Returns a new object (like `prior`) describing the posterior distribution of
-  recall probability at `tback` (which is an optional input, defaults to `tnow`).
+  recall probability at `tback` (which is an optional input, defaults to
+  `tnow`).
 
-  N.B. This function is tested for numerical stability for small `n < 5`. It may
-  be unstable for much larger `n`.
+  N.B. This function is tested for numerical stability for small `total < 5`. It
+  may be unstable for much larger `total`.
+
+  N.B.2. This function may throw an assertion error upon numerical instability.
+  This can happen if the algorithm is *extremely* surprised by a result; for
+  example, if `successes=0` and `total=5` (complete failure) when `tnow` is very
+  small compared to the halflife encoded in `prior`. Calling functions are asked
+  to call this inside a try-except block and to handle any possible
+  `AssertionError`s in a manner consistent with user expectations, for example,
+  by faking a more reasonable `tnow`. Please open an issue if you encounter such
+  exceptions for cases that you think are reasonable.
   """
-  assert (0 <= k and k <= n and 1 <= n)
+  assert (0 <= successes and successes <= total and 1 <= total)
 
   (alpha, beta, t) = prior
   if tback is None:
     tback = t
   dt = tnow / t
-  et = tnow / tback
+  et = tback / tnow
 
-  binomlns = [binomln(n - k, i) for i in range(n - k + 1)]
+  binomlns = [binomln(total - successes, i) for i in range(total - successes + 1)]
   logDenominator, logMeanNum, logM2Num = [
       logsumexp([
-          binomlns[i] + betaln(beta, alpha + dt * (k + i) + m * dt / et) for i in range(n - k + 1)
+          binomlns[i] + betaln(beta, alpha + dt * (successes + i) + m * dt * et)
+          for i in range(total - successes + 1)
       ],
-                b=[(-1)**i for i in range(n - k + 1)]) for m in range(3)
+                b=[(-1)**i
+                   for i in range(total - successes + 1)])
+      for m in range(3)
   ]
   mean = np.exp(logMeanNum - logDenominator)
   m2 = np.exp(logM2Num - logDenominator)
-  assert mean > 0
-  assert m2 > 0
+
+  message = dict(
+      prior=prior, successes=successes, total=total, tnow=tnow, rebalance=rebalance, tback=tback)
+  assert mean > 0, message
+  assert m2 > 0, message
 
   meanSq = np.exp(2 * (logMeanNum - logDenominator))
   var = m2 - meanSq
-  assert var > 0
+  assert var > 0, message
   newAlpha, newBeta = _meanVarToBeta(mean, var)
   proposed = newAlpha, newBeta, tback
-  return _rebalace(prior, k, n, tnow, proposed) if rebalance else proposed
+  return _rebalace(prior, successes, total, tnow, proposed) if rebalance else proposed
 
 
 def _rebalace(prior, k, n, tnow, proposed):
@@ -127,8 +141,6 @@ def _meanVarToBeta(mean, var):
   alpha = mean * tmp
   beta = (1 - mean) * tmp
   return alpha, beta
-
-
 def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   """When will memory decay to a given percentile? 🏀
   

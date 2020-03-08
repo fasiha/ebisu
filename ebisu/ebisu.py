@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+
 def predictRecall(prior, tnow, exact=False):
   """Expected recall probability now, given a prior distribution on it. 🍏
 
@@ -46,6 +47,8 @@ def _cachedBetaln(a, b):
   x = betaln(a, b)
   _BETALNCACHE[(a, b)] = x
   return x
+
+
 def updateRecall(prior, result, tnow, rebalance=True, tback=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
@@ -139,6 +142,8 @@ def _meanVarToBeta(mean, var):
   alpha = mean * tmp
   beta = (1 - mean) * tmp
   return alpha, beta
+
+
 def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   """When will memory decay to a given percentile? 🏀
   

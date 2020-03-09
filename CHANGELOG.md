@@ -7,6 +7,8 @@ The API for `updateRecall` has changed because `boolean` results don't make sens
 
 The old behavior can be recovered by setting `total=1` and `successes=1` upon success and 0 upon failure.
 
+The memory models from previous versions remain fully-compatible with this update.
+
 While this new feature allows more freedom in desining quiz applications, it does open up the possibility of numerical instability when the function receives a very surprising input. Please wrap calls to `updateRecall` in a `try` block to gracefully handle this possibility, and get in touch in case it happens to you a lot.
 
 ## 1.0.0

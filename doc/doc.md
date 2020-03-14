@@ -62,7 +62,7 @@
 
 
 
-##### `updateRecall(prior, result, tnow, rebalance=True, tback=None)` 
+##### `updateRecall(prior, success, total, tnow, rebalance=True, tback=None)` 
 
 > Update a prior on recall probability with a quiz result and time. 🍌
 > 
@@ -70,8 +70,16 @@
 >   representing a prior distribution on recall probability at some specific time
 >   after a fact's most recent review.
 > 
->   `result` is truthy for a successful quiz, falsy otherwise.
-> 
+>   `success` is an integer representing the number of times the item was 
+>   successfully recalled.
+>
+>   `total` is an integer representing the number ofimes the item was presented
+>   for review. 
+>
+>   > `success` and `total` allow you to score review sessions where
+>   > the same item was presented multiple times (and the student successfully
+>   > recalled the item 1 out of 4 times, for example).
+>
 >   `tnow` is the time elapsed between this fact's last review and the review
 >   being used to update.
 > 

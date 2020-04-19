@@ -8,8 +8,9 @@
   "scripts": {
     "doc": "pydoc-markdown ebisu.ebisu  > doc/doc.md",
     "build": "node md2code.js",
-    "html": "cp header.html index.html && pandoc --no-highlight -t html5 -f markdown_github-hard_line_breaks+yaml_metadata_block+markdown_in_html_blocks+auto_identifiers README.md | sed 's/\\\\&amp;/\\&/g' >> index.html && npx mjpage < index.html > tmp && mv tmp index.html",
-    "test": "npm run build && python3 -m \"nose\" -v",
+    "html": "cp header.html index.html && pandoc --no-highlight -t html5 -f markdown_github-hard_line_breaks+yaml_metadata_block+markdown_in_html_blocks+auto_identifiers README.md | sed 's/\\\\&amp;/\\&/g' >> index.html && npx mjpage < index.html > tmp && mv tmp index.html && npm run notebook",
+    "test": "npm run build && python3 -m \"nose\" -v && npm run notebook",
+    "notebook": "jupyter nbconvert --to notebook --execute EbisuHowto.ipynb",
     "pypi": "rm dist/* && python setup.py sdist bdist_wheel && python3 setup.py sdist bdist_wheel && twine upload dist/* --skip-existing"
   },
   "dependencies": {},

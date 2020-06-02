@@ -247,4 +247,55 @@ plt.semilogx(tbacks, (skewness), '-')
 plt.grid()
 plt.ylim([-4, 1])
 
-updateRecall((3.3, 3.3, 1.), 1, 1, 2.)
+
+def mkPosterior(prior, successes, total, tnow, tback):
+  (alpha, beta, t) = prior
+  dt = tnow / t
+  et = tback / tnow
+  binomlns = [binomln(total - successes, i) for i in range(total - successes + 1)]
+
+  signs = [(-1)**i for i in range(total - successes + 1)]
+  logDenominator = logsumexp([
+      binomlns[i] + betaln(beta, alpha + dt * (successes + i)) for i in range(total - successes + 1)
+  ],
+                             b=signs) + np.log(dt * et)
+  logPdf = lambda logp: logsumexp([
+      binomlns[i] + logp * ((alpha + dt * (successes + i)) / (dt * et) - 1) +
+      (beta - 1) * np.log(1 - np.exp(logp / (et * dt))) for i in range(total - successes + 1)
+  ],
+                                  b=signs) - logDenominator
+  return logPdf
+
+
+def compare(prior, successes, total, tnow, tback):
+  m1 = updateRecall(prior, successes, total, tnow, tback=tback, rebalance=False)
+
+  p1 = np.vectorize(mkPosterior(prior, successes, total, tnow, tback=tback))
+  from scipy.stats import beta as betarv
+  from scipy.integrate import trapz
+
+  ps = np.linspace(0, 1, 5000)
+
+  integrals = [trapz(np.exp(p1(np.log(ps))), ps), trapz(betarv.pdf(ps, m1[0], m1[1]), ps)]
+  err = trapz(np.abs(np.exp(p1(np.log(ps))) - betarv.pdf(ps, m1[0], m1[1])), ps)
+
+  plt.figure()
+  plt.subplot(211)
+  plt.plot(ps, np.exp(p1(np.log(ps))))
+  plt.plot(ps, betarv.pdf(ps, m1[0], m1[1]))
+  plt.subplot(212)
+  plt.plot(ps, np.exp(p1(np.log(ps))) - betarv.pdf(ps, m1[0], m1[1]))
+
+  ret = dict(err=err, m1=m1, p1=p1, integrals=integrals)
+  return ret
+
+
+pre1 = (3.3, 3.3, 1.)
+k = 3
+n = 3
+tnow = 50.
+tbackOrig = updateRecall(pre1, k, n, tnow)[2]
+hl = modelToPercentileDecay(updateRecall(pre1, k, n, tnow))
+
+resOrig = compare(pre1, k, n, tnow, tbackOrig)
+resHl = compare(pre1, k, n, tnow, hl)

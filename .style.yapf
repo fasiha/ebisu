@@ -1,3 +1,4 @@
 [style]
 based_on_style = chromium
 COLUMN_LIMIT = 100
+INDENT_WIDTH = 2

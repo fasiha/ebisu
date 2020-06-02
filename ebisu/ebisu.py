@@ -48,6 +48,8 @@ def _cachedBetaln(a, b):
   x = betaln(a, b)
   _BETALNCACHE[(a, b)] = x
   return x
+
+
 def binomln(n, k):
   "Log of scipy.special.binom calculated entirely in the log domain"
   return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
@@ -128,10 +130,8 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
 
 def _rebalace(prior, k, n, tnow, proposed):
   newAlpha, newBeta, _ = proposed
-  if (newAlpha > 2 * newBeta or newBeta > 2 * newAlpha):
-    roughHalflife = modelToPercentileDecay(proposed, coarse=True)
-    return updateRecall(prior, k, n, tnow, rebalance=False, tback=roughHalflife)
-  return proposed
+  roughHalflife = modelToPercentileDecay(proposed, coarse=False)
+  return updateRecall(prior, k, n, tnow, rebalance=False, tback=roughHalflife)
 
 
 def _meanVarToBeta(mean, var):
@@ -141,6 +141,8 @@ def _meanVarToBeta(mean, var):
   alpha = mean * tmp
   beta = (1 - mean) * tmp
   return alpha, beta
+
+
 def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   """When will memory decay to a given percentile? 🏀
   
@@ -211,3 +213,38 @@ def defaultModel(t, alpha=3.0, beta=None):
   `alpha`.
   """
   return (alpha, beta or alpha, t)
+
+
+def calcSkew(prior, successes, total, tnow, tback, N=3):
+  (alpha, beta, t) = prior
+  dt = tnow / t
+  et = tback / tnow
+
+  binomlns = [binomln(total - successes, i) for i in range(total - successes + 1)]
+  ncLogMoment = lambda m: logsumexp([
+      binomlns[i] + betaln(beta, alpha + dt * (successes + i) + m * dt * et)
+      for i in range(total - successes + 1)
+  ],
+                                    b=[(-1)**i for i in range(total - successes + 1)])
+  logDenominator = ncLogMoment(0)
+  logMean = ncLogMoment(1) - logDenominator
+  logStdev = ncLogMoment(2) - logDenominator
+  logSkew = ncLogMoment(3) - logDenominator
+  print([logMean, logStdev, logSkew])
+  # https://en.wikipedia.org/wiki/Skewness#Pearson's_moment_coefficient_of_skewness
+  skew = (np.exp(logSkew) - 3 * np.exp(logMean) * np.exp(2 * logStdev) -
+          np.exp(3 * logMean)) / np.exp(3 * logStdev)
+  return skew
+
+
+calcSkew((3.3, 3.3, 1.), successes=1, total=1, tnow=2., tback=1.4802435605039237)
+tbacks = np.logspace(-2, 2, 500)
+
+skewness = np.array(
+    list([calcSkew((3.3, 3.3, 1.), successes=0, total=10, tnow=.1 / 4, tback=t) for t in tbacks]))
+plt.figure()
+plt.semilogx(tbacks, (skewness), '-')
+plt.grid()
+plt.ylim([-4, 1])
+
+updateRecall((3.3, 3.3, 1.), 1, 1, 2.)

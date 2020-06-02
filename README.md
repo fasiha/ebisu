@@ -391,7 +391,7 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
   after a fact's most recent review.
 
   `successes` is the number of times the user *successfully* exercised this
-  memory during this review session, out of `n` attempts. Therefore, `0 <=
+  memory during this review session, out of `total` attempts. Therefore, `0 <=
   successes <= total` and `1 <= total`.
 
   If the user was shown this flashcard only once during this review session,

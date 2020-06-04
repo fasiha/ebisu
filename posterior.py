@@ -47,6 +47,7 @@ def mkPosterior(prior, successes, total, tnow, tback):
       binomlns[i] + betaln(beta, alpha + dt * (successes + i)) for i in range(total - successes + 1)
   ],
                              b=signs) + np.log(dt * et)
+  print(dict(logDenominator=logDenominator, den=np.exp(logDenominator)))
   logPdf = lambda logp: logsumexp([
       binomlns[i] + logp * ((alpha + dt * (successes + i)) / (dt * et) - 1) +
       (beta - 1) * np.log(1 - np.exp(logp / (et * dt))) for i in range(total - successes + 1)
@@ -175,24 +176,25 @@ mp.mp.dps = 30
 
 
 def cancel2(prior, successes, total, tnow, tback, dps=None):
+  n = total
+  k = successes
   if dps:
     mp.mp.dps = dps
   assert (0 <= successes and successes <= total and 1 <= total)
   (alpha, beta, t) = prior
   dt = tnow / t
   et = tback / tnow
-  print(dict(dt=dt, et=et, dtet=dt * et))
 
   def ncMoment(N):
     num = []
-    for i in range(successes + total + 1):
+    for i in range(total - successes + 1):
       numA = alpha + dt * (successes + i) + N * dt * et
       # numB = beta
       denA = n - k + 1 - i
       denB = 1 + i
       num.append((-1)**i * mp.gammaprod([numA, denA + denB], [numA + beta, denA, denB]))
     den = []
-    for i in range(successes + total + 1):
+    for i in range(total - successes + 1):
       numA = alpha + dt * (successes + i)
       # numB = beta
       denA = n - k + 1 - i
@@ -207,15 +209,163 @@ def cancel2(prior, successes, total, tnow, tback, dps=None):
   return mean, m2, var, [mean1, mean2], [m21, m22]
 
 
+def cancel3(prior, successes, total, tnow, tback, dps=None):
+  n = total
+  k = successes
+  if dps:
+    mp.mp.dps = dps
+  assert (0 <= successes and successes <= total and 1 <= total)
+  (alpha, beta, t) = prior
+  dt = tnow / t
+  et = tback / tnow
+
+  def ncMoment(N):
+    num = []
+    for i in range(total - successes + 1):
+      numA = alpha + dt * (successes + i) + N * dt * et
+      # numB = beta
+      denA = n - k + 1 - i
+      denB = 1 + i
+      num.append((-1)**i * mp.exp(
+          mp.loggamma(numA) + mp.loggamma(denA + denB) - mp.loggamma(numA + beta) -
+          mp.loggamma(denA) - mp.loggamma(denB)))
+    den = []
+    for i in range(total - successes + 1):
+      numA = alpha + dt * (successes + i)
+      # numB = beta
+      denA = n - k + 1 - i
+      denB = 1 + i
+      den.append((-1)**i * mp.exp(
+          mp.loggamma(numA) + mp.loggamma(denA + denB) - mp.loggamma(numA + beta) -
+          mp.loggamma(denA) - mp.loggamma(denB)))
+    return sum(num) / sum(den), num, den
+
+  mean, mean1, mean2 = ncMoment(1)
+  m2, m21, m22 = ncMoment(2)
+  var = m2 - mean**2
+
+  return mean, m2, var, [mean1, mean2], [m21, m22]
+
+
+def cancel4(prior, successes, total, tnow, tback, dps=None):
+  n = total
+  k = successes
+  if dps:
+    mp.mp.dps = dps
+  assert (0 <= successes and successes <= total and 1 <= total)
+  (alpha, beta, t) = prior
+  dt = tnow / t
+  et = tback / tnow
+
+  def ncMoment(N):
+    num = []
+    for i in range(total - successes + 1):
+      top = [alpha + dt * (successes + i) + N * dt * et]
+      bot = [alpha + dt * (successes + i) + N * dt * et + beta]
+      for j in range(total - successes + 1):
+        if j == i:
+          continue
+        left = total - successes + 1 - i
+        rite = 1 + i
+        top.append(left)
+        top.append(rite)
+        bot.append(left + rite)
+      num.append((-1)**i * mp.gammaprod(top, bot))
+    den = []
+    for i in range(total - successes + 1):
+      top = [alpha + dt * (successes + i)]
+      bot = [alpha + dt * (successes + i) + beta]
+      for j in range(total - successes + 1):
+        if j == i:
+          continue
+        left = total - successes + 1 - i
+        rite = 1 + i
+        top.append(left)
+        top.append(rite)
+        bot.append(left + rite)
+      den.append((-1)**i * mp.gammaprod(top, bot))
+    return sum(num) / sum(den), num, den
+
+  mean, mean1, mean2 = ncMoment(1)
+  m2, m21, m22 = ncMoment(2)
+  var = m2 - mean**2
+
+  return mean, m2, var, [mean1, mean2], [m21, m22]
+
+
+from math import prod
+
+
+def cancel5(prior, successes, total, tnow, tback, dps=None):
+  n = total
+  k = successes
+  if dps:
+    mp.mp.dps = dps
+  assert (0 <= successes and successes <= total and 1 <= total)
+  (alpha, beta, t) = prior
+  dt = tnow / t
+  et = tback / tnow
+
+  cs = [mp.beta(n - k + 1 - i, 1 + i) for i in range(n - k + 1)]
+  ys = [(-1)**i * mp.gamma(alpha + dt * (i + k)) / mp.gamma(alpha + dt * (i + k) + beta)
+        for i in range(n - k + 1)]
+  base = sum(ys[i] * prod(cs[j] for j in range(n - k + 1) if j != i) for i in range(n - k + 1))
+
+  def ncMoment(N):
+    xs = [(-1)**i * mp.gamma(alpha + dt * (i + k) + N * dt * et) /
+          mp.gamma(alpha + dt * (i + k) + N * dt * et + beta) for i in range(n - k + 1)]
+    return sum(
+        xs[i] * prod(cs[j] for j in range(n - k + 1) if j != i) for i in range(n - k + 1)) / base
+
+  mean = ncMoment(1)
+  m2 = ncMoment(2)
+  var = m2 - mean**2
+  return mean, m2, var
+
+
 k = 1
 n = 9
-tnow = 1 / 50.
 # above disagree, but this they agree?
 # n=8
 # tnow=2.
 foo = cancel(pre3, k, n, tnow, tback3)[-4:-1]
-print(list(_meanVarToBeta(foo[0], foo[2])) + [tback3])
+modelCancel = list(_meanVarToBeta(foo[0], foo[2])) + [tback3]
+print(modelCancel)
 
-mpres = cancel2(pre3, k, n, tnow, tback3)
+mpres = cancel2(pre3, k, n, tnow, tback3, dps=100)
 model4 = list(_meanVarToBeta(mpres[0], mpres[2])) + [tback3]
 print(model4)
+
+mpres2 = cancel3(pre3, k, n, tnow, tback3)
+model5 = list(_meanVarToBeta(mpres2[0], mpres2[2])) + [tback3]
+print(model5)
+
+# mpres3 = cancel4(pre3, k, n, tnow, tback3)
+# model6 = list(_meanVarToBeta(mpres3[0], mpres3[2])) + [tback3]
+# print(model6)
+
+mpres4 = cancel5(pre3, k, n, tnow, tback3)
+model7 = list(_meanVarToBeta(mpres4[0], mpres4[2])) + [tback3]
+print(model7)
+
+
+def mkPosteriorMp(prior, successes, total, tnow, tback, dps=None):
+  if dps:
+    mp.mp.dps = dps
+  (alpha, beta, t) = prior
+  dt = tnow / t
+  et = tback / tnow
+  n = total
+  k = successes
+  binoms = [mp.beta(n - k + 1 - i, 1 + i) for i in range(n - k + 1)]
+  den = sum(
+      (-1)**i / binoms[i] * mp.beta(alpha + (i + k) * dt, beta) for i in range(n - k + 1)) * dt * et
+  print(dict(denMPMATH=den))
+  return lambda p: sum((-1)**i / binoms[i] * (p**((alpha + dt * (k + i)) / (dt * et) - 1)) *
+                       (1 - p**(1 / (dt * et)))**(beta - 1) for i in range(n - k + 1)) / den
+
+
+mppdf = np.vectorize(mkPosteriorMp(pre3, k, n, tnow, tback3))
+mpdensity = mppdf(ps)
+# plt.figure()
+# plt.semilogx(ps, mpdensity, ps, pdf)

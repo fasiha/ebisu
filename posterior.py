@@ -1,5 +1,11 @@
+from scipy.special import gammaln
 from ebisu import *
 import matplotlib.pylab as plt
+
+
+def binomln(n, k):
+  "Log of scipy.special.binom calculated entirely in the log domain"
+  return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
 
 
 def calcSkew(prior, successes, total, tnow, tback, N=3):
@@ -161,7 +167,7 @@ def cancel(prior, successes, total, tnow, tback):
   meanSq = np.exp(2 * (l(*logMeanNum) - den))
   var = m2 - meanSq
 
-  return logDenominator, logMeanNum, logM2Num, mean, m2, var, den
+  return mean, m2, var, dict(logden=logDenominator, u1=logMeanNum, u2=logM2Num, den=den)
 
 
 c3 = cancel(pre3, 1, 10, tnow, tback3)
@@ -247,52 +253,6 @@ def cancel3(prior, successes, total, tnow, tback, dps=None):
   return mean, m2, var, [mean1, mean2], [m21, m22]
 
 
-def cancel4(prior, successes, total, tnow, tback, dps=None):
-  n = total
-  k = successes
-  if dps:
-    mp.mp.dps = dps
-  assert (0 <= successes and successes <= total and 1 <= total)
-  (alpha, beta, t) = prior
-  dt = tnow / t
-  et = tback / tnow
-
-  def ncMoment(N):
-    num = []
-    for i in range(total - successes + 1):
-      top = [alpha + dt * (successes + i) + N * dt * et]
-      bot = [alpha + dt * (successes + i) + N * dt * et + beta]
-      for j in range(total - successes + 1):
-        if j == i:
-          continue
-        left = total - successes + 1 - i
-        rite = 1 + i
-        top.append(left)
-        top.append(rite)
-        bot.append(left + rite)
-      num.append((-1)**i * mp.gammaprod(top, bot))
-    den = []
-    for i in range(total - successes + 1):
-      top = [alpha + dt * (successes + i)]
-      bot = [alpha + dt * (successes + i) + beta]
-      for j in range(total - successes + 1):
-        if j == i:
-          continue
-        left = total - successes + 1 - i
-        rite = 1 + i
-        top.append(left)
-        top.append(rite)
-        bot.append(left + rite)
-      den.append((-1)**i * mp.gammaprod(top, bot))
-    return sum(num) / sum(den), num, den
-
-  mean, mean1, mean2 = ncMoment(1)
-  m2, m21, m22 = ncMoment(2)
-  var = m2 - mean**2
-
-  return mean, m2, var, [mean1, mean2], [m21, m22]
-
-
 from math import prod
 
 
@@ -306,7 +266,7 @@ def cancel5(prior, successes, total, tnow, tback, dps=None):
   dt = tnow / t
   et = tback / tnow
 
-  cs = [mp.beta(n - k + 1 - i, 1 + i) for i in range(n - k + 1)]
+  cs = [mp.gamma(n - k + 1 - i) * mp.gamma(1 + i) for i in range(n - k + 1)]
   ys = [(-1)**i * mp.gamma(alpha + dt * (i + k)) / mp.gamma(alpha + dt * (i + k) + beta)
         for i in range(n - k + 1)]
   base = sum(ys[i] * prod(cs[j] for j in range(n - k + 1) if j != i) for i in range(n - k + 1))
@@ -314,13 +274,43 @@ def cancel5(prior, successes, total, tnow, tback, dps=None):
   def ncMoment(N):
     xs = [(-1)**i * mp.gamma(alpha + dt * (i + k) + N * dt * et) /
           mp.gamma(alpha + dt * (i + k) + N * dt * et + beta) for i in range(n - k + 1)]
-    return sum(
-        xs[i] * prod(cs[j] for j in range(n - k + 1) if j != i) for i in range(n - k + 1)) / base
+    return sum(xs[i] * prod(cs[j] for j in range(n - k + 1) if j != i) for i in range(n - k + 1))
 
-  mean = ncMoment(1)
-  m2 = ncMoment(2)
+  u1 = ncMoment(1)
+  u2 = ncMoment(2)
+  mean = u1 / base
+  m2 = u2 / base
   var = m2 - mean**2
-  return mean, m2, var
+  # print(dict(var=var, varAlt=(base*u2 - u1**2)/base**2))
+  return mean, m2, var, dict(u1=u1, u2=u2, den=base, cs=cs, ys=ys)
+
+
+def cancelFloatGammaln(prior, successes, total, tnow, tback):
+  n = total
+  k = successes
+  assert (0 <= successes and successes <= total and 1 <= total)
+  (alpha, beta, t) = prior
+  dt = tnow / t
+  et = tback / tnow
+  cs = [
+      gammaln(n - k + 1 - i) + gammaln(i + 1) - gammaln(i + 1 + n - k + 1 - i)
+      for i in range(n - k + 1)
+  ]
+  logDenominator, logMeanNum, logM2Num = [([
+      gammaln(alpha + dt * (successes + i) + m * dt * et) -
+      gammaln(beta + alpha + dt * (successes + i) + m * dt * et) - (cs[i])
+      for i in range(total - successes + 1)
+  ], [(-1)**i
+      for i in range(total - successes + 1)])
+                                          for m in range(3)]
+  l = lambda a, b: logsumexp(a, b=b)
+  den = l(*logDenominator)
+  mean = np.exp(l(*logMeanNum) - den)
+  m2 = np.exp(l(*logM2Num) - den)
+  meanSq = np.exp(2 * (l(*logMeanNum) - den))
+  var = m2 - meanSq
+
+  return mean, m2, var, dict(logden=logDenominator, u1=logMeanNum, u2=logM2Num, den=den)
 
 
 k = 1
@@ -328,8 +318,8 @@ n = 9
 # above disagree, but this they agree?
 # n=8
 # tnow=2.
-foo = cancel(pre3, k, n, tnow, tback3)[-4:-1]
-modelCancel = list(_meanVarToBeta(foo[0], foo[2])) + [tback3]
+floatRes = cancel(pre3, k, n, tnow, tback3)
+modelCancel = list(_meanVarToBeta(floatRes[0], floatRes[2])) + [tback3]
 print(modelCancel)
 
 mpres = cancel2(pre3, k, n, tnow, tback3, dps=100)
@@ -347,6 +337,10 @@ print(model5)
 mpres4 = cancel5(pre3, k, n, tnow, tback3)
 model7 = list(_meanVarToBeta(mpres4[0], mpres4[2])) + [tback3]
 print(model7)
+
+floatRes2 = cancelFloatGammaln(pre3, k, n, tnow, tback3)
+modelCancelFloatGammaln = list(_meanVarToBeta(floatRes2[0], floatRes2[2])) + [tback3]
+print(modelCancelFloatGammaln)
 
 
 def mkPosteriorMp(prior, successes, total, tnow, tback, dps=None):

@@ -171,30 +171,33 @@ msum(np.array(c3[0][0]) * np.array(c3[0][1]))
 lden, logm1n, logm2n = [msum(np.exp(np.array(a)) * np.array(b)) for a, b in c3[:3]]
 
 import mpmath as mp
-mp.mp.dps = 150
+mp.mp.dps = 30
 
 
-def cancel2(prior, successes, total, tnow, tback):
+def cancel2(prior, successes, total, tnow, tback, dps=None):
+  if dps:
+    mp.mp.dps = dps
   assert (0 <= successes and successes <= total and 1 <= total)
   (alpha, beta, t) = prior
   dt = tnow / t
   et = tback / tnow
+  print(dict(dt=dt, et=et, dtet=dt * et))
 
   def ncMoment(N):
     num = []
     for i in range(successes + total + 1):
       numA = alpha + dt * (successes + i) + N * dt * et
-      numB = beta
+      # numB = beta
       denA = n - k + 1 - i
       denB = 1 + i
-      num.append((-1)**i * mp.gammaprod([numA, numB, denA + denB], [numA + numB, denA, denB]))
+      num.append((-1)**i * mp.gammaprod([numA, denA + denB], [numA + beta, denA, denB]))
     den = []
     for i in range(successes + total + 1):
       numA = alpha + dt * (successes + i)
-      numB = beta
+      # numB = beta
       denA = n - k + 1 - i
       denB = 1 + i
-      den.append((-1)**i * mp.gammaprod([numA, numB, denA + denB], [numA + numB, denA, denB]))
+      den.append((-1)**i * mp.gammaprod([numA, denA + denB], [numA + beta, denA, denB]))
     return sum(num) / sum(den), num, den
 
   mean, mean1, mean2 = ncMoment(1)
@@ -205,8 +208,11 @@ def cancel2(prior, successes, total, tnow, tback):
 
 
 k = 1
-n = 10
+n = 9
 tnow = 1 / 50.
+# above disagree, but this they agree?
+# n=8
+# tnow=2.
 foo = cancel(pre3, k, n, tnow, tback3)[-4:-1]
 print(list(_meanVarToBeta(foo[0], foo[2])) + [tback3])
 

@@ -48,6 +48,8 @@ def _cachedBetaln(a, b):
   x = betaln(a, b)
   _BETALNCACHE[(a, b)] = x
   return x
+
+
 def binomln(n, k):
   "Log of scipy.special.binom calculated entirely in the log domain"
   return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
@@ -126,6 +128,53 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
   return _rebalace(prior, successes, total, tnow, proposed) if rebalance else proposed
 
 
+# via https://stats.stackexchange.com/q/419197/31187
+def up2(prior, quiz, tnow, rebalance=True, tback=None):
+  (alpha, beta, t) = prior
+  if tback is None:
+    tback = t
+  dt = tnow / t
+  et = tback / tnow
+
+  z, q0, q1 = quiz
+  c = (alpha * q1 + beta * q0) / (alpha + beta)
+  if z:
+    r = q1 / c
+    s = q0 / c
+  else:
+    r = (1 - q1) / (1 - c)
+    s = (1 - q0) / (1 - c)
+
+  moment = lambda N: logsumexp([
+      betaln(alpha + dt + N * dt * et, beta),
+      betaln(alpha + N * dt * et, beta),
+  ],
+                               b=[r - s, s])
+
+  logDen = moment(0)
+  logmean = moment(1) - logDen
+  mean = np.exp(logmean)
+  logm2 = moment(2) - logDen
+  var = np.exp(logm2) - np.exp(2 * logmean)
+
+  # logm3 = moment(3) - logDen
+  # skewness = (np.exp(logm3) - 3 * mean * var - mean**3) / var**(3 / 2)
+  # print(dict(et=et, skewness=skewness))
+
+  assert mean > 0, dict(logmean=logmean, mean=mean, logm2=logm2, var=var, quiz=quiz, tnow=tnow)
+  assert var > 0, dict(logmean=logmean, mean=mean, logm2=logm2, var=var, quiz=quiz, tnow=tnow)
+  newAlpha, newBeta = _meanVarToBeta(mean, var)
+  proposed = newAlpha, newBeta, tback
+  ret = _rebalace2(prior, quiz, tnow, proposed) if rebalance else proposed
+  return ret
+
+
+def _rebalace2(prior, quiz, tnow, proposed):
+  newAlpha, newBeta, _ = proposed
+  roughHalflife = modelToPercentileDecay(proposed, coarse=False)
+  return up2(prior, quiz, tnow, rebalance=False, tback=roughHalflife)
+
+
 def _rebalace(prior, k, n, tnow, proposed):
   newAlpha, newBeta, _ = proposed
   if (newAlpha > 2 * newBeta or newBeta > 2 * newAlpha):
@@ -141,6 +190,8 @@ def _meanVarToBeta(mean, var):
   alpha = mean * tmp
   beta = (1 - mean) * tmp
   return alpha, beta
+
+
 def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   """When will memory decay to a given percentile? 🏀
   
@@ -211,3 +262,34 @@ def defaultModel(t, alpha=3.0, beta=None):
   `alpha`.
   """
   return (alpha, beta or alpha, t)
+
+
+withlh = lambda model: [model, modelToPercentileDecay(model)]
+[
+    print(withlh(x)) for x in [
+        up2((3.3, 3.3, 1), [True, 0.0, 1.], 1, tback=1., rebalance=False),
+        up2((3.3, 3.3, 1), [False, 0.0, 1.], 1, tback=1., rebalance=False),
+        up2((3.3, 3.3, 1), [True, 0.3, 1. - .3], 1, tback=1., rebalance=False),
+        up2((3.3, 3.3, 1), [False, .3, 1. - .3], 1, tback=1., rebalance=False),
+        up2((3.3, 3.3, 1), [True, 0.5, 1. - .5], 1, tback=1., rebalance=False),
+        up2((3.3, 3.3, 1), [False, .5, 1. - .5], 1, tback=1., rebalance=False),
+        up2((3.3, 3.3, 1), [True, 0, 1. - 0], 2, tback=1., rebalance=False),
+        up2((3.3, 3.3, 1), [False, 0, 1. - 0], 2, tback=1., rebalance=False),
+        up2((3.3, 3.3, 1), [True, .3, 1. - .3], 2, tback=1., rebalance=False),
+        up2((3.3, 3.3, 1), [False, 0, 1], 2, tback=1., rebalance=False),
+        up2((3.3, 3.3, 1), [False, 0.3, 1. - .3], 2, tback=1., rebalance=False),
+        up2((3.3, 3.3, 1), [False, 0.15, 1. - .3], 2, tback=1., rebalance=False),
+        up2((3.3, 3.3, 1), [False, 0.0, 1. - .3], 2, tback=1., rebalance=False),
+    ]
+]
+
+print('| Noise | Nominal result | Quiz time | New halflife |')
+print('| ----- | -------------- | --------- | ------------ |')
+prior = (3.3, 3.3, 1.)
+for q in [0, .1, .25, .5]:
+  print('|  |  |  |  |')
+  for result in [True, False]:
+    for tnow in [.25, 1., 3.]:
+      updated = up2(prior, [result, q, 1 - q], tnow, tback=1., rebalance=False)
+      halflife = modelToPercentileDecay(updated)
+      print('| {} | {} | {} | {:.3f} |'.format(q, result, tnow, halflife))

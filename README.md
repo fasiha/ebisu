@@ -11,28 +11,28 @@
 
 ### Table of contents
 
-<!-- TOC depthFrom:2 depthTo:3 withLinks:1 updateOnSave:1 orderedList:0 -->
-
-- [Important links](#important-links)
-	- [Table of contents](#table-of-contents)
-- [Introduction](#introduction)
-- [Quickstart](#quickstart)
-- [How it works](#how-it-works)
-- [The math](#the-math)
-	- [Bernoulli quizzes](#bernoulli-quizzes)
-	- [Moving Beta distributions through time](#moving-beta-distributions-through-time)
-	- [Recall probability right now](#recall-probability-right-now)
-	- [Choice of initial model parameters](#choice-of-initial-model-parameters)
-	- [Updating the posterior with quiz results](#updating-the-posterior-with-quiz-results)
-- [Source code](#source-code)
-	- [Core library](#core-library)
-	- [Miscellaneous functions](#miscellaneous-functions)
-	- [Test code](#test-code)
-- [Demo codes](#demo-codes)
-	- [Visualizing half-lives](#visualizing-half-lives)
-	- [Why we work with random variables](#why-we-work-with-random-variables)
-- [Requirements for building all aspects of this repo](#requirements-for-building-all-aspects-of-this-repo)
-- [Acknowledgements](#acknowledgements)
+- [Ebisu: intelligent quiz scheduling](#ebisu-intelligent-quiz-scheduling)
+  - [Important links](#important-links)
+    - [Table of contents](#table-of-contents)
+  - [Introduction](#introduction)
+  - [Quickstart](#quickstart)
+  - [How it works](#how-it-works)
+  - [The math](#the-math)
+    - [Bernoulli quizzes](#bernoulli-quizzes)
+    - [Moving Beta distributions through time](#moving-beta-distributions-through-time)
+    - [Recall probability right now](#recall-probability-right-now)
+    - [Choice of initial model parameters](#choice-of-initial-model-parameters)
+    - [Updating the posterior with quiz results](#updating-the-posterior-with-quiz-results)
+  - [Source code](#source-code)
+    - [Core library](#core-library)
+    - [Miscellaneous functions](#miscellaneous-functions)
+    - [Test code](#test-code)
+  - [Demo codes](#demo-codes)
+    - [Visualizing half-lives](#visualizing-half-lives)
+    - [Why we work with random variables](#why-we-work-with-random-variables)
+    - [Moving Beta distributions through time](#moving-beta-distributions-through-time-1)
+  - [Requirements for building all aspects of this repo](#requirements-for-building-all-aspects-of-this-repo)
+  - [Acknowledgments](#acknowledgments)
 
 <!-- /TOC -->
 
@@ -239,7 +239,7 @@ This is the posterior at time \\(t_2\\), the time of the quiz. I’d like to hav
 Then, \\(P(p_{t'} | k_{t_2}, n_{t_2}) = Posterior(p^{1/ε}|k_{t_2}, n_{t_2}) ⋅ \\frac{1}{ε} p^{1/ε - 1}\\):
 \\[
   P(p_{t'} | k_{t_2}, n_{t_2}) = \\frac{
-    \\sum_{i=0}^{n-k} \\binom{n-k}{i} (-1)^i p^\\frac{α + δ (k + i) - 1}{δ ε} (1-p^{1/(δε)})^{β - 1}
+    \\sum_{i=0}^{n-k} \\binom{n-k}{i} (-1)^i p^(\\frac{α + δ (k + i)}{δ ε} - 1) (1-p^{1/(δε)})^{β - 1}
   }{
     δε \\sum_{i=0}^{n-k} \\binom{n-k}{i} (-1)^i ⋅ B(α + δ (k + i), \\, β)
   }.

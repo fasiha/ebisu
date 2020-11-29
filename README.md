@@ -205,7 +205,7 @@ Here, “prior” refers to the GB1 density \\(P(p_t^δ)\\) derived above. \\(Li
 
 Combining all these into one expression, we have:
 \\[
-  Posterior(p|k, n) = \\frac{1}{δ B(α, β)} \\frac{
+  Posterior(p|k, n) = \\frac{
     p^{α/δ - 1} (1-p^{1/δ})^{β - 1} p^k (1-p)^{n-k}
   }{
     \\int_0^1 p^{α/δ - 1} (1-p^{1/δ})^{β - 1} p^k (1-p)^{n-k} \\, dp

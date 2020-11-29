@@ -94,7 +94,8 @@
 <li><a href="https://fasiha.github.io/#contact">Contact</a></li>
 </ul>
 <h3 id="table-of-contents">Table of contents</h3>
-<!-- TOC depthFrom:2 depthTo:3 withLinks:1 updateOnSave:1 orderedList:0 -->
+<ul>
+<li><a href="#ebisu-intelligent-quiz-scheduling">Ebisu: intelligent quiz scheduling</a>
 <ul>
 <li><a href="#important-links">Important links</a>
 <ul>
@@ -121,9 +122,11 @@
 <ul>
 <li><a href="#visualizing-half-lives">Visualizing half-lives</a></li>
 <li><a href="#why-we-work-with-random-variables">Why we work with random variables</a></li>
+<li><a href="#moving-beta-distributions-through-time-1">Moving Beta distributions through time</a></li>
 </ul></li>
 <li><a href="#requirements-for-building-all-aspects-of-this-repo">Requirements for building all aspects of this repo</a></li>
-<li><a href="#acknowledgements">Acknowledgements</a></li>
+<li><a href="#acknowledgments">Acknowledgments</a></li>
+</ul></li>
 </ul>
 <!-- /TOC -->
 <h2 id="introduction">Introduction</h2>
@@ -140,7 +143,7 @@
 <p>Behind these two simple functions, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and exponential forgetting.</p>
 <p>With this system, quiz applications can move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today; an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed.</p>
 <p>Ebisu also enables apps to provide an infinite stream of quizzes for students who are cramming. Thus, Ebisu intelligently handles over-reviewing as well as under-reviewing.</p>
-<p>This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as source code for a Python implementation (requires Scipy and Numpy). Separate implementations in <a href="https://fasiha.github.io/ebisu.js/">JavaScript (Ebisu.js)</a> and <a href="https://github.com/fasiha/ebisu-java">Java (ebisu-java)</a> exist.</p>
+<p>This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as source code for a Python implementation (requires Scipy and Numpy). Separate implementations in <a href="https://fasiha.github.io/ebisu.js/">JavaScript (Ebisu.js)</a>, <a href="https://github.com/fasiha/ebisu-java">Java (ebisu-java)</a> and <a href="https://github.com/ttencate/ebisu_dart">Dart (ebisu_dart)</a> exist.</p>
 <p>The next section is a <a href="#quickstart">Quickstart</a> guide to setup and usage. See this if you know you want to use Ebisu in your app.</p>
 <p>Then in the <a href="#how-it-works">How It Works</a> section, I contrast Ebisu to other scheduling algorithms and describe, non-technically, why you should use it.</p>
 <p>Then there’s a long <a href="#the-math">Math</a> section that details Ebisu’s algorithm mathematically. If you like Beta-distributed random variables, conjugate priors, and marginalization, this is for you. You’ll also find the key formulas that implement <code>predictRecall</code> and <code>updateRecall</code> here.</p>
@@ -155,7 +158,7 @@
 <p><strong>Update a fact’s model with quiz results</strong> <code>ebisu.updateRecall(prior: tuple, success: int, total: int, tnow: float) -&gt; tuple</code> where <code>prior</code> and <code>tnow</code> are as above, and where <code>success</code> is the number of times the student successfully exercised this memory during the current review session out of <code>total</code> times—this way your quiz app can review the same fact multiple times in one sitting! The returned value is this fact’s new prior model—the old one can be discarded.</p>
 <p><strong>IPython Notebook crash course</strong> For a conversational introduction to the API in the context of a mocked quiz app, see this <a href="./EbisuHowto.ipynb">IPython Notebook crash course</a>.</p>
 <p><strong>Further information</strong> <a href="./doc/doc.md">Module docstrings</a> in a pinch but full details plus literate source below, under <a href="#source-code">Source code</a>.</p>
-<p><strong>Alternative implementations</strong> <a href="https://fasiha.github.io/ebisu.js/">Ebisu.js</a> is a JavaScript port for browser and Node.js. <a href="https://github.com/fasiha/ebisu-java">ebisu-java</a> is for Java and JVM languages.</p>
+<p><strong>Alternative implementations</strong> <a href="https://fasiha.github.io/ebisu.js/">Ebisu.js</a> is a JavaScript port for browser and Node.js. <a href="https://github.com/fasiha/ebisu-java">ebisu-java</a> is for Java and JVM languages. <a href="https://github.com/ttencate/ebisu_dart">ebisu_dart</a> is a Dart port for browser and native targets.</p>
 <h2 id="how-it-works">How it works</h2>
 <p>There are many scheduling schemes, e.g.,</p>
 <ul>
@@ -1454,8 +1457,8 @@
  <use xlink:href="#MJMATHI-3B4" x="3233" y="0"></use>
 </g>
 </svg></span>, but we’ll add time subscripts again below.)</p>
-<p>Combining all these into one expression, we have: <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="68.318ex" height="7.676ex" style="vertical-align: -3.505ex;" viewBox="0 -1796 29414.7 3304.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-101-Title">
-<title id="MathJax-SVG-101-Title"> Posterior(p|k, n) = \frac{1}{δ B(α, β)} \frac{ p^{α/δ - 1} (1-p^{1/δ})^{β - 1} p^k (1-p)^{n-k} }{ \int_0^1 p^{α/δ - 1} (1-p^{1/δ})^{β - 1} p^k (1-p)^{n-k} \, dp }, </title>
+<p>Combining all these into one expression, we have: <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="59.039ex" height="7.676ex" style="vertical-align: -3.505ex;" viewBox="0 -1796 25419.5 3304.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-101-Title">
+<title id="MathJax-SVG-101-Title"> Posterior(p|k, n) = \frac{ p^{α/δ - 1} (1-p^{1/δ})^{β - 1} p^k (1-p)^{n-k} }{ \int_0^1 p^{α/δ - 1} (1-p^{1/δ})^{β - 1} p^k (1-p)^{n-k} \, dp }, </title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-6F" x="751" y="0"></use>
@@ -1476,21 +1479,6 @@
  <use xlink:href="#MJMAIN-3D" x="7674" y="0"></use>
 <g transform="translate(8452,0)">
 <g transform="translate(397,0)">
-<rect stroke="none" width="3755" height="60" x="0" y="220"></rect>
- <use xlink:href="#MJMAIN-31" x="1627" y="676"></use>
-<g transform="translate(60,-771)">
- <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
- <use xlink:href="#MJMATHI-42" x="444" y="0"></use>
- <use xlink:href="#MJMAIN-28" x="1204" y="0"></use>
- <use xlink:href="#MJMATHI-3B1" x="1593" y="0"></use>
- <use xlink:href="#MJMAIN-2C" x="2234" y="0"></use>
- <use xlink:href="#MJMATHI-3B2" x="2679" y="0"></use>
- <use xlink:href="#MJMAIN-29" x="3245" y="0"></use>
-</g>
-</g>
-</g>
-<g transform="translate(12725,0)">
-<g transform="translate(120,0)">
 <rect stroke="none" width="16170" height="60" x="0" y="220"></rect>
 <g transform="translate(1293,770)">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
@@ -1591,7 +1579,7 @@
 </g>
 </g>
 </g>
- <use xlink:href="#MJMAIN-2C" x="29136" y="0"></use>
+ <use xlink:href="#MJMAIN-2C" x="25141" y="0"></use>
 </g>
 </svg></span> where note that the big integrand in the denominator is just the numerator.</p>
 <p>We use two helpful facts now. The more important one is that <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="39.502ex" height="6.176ex" style="vertical-align: -2.338ex;" viewBox="0 -1652.5 17007.9 2659.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-102-Title">
@@ -2045,8 +2033,8 @@
 </g>
 </g>
 </g>
-</svg></span>: <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="59.847ex" height="9.176ex" style="vertical-align: -3.338ex;" viewBox="0 -2513.6 25767.3 3950.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-119-Title">
-<title id="MathJax-SVG-119-Title"> P(p_{t'} | k_{t_2}, n_{t_2}) = \frac{ \sum_{i=0}^{n-k} \binom{n-k}{i} (-1)^i p^\frac{α + δ (k + i) - 1}{δ ε} (1-p^{1/(δε)})^{β - 1} }{ δε \sum_{i=0}^{n-k} \binom{n-k}{i} (-1)^i ⋅ B(α + δ (k + i), \, β) }. </title>
+</svg></span>: <span class="mjpage mjpage__block"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="65.014ex" height="8.509ex" style="vertical-align: -3.338ex;" viewBox="0 -2226.5 27991.9 3663.7" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-119-Title">
+<title id="MathJax-SVG-119-Title"> P(p_{t'} | k_{t_2}, n_{t_2}) = \frac{ \sum_{i=0}^{n-k} \binom{n-k}{i} (-1)^i p^(\frac{α + δ (k + i)}{δ ε} - 1) (1-p^{1/(δε)})^{β - 1} }{ δε \sum_{i=0}^{n-k} \binom{n-k}{i} (-1)^i ⋅ B(α + δ (k + i), \, β) }. </title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-50" x="0" y="0"></use>
  <use xlink:href="#MJMAIN-28" x="751" y="0"></use>
@@ -2077,8 +2065,8 @@
  <use xlink:href="#MJMAIN-3D" x="6169" y="0"></use>
 <g transform="translate(6947,0)">
 <g transform="translate(397,0)">
-<rect stroke="none" width="18023" height="60" x="0" y="220"></rect>
-<g transform="translate(60,872)">
+<rect stroke="none" width="20247" height="60" x="0" y="220"></rect>
+<g transform="translate(60,988)">
  <use xlink:href="#MJSZ1-2211" x="0" y="0"></use>
 <g transform="translate(1056,477)">
  <use transform="scale(0.707)" xlink:href="#MJMATHI-6E" x="0" y="0"></use>
@@ -2111,32 +2099,34 @@
 </g>
 <g transform="translate(7330,0)">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
-<g transform="translate(503,551)">
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-28" x="712" y="513"></use>
+</g>
+<g transform="translate(8209,0)">
 <g transform="translate(120,0)">
-<rect stroke="none" width="3315" height="60" x="0" y="146"></rect>
-<g transform="translate(60,515)">
- <use transform="scale(0.574)" xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
- <use transform="scale(0.574)" xlink:href="#MJMAIN-2B" x="640" y="0"></use>
- <use transform="scale(0.574)" xlink:href="#MJMATHI-3B4" x="1419" y="0"></use>
- <use transform="scale(0.574)" xlink:href="#MJMAIN-28" x="1863" y="0"></use>
- <use transform="scale(0.574)" xlink:href="#MJMATHI-6B" x="2253" y="0"></use>
- <use transform="scale(0.574)" xlink:href="#MJMAIN-2B" x="2774" y="0"></use>
- <use transform="scale(0.574)" xlink:href="#MJMATHI-69" x="3553" y="0"></use>
- <use transform="scale(0.574)" xlink:href="#MJMAIN-29" x="3898" y="0"></use>
- <use transform="scale(0.574)" xlink:href="#MJMAIN-2212" x="4288" y="0"></use>
- <use transform="scale(0.574)" xlink:href="#MJMAIN-31" x="5066" y="0"></use>
+<rect stroke="none" width="3152" height="60" x="0" y="220"></rect>
+<g transform="translate(60,622)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B1" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2B" x="640" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="1419" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-28" x="1863" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-6B" x="2253" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-2B" x="2774" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-69" x="3553" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMAIN-29" x="3898" y="0"></use>
 </g>
-<g transform="translate(1396,-430)">
- <use transform="scale(0.574)" xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
- <use transform="scale(0.574)" xlink:href="#MJMATHI-3B5" x="444" y="0"></use>
+<g transform="translate(1253,-453)">
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#MJMATHI-3B5" x="444" y="0"></use>
 </g>
 </g>
 </g>
-</g>
- <use xlink:href="#MJMAIN-28" x="11489" y="0"></use>
- <use xlink:href="#MJMAIN-31" x="11879" y="0"></use>
- <use xlink:href="#MJMAIN-2212" x="12601" y="0"></use>
-<g transform="translate(13602,0)">
+ <use xlink:href="#MJMAIN-2212" x="11823" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="12824" y="0"></use>
+ <use xlink:href="#MJMAIN-29" x="13324" y="0"></use>
+ <use xlink:href="#MJMAIN-28" x="13714" y="0"></use>
+ <use xlink:href="#MJMAIN-31" x="14103" y="0"></use>
+ <use xlink:href="#MJMAIN-2212" x="14826" y="0"></use>
+<g transform="translate(15827,0)">
  <use xlink:href="#MJMATHI-70" x="0" y="0"></use>
 <g transform="translate(503,362)">
  <use transform="scale(0.707)" xlink:href="#MJMAIN-31" x="0" y="0"></use>
@@ -2147,7 +2137,7 @@
  <use transform="scale(0.707)" xlink:href="#MJMAIN-29" x="2301" y="0"></use>
 </g>
 </g>
-<g transform="translate(16108,0)">
+<g transform="translate(18333,0)">
  <use xlink:href="#MJMAIN-29" x="0" y="0"></use>
 <g transform="translate(389,362)">
  <use transform="scale(0.707)" xlink:href="#MJMATHI-3B2" x="0" y="0"></use>
@@ -2156,7 +2146,7 @@
 </g>
 </g>
 </g>
-<g transform="translate(499,-989)">
+<g transform="translate(1611,-989)">
  <use xlink:href="#MJMATHI-3B4" x="0" y="0"></use>
  <use xlink:href="#MJMATHI-3B5" x="444" y="0"></use>
 <g transform="translate(1077,0)">
@@ -2208,7 +2198,7 @@
 </g>
 </g>
 </g>
- <use xlink:href="#MJMAIN-2E" x="25488" y="0"></use>
+ <use xlink:href="#MJMAIN-2E" x="27713" y="0"></use>
 </g>
 </svg></span> The denominator is the same in this <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.524ex" height="2.343ex" style="vertical-align: -0.338ex;" viewBox="0 -863.1 656.3 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-120-Title">
 <title id="MathJax-SVG-120-Title">t'</title>
@@ -2913,7 +2903,7 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
   after a fact's most recent review.
 
   `successes` is the number of times the user *successfully* exercised this
-  memory during this review session, out of `n` attempts. Therefore, `0 &lt;=
+  memory during this review session, out of `total` attempts. Therefore, `0 &lt;=
   successes &lt;= total` and `1 &lt;= total`.
 
   If the user was shown this flashcard only once during this review session,

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from scipy.special import betaln, logsumexp
+from scipy.special import beta as betafn
 import numpy as np
 
 
@@ -48,9 +49,82 @@ def _cachedBetaln(a, b):
   x = betaln(a, b)
   _BETALNCACHE[(a, b)] = x
   return x
+
+
 def binomln(n, k):
   "Log of scipy.special.binom calculated entirely in the log domain"
   return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
+
+
+def updateRecallFuzzy(prior, result, tnow, tback=None):
+  (alpha, beta, t) = prior
+  if tback is None:
+    tback = t
+  dt = tnow / t
+  et = tback / tnow
+
+  z = result > 0.5
+  q1 = result if z else 1 - result  # alternatively, max(result, 1-result)
+  q0 = 1 - q1
+
+  def moments(maxN, c, d, etInner=et):
+    nums = [
+        c * betafn(alpha + dt + N * dt * etInner, beta) + d * betafn(alpha + N * dt * etInner, beta)
+        for N in range(1, 1 + maxN)
+    ]
+    den = c * betafn(alpha + dt, beta) + d * betafn(alpha, beta)
+    return [num / den for num in nums]
+
+  if z == False:
+    mean, secondMoment = moments(2, q0 - q1, 1 - q0)
+  else:
+    mean, secondMoment = moments(2, q1 - q0, q0)
+
+  var = secondMoment - mean * mean
+  newAlpha, newBeta = _meanVarToBeta(mean, var)
+  proposed = newAlpha, newBeta, tback
+  return proposed
+
+
+# via https://stats.stackexchange.com/q/419197/31187
+def up2(prior, result, tnow, tback=None):
+  (alpha, beta, t) = prior
+  if tback is None:
+    tback = t
+  dt = tnow / t
+  et = tback / tnow
+
+  z = result > 0.5
+  q1 = result if z else 1 - result  # alternatively, max(result, 1-result)
+  q0 = 1 - q1
+
+  c = (alpha * q1 + beta * q0) / (alpha + beta)
+  if z:
+    r = q1 / c
+    s = q0 / c
+  else:
+    r = (1 - q1) / (1 - c)
+    s = (1 - q0) / (1 - c)
+
+  moment = lambda N: logsumexp([
+      betaln(alpha + dt + N * dt * et, beta),
+      betaln(alpha + N * dt * et, beta),
+  ],
+                               b=[r - s, s])
+
+  logDen = moment(0)
+  logmean = moment(1) - logDen
+  mean = np.exp(logmean)
+  logm2 = moment(2) - logDen
+  var = np.exp(logm2) - np.exp(2 * logmean)
+
+  # logm3 = moment(3) - logDen
+  # skewness = (np.exp(logm3) - 3 * mean * var - mean**3) / var**(3 / 2)
+  # print(dict(et=et, skewness=skewness))
+
+  newAlpha, newBeta = _meanVarToBeta(mean, var)
+  proposed = newAlpha, newBeta, tback
+  return proposed
 
 
 def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
@@ -141,6 +215,8 @@ def _meanVarToBeta(mean, var):
   alpha = mean * tmp
   beta = (1 - mean) * tmp
   return alpha, beta
+
+
 def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   """When will memory decay to a given percentile? 🏀
   
@@ -211,3 +287,14 @@ def defaultModel(t, alpha=3.0, beta=None):
   `alpha`.
   """
   return (alpha, beta or alpha, t)
+
+
+for z in [1., 0.9, 0.75, 0.5, 0.25, 0.1, 0.0]:
+  pre = (3., 4., 10.)
+  tnow = 19.
+  post = updateRecallFuzzy(pre, z, tnow, tback=pre[-1])
+  print(z, modelToPercentileDecay(post), post)
+  post = up2(pre, z, tnow, tback=pre[-1])
+  print(z, modelToPercentileDecay(post), post)
+  post = updateRecall(pre, z > 0.5, 1, tnow, tback=pre[-1], rebalance=False)
+  print(z, modelToPercentileDecay(post), post)

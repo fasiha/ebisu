@@ -23,6 +23,7 @@
     - [Recall probability right now](#recall-probability-right-now)
     - [Choice of initial model parameters](#choice-of-initial-model-parameters)
     - [Updating the posterior with quiz results](#updating-the-posterior-with-quiz-results)
+    - [Bonus: soft-binary quizzes](#bonus-soft-binary-quizzes)
   - [Source code](#source-code)
     - [Core library](#core-library)
     - [Miscellaneous functions](#miscellaneous-functions)
@@ -271,9 +272,63 @@ To summarize the update step: you started with a flashcard whose memory model wa
     \\sum_{i=0}^{n-k} \\binom{n-k}{i} (-1)^i ⋅ B(α + (i+k)δ, \\, β)
   } \\).
 
-That’s it! That’s all the math.
-
 > **Note** The Beta function \\(B(a,b)=Γ(a) Γ(b) / \Gamma(a+b)\\), being a function of a rapidly-growing function like the Gamma function (it is a generalization of factorial), may lose precision in the above expressions for unusual α and β and δ and ε. Addition and subtraction are risky when dealing with floating point numbers that have lost much of their precision. Ebisu takes care to use [log-Beta](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.betaln.html) and [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html) to minimize loss of precision.
+
+### Bonus: soft-binary quizzes
+For this section, let's restrict ourselves to \\(n=1\\); a review consists of just one quiz. But imagine if, instead of a Bernoulli trial that yields a binary 0 or 1, you had a “soft-binary” or “fuzzy” quiz result. Could we adjust the Ebisu model to consume such non-binary quiz results? As luck would have it, Stack Exchange user [@mef](https://stats.stackexchange.com/a/419320) has invented a lovely way to model this.
+ 
+Let \\(x \sim Bernoulli(p)\\) be the true Bernoulli draw, that is, the binary quiz result if there was no ambiguity or fuzziness around the student's performance: \\(x\\) is either 0 or 1. However, rather than observe \\(x\\), we actually observe a “noisy report” \\((z | x) \sim Bernoulli(q_x)\\) where
+- \\(q_1 = p(z = 1 | x = 1)\\) while
+- \\(q_0 = p(z = 1 | x = 0)\\).
+
+Note that, in the true-binary case, without fuzziness, \\(q_1 = 1\\) and \\(q_0 = 0\\), but in the soft-binary case, these two parameters are independent and free for you to specify as any numbers between 0 and 1 inclusive.
+
+Let’s work through the analysis, and then we’ll consider the question of how a real quiz app might set these parameters.
+
+The posterior
+\\[
+  P(p | z) = \\frac{Prior(p) \cdot Lik(z | p)}{\int_0^1 Prior(p) \cdot Lik(z|p) dp}
+\\]
+follows along similar lines as above—the prior is the GB1 prior on the recall probability at time \\(t_2\\), and the denominator above is just the definite integral of the numerator—except with a more complex likelihood. To describe that likelihood, we can take advantage of @mef’s derivation that the joint probability \\(P(p, x, z) = P(z|x) P(x|p) P(p)\\), then marginalize out \\(x\\) and divide by the marginal on \\(p\\). So, first, marginalize:
+\\[
+  P(p, z) = \sum_{x=0}^1 P(p, x, z) =  P(p) \sum_{x=0}^1 P(z|x) P(x|p),
+\\]
+and then divide:
+\\[
+  \frac{P(p, z)}{P(p)} = Lik(z | p) = \sum_{x=0}^1 P(z|x) P(x|p)
+\\]
+to get the likelihood. You could have written down last statement, \\(Lik(z | p) = \sum_{x=0}^1 P(z|x) P(x|p)\\), since it follows from definitions but the above long-winded way was how I first saw it, via @mef’s expression for the joint probability.
+
+Let’s break this likelihood into its two cases:
+- \\(Lik(z=0 | p) = P(z=0|x=0) P(x=0|p) + P(z=0|x=1) P(x=1|p) = (1-q_0)(1-p) + (1-q_1) p\\);
+- \\(Lik(z=1| p) = P(z=1|x=0) P(x=0|p) + P(z=1|x=1) P(x=1|p)=q_0 (1-p) + q_1 p\\).
+
+Massaging this posterior and putting it through the \\(ε=t' / t_2\\) time-travel can be tedious. A useful fact that you arrive at is, if \\(Lik(z|p) = r p + s\\), then the moments of the posterior on \\(p\\), time-traveled to \\(t'\\), are
+\\[
+  E[p_{t'}^N] = \frac{
+    r B(α + δ + N δ ε, β) + s B(α + N δ ε, β)
+  }{
+    r B(α + δ, β) + s B(α, β)
+  }.
+\\]
+This is useful because the likelihoods for both cases of \\(z\\) fit this pattern:
+- for \\(z=0\\), \\(r=q_0 - q_1\\) and \\(s=1-q_0\\), while
+- for \\(z=1\\), \\(r=q_1 - q_0\\) and \\(s=q_0\\).
+
+It’s comforting that the above two expressions yield the same moments as the no-noise case described in the previous section with \\(n=1\\) binomial quizzes (i.e., Bernoulli quizzes). As mentioned above, in the no-noise case, \\(q_x = x\\).
+
+With these expressions, the first and second moments of the posterior, viz., \\(m_1\\) and \\(m_2\\) respectively, can be evaluated for either \\(z\\). The two moments can then be moment-matched to the nearest Beta distribution to yield an updated model—the details of those final steps are the same as the binomial case discussed in the previous section.
+
+Let’s consider how a flashcard app might use this statistical machinery for soft-binary quizzes, where the quiz result is a decimal value between 0 and 1, inclusive. A very reasonable convention would be to treat values greater 0.5 as \\(z=1\\) and the rest as \\(z=0\\). But this still leaves open two independent parameters, \\(q_1 = p(z = 1 | x = 1)\\) and \\(q_0 = p(z = 1 | x = 0)\\). These paramters can be seen as,
+- what are the odds that the student really knew the answer but it just slipped her mind, because of factors other than her memory—what she ate just before the quiz, how much coffee she’s had, her stress level, the ambient noise? This is \\(q_1\\).
+- And similarly, suppose the student really had forgotten the answer: what are the odds that she got the quiz right? This is \\(q_0\\), and while it may seem absurd, consider how often you’ve remembered the answer after some struggle and were sure that had circumstances been slightly different, you’d have failed the quiz?
+
+One appealing way to set both these parameters for a given fuzzy quiz result is, given a `0 <= result <= 1`,
+1. set \\(q_1 = \max(result, 1-result)\\), and then
+2. \\(q_0 = 1-q_1\\).
+3. Let \\(z = result > 0.5\\).
+
+This algorithm is appealing because the posterior models have halflife that smoothly vary between the hard-fail and the full-pass case. That is, if a quiz's Ebisu model had a halflife of 10 time units, and a hard Bernoulli fail would drop the halflife to 8.5 and a full Bernoulli pass would raise it to 15, fuzzy results between 0 and 1 would yield updated models with halflife smoothly varying between 8.5 and 15, with a fuzzy result of 0.5 yielding a halflife of 10. This is sensible because \\(q_0 = q_1 = 0.5\\) implies your fuzzy quiz result is completely uninformative about your actual memory, so Ebisu has no choice but to leave the model alone.
 
 ## Source code
 

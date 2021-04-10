@@ -239,7 +239,7 @@ This is the posterior at time \\(t_2\\), the time of the quiz. I’d like to hav
 Then, \\(P(p_{t'} | k_{t_2}, n_{t_2}) = Posterior(p^{1/ε}|k_{t_2}, n_{t_2}) ⋅ \\frac{1}{ε} p^{1/ε - 1}\\):
 \\[
   P(p_{t'} | k_{t_2}, n_{t_2}) = \\frac{
-    \\sum_{i=0}^{n-k} \\binom{n-k}{i} (-1)^i p^(\\frac{α + δ (k + i)}{δ ε} - 1) (1-p^{1/(δε)})^{β - 1}
+    \\sum_{i=0}^{n-k} \\binom{n-k}{i} (-1)^i p^{\\frac{α + δ (k + i)}{δ ε} - 1} (1-p^{1/(δε)})^{β - 1}
   }{
     δε \\sum_{i=0}^{n-k} \\binom{n-k}{i} (-1)^i ⋅ B(α + δ (k + i), \\, β)
   }.

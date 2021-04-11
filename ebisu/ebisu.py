@@ -56,7 +56,7 @@ def binomln(n, k):
   return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
 
 
-def updateRecallFuzzy(prior, result, tnow, tback=None):
+def updateRecallFuzzy(prior, result, tnow, tback=None, q0=None):
   (alpha, beta, t) = prior
   if tback is None:
     tback = t
@@ -65,7 +65,8 @@ def updateRecallFuzzy(prior, result, tnow, tback=None):
 
   z = result > 0.5
   q1 = result if z else 1 - result  # alternatively, max(result, 1-result)
-  q0 = 1 - q1
+  if q0 is None:
+    q0 = 1 - q1
 
   def moments(maxN, c, d, etInner=et):
     nums = [
@@ -289,12 +290,45 @@ def defaultModel(t, alpha=3.0, beta=None):
   return (alpha, beta or alpha, t)
 
 
+def rescaleHalflife(prior, scale=1.):
+  """Given any model, return a new model with the original's halflife scaled.
+  Use this function to adjust the halflife of a model.
+  Perhaps you want to see this flashcard far less, because you *really* know it.
+  `newModel = rescaleHalflife(model, 5)` to shift its memory model out to five
+  times the old halflife.
+  Or if there's a flashcard that suddenly you want to review more frequently,
+  perhaps because you've recently learned a confuser flashcard that interferes
+  with your memory of the first, `newModel = rescaleHalflife(model, 0.1)` will
+  reduce its halflife by a factor of one-tenth.
+  Useful tip: the returned model will have matching α = β, where `alpha, beta,
+  newHalflife = newModel`. This happens because we first find the old model's
+  halflife, then we time-shift its probability density to that halflife. That's
+  the distribution this function returns, except at the *scaled* halflife.
+  """
+  (alpha, beta, t) = prior
+  oldHalflife = modelToPercentileDecay(prior)
+  dt = oldHalflife / t
+
+  logDenominator = betaln(alpha, beta)
+  logm2 = betaln(alpha + 2 * dt, beta) - logDenominator
+  m2 = np.exp(logm2)
+  newAlphaBeta = 1 / (8 * m2 - 2) - 0.5
+  return (newAlphaBeta, newAlphaBeta, oldHalflife * scale)
+
+
 for z in [1., 0.9, 0.75, 0.5, 0.25, 0.1, 0.0]:
   pre = (3., 4., 10.)
   tnow = 19.
   post = updateRecallFuzzy(pre, z, tnow, tback=pre[-1])
   print(z, modelToPercentileDecay(post), post)
+  post = updateRecallFuzzy(pre, z, tnow, tback=pre[-1], q0=0)
+  print(z, modelToPercentileDecay(post), post)
   post = up2(pre, z, tnow, tback=pre[-1])
   print(z, modelToPercentileDecay(post), post)
   post = updateRecall(pre, z > 0.5, 1, tnow, tback=pre[-1], rebalance=False)
   print(z, modelToPercentileDecay(post), post)
+
+pre = (3., 4., 10.)
+tnow = 19.
+post = rescaleHalflife(pre, 2.)
+print(post)

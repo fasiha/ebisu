@@ -24,6 +24,7 @@
     - [Choice of initial model parameters](#choice-of-initial-model-parameters)
     - [Updating the posterior with quiz results](#updating-the-posterior-with-quiz-results)
     - [Bonus: soft-binary quizzes](#bonus-soft-binary-quizzes)
+    - [Bonus: rescaling quiz ease or difficulty](#bonus-rescaling-quiz-ease-or-difficulty)
   - [Source code](#source-code)
     - [Core library](#core-library)
     - [Miscellaneous functions](#miscellaneous-functions)
@@ -329,6 +330,38 @@ One appealing way to set both these parameters for a given fuzzy quiz result is,
 3. Let \\(z = result > 0.5\\).
 
 This algorithm is appealing because the posterior models have halflife that smoothly vary between the hard-fail and the full-pass case. That is, if a quiz's Ebisu model had a halflife of 10 time units, and a hard Bernoulli fail would drop the halflife to 8.5 and a full Bernoulli pass would raise it to 15, fuzzy results between 0 and 1 would yield updated models with halflife smoothly varying between 8.5 and 15, with a fuzzy result of 0.5 yielding a halflife of 10. This is sensible because \\(q_0 = q_1 = 0.5\\) implies your fuzzy quiz result is completely uninformative about your actual memory, so Ebisu has no choice but to leave the model alone.
+
+### Bonus: rescaling quiz ease or difficulty
+Another kind of feedback that users can provide is indication that a quiz was either too late or too early, or in other words, the user wants to see a flashcard more frequently or less frequently than its current trajectory.
+
+There are any number of reasonable reasons why a flashcard's memory model may be miscalibrated. The user may have recently learned several confuser facts that interfere with another flashcard, or the opposite, the user may have obtained an insight that crystallizes several flashcards. The user may add flashcards that they already know quite well. The user may have not studied for a long time and needs Ebisu to rescale its halflife.
+
+I have found that anything that quiz apps can do to remove reasons for users to abandon studying is a good thing.
+
+We can handle such explicit feedback quite readily with the GB1 time-traveling framework developed above. Recall that each flashcard has its own Ebisu model \\((α, β, t)\\) which specify that the probability of recall \\(t\\) time units after studying follows a \\(Beta(α, β)\\) probability distribution.
+
+Then, we can accept a number from the user \\(u > 0\\) that we interpret to mean “rescale this model’s halflife by \\(u\\)”. This can be less than 1, meaning “shorten this halflife, it’s too long”, or greater than 1 meaning the opposite.
+
+To achieve this command, we
+1. find the time \\(h\\) such that the probability of recall is exactly 0.5: \\(h\\) for “halflife”. This can be done via a one-dimensional search.
+2. We time-travel the \\(Beta(α, β)\\) distribution (which is valid at \\(t\\)) through Ebbinghaus’ exponential forgetting function to this halflife and obtain the GB1 distribution on probabilty recall there.
+3. We moment-match that GB1 distribution to a Beta random variable to obtain a new model that’s perfectly balanced: \\((α_h, α_h, h)\\).
+4. Then we simply scale the halflife with with \\(u\\), yielding an updated and halflife-rescaled model, \\((α_h, α_h, u \cdot h)\\).
+
+The mean of the GB1 distribution on probability recall will be 0.5 by construction at the halflife \\(h\\): letting \\(δ = \frac{h}{t}\\),
+\\[
+  m_1 = E[p_t^δ] = \frac{B(α+δ, β)}{B(α,β)} = \frac{1}{2}.
+\\]
+The second non-central moment of GB1 distributions is also straightforward:
+\\[
+  m_2 = E\left[(p_t^δ) ^ 2\right] = \frac{B(α+2δ, β)}{B(α,β)}.
+\\]
+As we’ve done before, with these two moments, we can find the closest Beta random variable: letting \\(μ = 0.5\\) and \\(σ^2 = m_2 - 0.5^2\\), the recall probability at the halflife, \\(h\\), time units after last review is approximately \\(Beta(α_h, α_h)\\) where
+\\[α_h = μ (μ(1-μ)/σ^2 - 1) = \frac{1}{8 m_2 - 2} - \frac{1}{2}.\\]
+
+All that remains is to mindlessly follow the user’s instructions and scale the halflife by \\(u\\).
+
+In this way, we can rescale an Ebisu model \\((α, β, t)\\) to \\((α_h, α_h, u \cdot h)\\).
 
 ## Source code
 

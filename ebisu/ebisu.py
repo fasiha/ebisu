@@ -114,19 +114,39 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=N
 
   If the user was shown this flashcard only once during this review session,
   then `total=1`. If the quiz was a success, then `successes=1`, else
-  `successes=0`.
+  `successes=0`. (See below for fuzzy quizzes.)
   
   If the user was shown this flashcard *multiple* times during the review
   session (e.g., Duolingo-style), then `total` can be greater than 1.
 
-  `tnow` is the time elapsed between this fact's last review and the review
-  being used to update.
+  If `total` is 1, `successes` can be a float between 0 and 1 inclusive. This
+  implies that while there was some "real" quiz result, we only observed a
+  scrambled version of it, which is `successes > 0.5`. A "real" successful quiz
+  has a `max(successes, 1 - successes)` chance of being scrambled such that we
+  observe a failed quiz `successes > 0.5`. E.g., `successes` of 0.9 *and* 0.1
+  imply there was a 10% chance a "real" successful quiz could result in a failed
+  quiz.
 
-  (The keyword arguments `rebalance` and `tback` are intended for internal use.)
+  This noisy quiz model also allows you to specify the related probability that
+  a "real" quiz failure could be scrambled into the successful quiz you observed.
+  Consider "Oh no, if you'd asked me that yesterday, I would have forgotten it."
+  By default, this probability is `1 - max(successes, 1 - successes)` but doesn't
+  need to be that value. Provide `q0` to set this explicitly. See the full Ebisu
+  mathematical analysis for details on this model and why this is called "q0".
+
+  `tnow` is the time elapsed between this fact's last review.
 
   Returns a new object (like `prior`) describing the posterior distribution of
-  recall probability at `tback` (which is an optional input, defaults to
-  `tnow`).
+  recall probability at `tback` time after review.
+  
+  If `rebalance` is True, the new object represents the updated recall
+  probability at *the halflife*, i,e., `tback` such that the expected
+  recall probability is is 0.5. This is the default behavior.
+  
+  Performance-sensitive users might consider disabling rebalancing. In that
+  case, they may pass in the `tback` that the returned model should correspond
+  to. If none is provided, the returned model represets recall at the same time
+  as the input model.
 
   N.B. This function is tested for numerical stability for small `total < 5`. It
   may be unstable for much larger `total`.

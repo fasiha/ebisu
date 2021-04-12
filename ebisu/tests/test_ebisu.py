@@ -155,6 +155,22 @@ class TestEbisu(unittest.TestCase):
       self.assertAlmostEqual(
           predictRecall(pre, tnow, exact=True), predictRecall(post, tnow, exact=True), delta=1e-3)
 
+  def test_fuzzy(self):
+    "Binary quizzes are heavily tested above. Now test float/fuzzy quizzes here"
+    fuzzies = np.linspace(0, 1, 11)  # test 0 and 1 too
+    for tnow in np.logspace(-1, 2, 10):
+      for a in np.linspace(2, 100, 5):
+        for b in np.linspace(2, 100, 5):
+          prior = (a, b, 1.0)
+          newmodels = [updateRecall(prior, q, 1, tnow) for q in fuzzies]
+          for m in newmodels:
+            # check rebalance is working
+            newa, newb, newt = m
+            self.assertAlmostEqual(newa, newb)
+            self.assertAlmostEqual(newt, modelToPercentileDecay(m))
+          # now the important part: make sure halflife varies smoothly between q=0 and q=1
+          self.assertTrue(monotonicIncreasing([x for _, _, x in newmodels]))
+
 
 def monotonicIncreasing(v):
   # allow a tiny bit of negative slope

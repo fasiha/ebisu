@@ -200,11 +200,11 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
       prior=prior, successes=successes, total=total, tnow=tnow, rebalance=rebalance, tback=tback)
 
   if rebalance:
-    from scipy.optimize import minimize_scalar
+    from scipy.optimize import root_scalar
     root = lambda et: np.exp(unnormalizedLogMoment(1, et) - logDenominator) - 0.5
     bounds = _expand(root, 1 / dt)
-    sol = minimize_scalar(lambda et: root(et)**2, bounds=bounds, method='Bounded')
-    et = sol.x
+    sol = root_scalar(root, bracket=bounds)
+    et = sol.root
     tback = et * tnow
   if tback:
     et = tback / tnow

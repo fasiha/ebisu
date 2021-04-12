@@ -56,7 +56,7 @@ def binomln(n, k):
   return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
 
 
-def updateRecallFuzzy(prior, result, tnow, tback=None, q0=None):
+def updateRecallFuzzy(prior, result, tnow, rebalance=True, tback=None, q0=None):
   (alpha, beta, t) = prior
 
   z = result > 0.5
@@ -81,12 +81,15 @@ def updateRecallFuzzy(prior, result, tnow, tback=None, q0=None):
       num += d * betafn(alpha + N * dt * et, beta)
     return num / den
 
-  if tback is None:
+  if rebalance:
     from scipy.optimize import minimize
     sol = minimize(lambda et: (moment(1, et) - 0.5)**2, x0=[1 / dt], bounds=[[0, np.inf]])
     et = sol.x[0]
     tback = et * tnow
+  elif tback:
+    et = tback / tnow
   else:
+    tback = t
     et = tback / tnow
 
   mean = moment(1, et)  # could be just a bit away from 0.5 after rebal, so reevaluate

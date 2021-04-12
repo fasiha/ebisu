@@ -171,6 +171,15 @@ class TestEbisu(unittest.TestCase):
           # now the important part: make sure halflife varies smoothly between q=0 and q=1
           self.assertTrue(monotonicIncreasing([x for _, _, x in newmodels]))
 
+    # make sure `tback` works
+    prior = (3., 4., 10)
+    tback = 5.
+    post = updateRecall(prior, 1, 1, 1., rebalance=False, tback=tback)
+    self.assertAlmostEqual(post[2], tback)
+    # and default `tback` if everything is omitted is original `t`
+    post = updateRecall(prior, 1, 1, 1., rebalance=False)
+    self.assertAlmostEqual(post[2], prior[2])
+
 
 def monotonicIncreasing(v):
   # allow a tiny bit of negative slope

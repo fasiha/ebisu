@@ -201,9 +201,9 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
 
   if rebalance:
     from scipy.optimize import root_scalar
-    root = lambda et: np.exp(unnormalizedLogMoment(1, et) - logDenominator) - 0.5
-    bounds = _expand(root, 1 / dt)
-    sol = root_scalar(root, bracket=bounds)
+    target = np.log(0.5)
+    rootfn = lambda et: (unnormalizedLogMoment(1, et) - logDenominator) - target
+    sol = root_scalar(rootfn, bracket=_findBracket(rootfn, 1 / dt))
     et = sol.root
     tback = et * tnow
   if tback:
@@ -342,14 +342,26 @@ def rescaleHalflife(prior, scale=1.):
   return (newAlphaBeta, newAlphaBeta, oldHalflife * scale)
 
 
-def _expand(f, init):
-  """Find [lo, hi] such that f(lo) has different sign than f(hi)
-  
-  Makes no assumptions about monotonicity.
-  """
-  x0, x1 = (init * .5, init * 2.0)
-  y0, y1 = (f(x0), f(x1))
-  while np.sign(y0) == np.sign(y1):
-    x0, x1 = (x0 * 0.5, x1 * 2)
-    y0, y1 = (f(x0), f(x1))
-  return [x0, x1]
+def _findBracket(f, init=1., growfactor=2.):
+  # Scan for a bracket.
+  factorhigh = growfactor
+  factorlow = 1 / factorhigh
+  blow = factorlow * init
+  bhigh = factorhigh * init
+  flow = f(blow)
+  fhigh = f(bhigh)
+  while flow > 0 and fhigh > 0:
+    # Move the bracket up.
+    blow = bhigh
+    flow = fhigh
+    bhigh *= factorhigh
+    fhigh = f(bhigh)
+  while flow < 0 and fhigh < 0:
+    # Move the bracket down.
+    bhigh = blow
+    fhigh = flow
+    blow *= factorlow
+    flow = f(blow)
+
+  assert flow > 0 and fhigh < 0
+  return [blow, bhigh]

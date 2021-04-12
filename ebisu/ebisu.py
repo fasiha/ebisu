@@ -71,10 +71,14 @@ def updateRecallFuzzy(prior, result, tnow, tback=None, q0=None):
   else:
     c, d = (q1 - q0, q0)
 
-  den = c * betafn(alpha + dt, beta) + d * betafn(alpha, beta)
+  den = c * betafn(alpha + dt, beta) + d * (betafn(alpha, beta) if d else 0)
 
   def moment(N, et):
-    num = c * betafn(alpha + dt + N * dt * et, beta) + d * betafn(alpha + N * dt * et, beta)
+    num = 0
+    if c != 0:
+      num += c * betafn(alpha + dt + N * dt * et, beta)
+    if d != 0:
+      num += d * betafn(alpha + N * dt * et, beta)
     return num / den
 
   if tback is None:

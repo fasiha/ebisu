@@ -82,9 +82,8 @@ def updateRecallFuzzy(prior, result, tnow, rebalance=True, tback=None, q0=None):
     return num / den
 
   if rebalance:
-    from scipy.optimize import minimize
-    sol = minimize(lambda et: (moment(1, et) - 0.5)**2, x0=[1 / dt], bounds=[[0, np.inf]])
-    et = sol.x[0]
+    from scipy.optimize import newton
+    et = newton(lambda et: moment(1, et) - 0.5, 1 / dt)
     tback = et * tnow
   elif tback:
     et = tback / tnow
@@ -183,35 +182,53 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
   assert (0 <= successes and successes <= total and 1 <= total)
 
   (alpha, beta, t) = prior
-  if tback is None:
-    tback = t
   dt = tnow / t
-  et = tback / tnow
+  failures = total - successes
+  binomlns = [binomln(failures, i) for i in range(failures + 1)]
 
-  binomlns = [binomln(total - successes, i) for i in range(total - successes + 1)]
-  logDenominator, logMeanNum, logM2Num = [
-      logsumexp([
-          binomlns[i] + betaln(beta, alpha + dt * (successes + i) + m * dt * et)
-          for i in range(total - successes + 1)
-      ],
-                b=[(-1)**i
-                   for i in range(total - successes + 1)])
-      for m in range(3)
-  ]
-  mean = np.exp(logMeanNum - logDenominator)
-  m2 = np.exp(logM2Num - logDenominator)
+  def unnormalizedLogMoment(m, et):
+    return logsumexp([
+        binomlns[i] + betaln(alpha + dt * (successes + i) + m * dt * et, beta)
+        for i in range(failures + 1)
+    ],
+                     b=[(-1)**i for i in range(failures + 1)])
 
+  logDenominator = unnormalizedLogMoment(0, et=0)  # et doesn't matter for 0th moment
   message = dict(
       prior=prior, successes=successes, total=total, tnow=tnow, rebalance=rebalance, tback=tback)
+
+  if rebalance:
+    from scipy.optimize import newton
+    et = newton(
+        lambda et: np.exp(unnormalizedLogMoment(1, et) - logDenominator) - 0.5,
+        1 / dt,
+        maxiter=5000)
+    tback = et * tnow
+
+    m2 = np.exp(unnormalizedLogMoment(2, et) - logDenominator)
+    assert m2 > 0, message
+
+    newAlphaBeta = 1 / (8 * m2 - 2) - 0.5
+    return (newAlphaBeta, newAlphaBeta, tback)
+
+  if tback:
+    et = tback / tnow
+  else:
+    tback = t
+    et = tback / tnow
+
+  logMean = unnormalizedLogMoment(1, et) - logDenominator
+  mean = np.exp(logMean)
+  m2 = np.exp(unnormalizedLogMoment(2, et) - logDenominator)
+
   assert mean > 0, message
   assert m2 > 0, message
 
-  meanSq = np.exp(2 * (logMeanNum - logDenominator))
+  meanSq = np.exp(2 * logMean)
   var = m2 - meanSq
   assert var > 0, message
   newAlpha, newBeta = _meanVarToBeta(mean, var)
-  proposed = newAlpha, newBeta, tback
-  return _rebalace(prior, successes, total, tnow, proposed) if rebalance else proposed
+  return (newAlpha, newBeta, tback)
 
 
 def _rebalace(prior, k, n, tnow, proposed):
@@ -329,19 +346,31 @@ def rescaleHalflife(prior, scale=1.):
   return (newAlphaBeta, newAlphaBeta, oldHalflife * scale)
 
 
-for z in [1., 0.9, 0.75, 0.5, 0.25, 0.1, 0.0]:
-  pre = (3., 4., 10.)
-  tnow = 19.
-  post = updateRecallFuzzy(pre, z, tnow)
-  print(z, modelToPercentileDecay(post), post)
-  post = updateRecallFuzzy(pre, z, tnow, q0=0)
-  print(z, modelToPercentileDecay(post), post)
-  post = up2(pre, z, tnow, tback=pre[-1])
-  print(z, modelToPercentileDecay(post), post)
-  post = updateRecall(pre, z > 0.5, 1, tnow, tback=pre[-1], rebalance=False)
-  print(z, modelToPercentileDecay(post), post)
+for tnow in [1., 40.]:
+  for z in [1., 0.9, 0.75, 0.5, 0.25, 0.1, 0.0]:
+    pre = (3., 4., 10.)
+    post = updateRecallFuzzy(pre, z, tnow)
+    print('fuzzy', dict(z=z, tnow=tnow, hl=modelToPercentileDecay(post), new=post))
+    post = updateRecallFuzzy(pre, z, tnow, q0=0)
+    print('q0=0', dict(z=z, tnow=tnow, hl=modelToPercentileDecay(post), new=post))
+    post = up2(pre, z, tnow, tback=pre[-1])
+    print('2020', dict(z=z, tnow=tnow, hl=modelToPercentileDecay(post), new=post))
+    if z == 1. or z == 0:
+      post = updateRecall(pre, z > 0.5, 1, tnow)
+      print('binom', dict(z=z, tnow=tnow, hl=modelToPercentileDecay(post), new=post))
+
+print('BINOMIAL')
+for n in [1, 2, 3, 5]:
+  for tnow in [40., 1.]:
+    for k in range(n + 1):
+      try:
+        post = updateRecall(pre, k, n, tnow)
+        print(dict(n=n, tnow=tnow, k=k, hl=modelToPercentileDecay(post), post=post))
+      except Exception as e:
+        print(dict(n=n, tnow=tnow, k=k))
+        raise e
 
 pre = (3., 4., 10.)
 tnow = 19.
 post = rescaleHalflife(pre, 2.)
-print(post)
+print(dict(oldhl=modelToPercentileDecay(pre), rescaled=post, newhl=modelToPercentileDecay(post)))

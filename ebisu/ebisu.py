@@ -331,11 +331,11 @@ def _findBracket(f, init=1., growfactor=2.):
 
   Starts the bracket at `[init / growfactor, init * growfactor]`
   and then geometrically (exponentially) grows and shrinks the
-  bracket. For misbehaved functions, these can help you avoid
-  numerical instability. For well-behaved functions, the defaults
-  may be too conservative.
+  bracket by `growthfactor` and `1 / growthfactor` respectively.
+  For misbehaved functions, these can help you avoid numerical
+  instability. For well-behaved functions, the defaults may be
+  too conservative.
   """
-  # Scan for a bracket.
   factorhigh = growfactor
   factorlow = 1 / factorhigh
   blow = factorlow * init

@@ -96,6 +96,8 @@ def updateRecallFuzzy(prior, result, tnow, rebalance=True, tback=None, q0=None):
 
   var = secondMoment - mean * mean
   newAlpha, newBeta = _meanVarToBeta(mean, var)
+  assert newAlpha > 0
+  assert newBeta > 0
   return (newAlpha, newBeta, tback)
 
 
@@ -198,19 +200,12 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
       prior=prior, successes=successes, total=total, tnow=tnow, rebalance=rebalance, tback=tback)
 
   if rebalance:
-    from scipy.optimize import newton
-    et = newton(
-        lambda et: np.exp(unnormalizedLogMoment(1, et) - logDenominator) - 0.5,
-        1 / dt,
-        maxiter=5000)
+    from scipy.optimize import minimize_scalar
+    root = lambda et: np.exp(unnormalizedLogMoment(1, et) - logDenominator) - 0.5
+    bounds = _expand(root, 1 / dt)
+    sol = minimize_scalar(lambda et: root(et)**2, bounds=bounds, method='Bounded')
+    et = sol.x
     tback = et * tnow
-
-    m2 = np.exp(unnormalizedLogMoment(2, et) - logDenominator)
-    assert m2 > 0, message
-
-    newAlphaBeta = 1 / (8 * m2 - 2) - 0.5
-    return (newAlphaBeta, newAlphaBeta, tback)
-
   if tback:
     et = tback / tnow
   else:
@@ -343,34 +338,18 @@ def rescaleHalflife(prior, scale=1.):
   logm2 = betaln(alpha + 2 * dt, beta) - logDenominator
   m2 = np.exp(logm2)
   newAlphaBeta = 1 / (8 * m2 - 2) - 0.5
+  assert newAlphaBeta > 0
   return (newAlphaBeta, newAlphaBeta, oldHalflife * scale)
 
 
-for tnow in [1., 40.]:
-  for z in [1., 0.9, 0.75, 0.5, 0.25, 0.1, 0.0]:
-    pre = (3., 4., 10.)
-    post = updateRecallFuzzy(pre, z, tnow)
-    print('fuzzy', dict(z=z, tnow=tnow, hl=modelToPercentileDecay(post), new=post))
-    post = updateRecallFuzzy(pre, z, tnow, q0=0)
-    print('q0=0', dict(z=z, tnow=tnow, hl=modelToPercentileDecay(post), new=post))
-    post = up2(pre, z, tnow, tback=pre[-1])
-    print('2020', dict(z=z, tnow=tnow, hl=modelToPercentileDecay(post), new=post))
-    if z == 1. or z == 0:
-      post = updateRecall(pre, z > 0.5, 1, tnow)
-      print('binom', dict(z=z, tnow=tnow, hl=modelToPercentileDecay(post), new=post))
-
-print('BINOMIAL')
-for n in [1, 2, 3, 5]:
-  for tnow in [40., 1.]:
-    for k in range(n + 1):
-      try:
-        post = updateRecall(pre, k, n, tnow)
-        print(dict(n=n, tnow=tnow, k=k, hl=modelToPercentileDecay(post), post=post))
-      except Exception as e:
-        print(dict(n=n, tnow=tnow, k=k))
-        raise e
-
-pre = (3., 4., 10.)
-tnow = 19.
-post = rescaleHalflife(pre, 2.)
-print(dict(oldhl=modelToPercentileDecay(pre), rescaled=post, newhl=modelToPercentileDecay(post)))
+def _expand(f, init):
+  """Find [lo, hi] such that f(lo) has different sign than f(hi)
+  
+  Makes no assumptions about monotonicity.
+  """
+  x0, x1 = (init * .5, init * 2.0)
+  y0, y1 = (f(x0), f(x1))
+  while np.sign(y0) == np.sign(y1):
+    x0, x1 = (x0 * 0.5, x1 * 2)
+    y0, y1 = (f(x0), f(x1))
+  return [x0, x1]

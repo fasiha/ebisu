@@ -118,13 +118,11 @@ class TestEbisu(unittest.TestCase):
     def inner(a, b, n=1):
       prior = (a, b, 1.0)
       hl = modelToPercentileDecay(prior)
-      ts = np.linspace(.001, 1000, 101)
-      passhl = np.vectorize(
-          lambda tnow: modelToPercentileDecay(updateRecall(prior, n, n, tnow, 1.0)))(
-              ts)
-      failhl = np.vectorize(
-          lambda tnow: modelToPercentileDecay(updateRecall(prior, 0, n, tnow, 1.0)))(
-              ts)
+      ts = np.linspace(.001, 1000, 21) * hl
+      passhl = np.vectorize(lambda tnow: modelToPercentileDecay(updateRecall(prior, n, n, tnow)))(
+          ts)
+      failhl = np.vectorize(lambda tnow: modelToPercentileDecay(updateRecall(prior, 0, n, tnow)))(
+          ts)
       self.assertTrue(monotonicIncreasing(passhl))
       self.assertTrue(monotonicIncreasing(failhl))
       # Passing should only increase halflife
@@ -136,13 +134,28 @@ class TestEbisu(unittest.TestCase):
       for b in [2., 20, 200]:
         inner(a, b, n=1)
 
+  def test_rescale(self):
+    pre = (3., 4., 1.)
+    oldhl = modelToPercentileDecay(pre)
+    for u in [0.1, 1., 10.]:
+      post = rescaleHalflife(pre, u)
+      self.assertAlmostEqual(modelToPercentileDecay(post), oldhl * u)
+
+    # don't change halflife: in this case, predictions should be really close
+    post = rescaleHalflife(pre, 1.0)
+    for tnow in [1e-2, .1, 1., 10., 100.]:
+      self.assertAlmostEqual(
+          predictRecall(pre, tnow, exact=True), predictRecall(post, tnow, exact=True), delta=1e-3)
+
 
 def monotonicIncreasing(v):
-  return np.all(np.diff(v) >= -np.spacing(1.) * 1e8)
+  # allow a tiny bit of negative slope
+  return np.all(np.diff(v) >= -1e-6)
 
 
 def monotonicDecreasing(v):
-  return np.all(np.diff(v) <= np.spacing(1.) * 1e8)
+  # same as above, allow a tiny bit of positive slope
+  return np.all(np.diff(v) <= 1e-6)
 
 
 if __name__ == '__main__':

@@ -56,7 +56,7 @@ def binomln(n, k):
   return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
 
 
-def updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None):
+def _updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None):
   (alpha, beta, t) = prior
 
   z = result > 0.5
@@ -142,7 +142,7 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=N
   """
   assert (0 <= successes and successes <= total and 1 <= total)
   if total == 1:
-    return updateRecallSingle(prior, successes, tnow, rebalance=rebalance, tback=tback, q0=q0)
+    return _updateRecallSingle(prior, successes, tnow, rebalance=rebalance, tback=tback, q0=q0)
 
   (alpha, beta, t) = prior
   dt = tnow / t

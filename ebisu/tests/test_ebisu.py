@@ -142,6 +142,7 @@ class TestEbisu(unittest.TestCase):
         inner(a, b, n=1)
 
   def test_rescale(self):
+    "Test rescaleHalflife"
     pre = (3., 4., 1.)
     oldhl = modelToPercentileDecay(pre)
     for u in [0.1, 1., 10.]:

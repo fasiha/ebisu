@@ -58,33 +58,39 @@ def binomln(n, k):
 
 def updateRecallFuzzy(prior, result, tnow, tback=None, q0=None):
   (alpha, beta, t) = prior
-  if tback is None:
-    tback = t
-  dt = tnow / t
-  et = tback / tnow
 
   z = result > 0.5
   q1 = result if z else 1 - result  # alternatively, max(result, 1-result)
   if q0 is None:
     q0 = 1 - q1
 
-  def moments(maxN, c, d, etInner=et):
-    nums = [
-        c * betafn(alpha + dt + N * dt * etInner, beta) + d * betafn(alpha + N * dt * etInner, beta)
-        for N in range(1, 1 + maxN)
-    ]
-    den = c * betafn(alpha + dt, beta) + d * betafn(alpha, beta)
-    return [num / den for num in nums]
+  dt = tnow / t
 
   if z == False:
-    mean, secondMoment = moments(2, q0 - q1, 1 - q0)
+    c, d = (q0 - q1, 1 - q0)
   else:
-    mean, secondMoment = moments(2, q1 - q0, q0)
+    c, d = (q1 - q0, q0)
+
+  den = c * betafn(alpha + dt, beta) + d * betafn(alpha, beta)
+
+  def moment(N, et):
+    num = c * betafn(alpha + dt + N * dt * et, beta) + d * betafn(alpha + N * dt * et, beta)
+    return num / den
+
+  if tback is None:
+    from scipy.optimize import minimize
+    sol = minimize(lambda et: (moment(1, et) - 0.5)**2, x0=[1 / dt], bounds=[[0, np.inf]])
+    et = sol.x[0]
+    tback = et * tnow
+  else:
+    et = tback / tnow
+
+  mean = moment(1, et)  # could be just a bit away from 0.5 after rebal, so reevaluate
+  secondMoment = moment(2, et)
 
   var = secondMoment - mean * mean
   newAlpha, newBeta = _meanVarToBeta(mean, var)
-  proposed = newAlpha, newBeta, tback
-  return proposed
+  return (newAlpha, newBeta, tback)
 
 
 # via https://stats.stackexchange.com/q/419197/31187
@@ -319,9 +325,9 @@ def rescaleHalflife(prior, scale=1.):
 for z in [1., 0.9, 0.75, 0.5, 0.25, 0.1, 0.0]:
   pre = (3., 4., 10.)
   tnow = 19.
-  post = updateRecallFuzzy(pre, z, tnow, tback=pre[-1])
+  post = updateRecallFuzzy(pre, z, tnow)
   print(z, modelToPercentileDecay(post), post)
-  post = updateRecallFuzzy(pre, z, tnow, tback=pre[-1], q0=0)
+  post = updateRecallFuzzy(pre, z, tnow, q0=0)
   print(z, modelToPercentileDecay(post), post)
   post = up2(pre, z, tnow, tback=pre[-1])
   print(z, modelToPercentileDecay(post), post)

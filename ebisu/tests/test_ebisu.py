@@ -5,6 +5,8 @@ from ebisu.alternate import *
 import unittest
 import numpy as np
 
+np.seterr(all='raise')
+
 
 def relerr(dirt, gold):
   return abs(dirt - gold) / abs(gold)
@@ -109,6 +111,11 @@ class TestEbisu(unittest.TestCase):
 
     inner(3.3, 4.4, 1., [0.1, 1., 9.5])
     inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
+
+    # make sure all is well for balanced models where we know the halflife already
+    for t in np.logspace(-1, 2, 10):
+      for ab in np.linspace(2, 10, 5):
+        self.assertAlmostEqual(modelToPercentileDecay((ab, ab, t)), t)
 
   def test_asymptotic(self):
     """Failing quizzes in far future shouldn't modify model when updating.

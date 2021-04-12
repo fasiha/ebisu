@@ -243,14 +243,13 @@ def _meanVarToBeta(mean, var):
   return alpha, beta
 
 
-def modelToPercentileDecay(model, percentile=0.5, coarse=False):
+def modelToPercentileDecay(model, percentile=0.5):
   """When will memory decay to a given percentile? 🏀
   
   Given a memory `model` of the kind consumed by `predictRecall`,
   etc., and optionally a `percentile` (defaults to 0.5, the
   half-life), find the time it takes for memory to decay to
-  `percentile`. If `coarse`, the returned time (in the same units as
-  `model`) is approximate.
+  `percentile`.
   """
   # Use a root-finding routine in log-delta space to find the delta that
   # will cause the GB1 distribution to have a mean of the requested quantile.
@@ -266,36 +265,17 @@ def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   logBab = betaln(alpha, beta)
   logPercentile = np.log(percentile)
 
-  def f(lndelta):
-    logMean = betaln(alpha + np.exp(lndelta), beta) - logBab
+  def f(delta):
+    logMean = betaln(alpha + delta, beta) - logBab
     return logMean - logPercentile
 
-  # Scan for a bracket.
-  bracket_width = 1.0 if coarse else 6.0
-  blow = -bracket_width / 2.0
-  bhigh = bracket_width / 2.0
-  flow = f(blow)
-  fhigh = f(bhigh)
-  while flow > 0 and fhigh > 0:
-    # Move the bracket up.
-    blow = bhigh
-    flow = fhigh
-    bhigh += bracket_width
-    fhigh = f(bhigh)
-  while flow < 0 and fhigh < 0:
-    # Move the bracket down.
-    bhigh = blow
-    fhigh = flow
-    blow -= bracket_width
-    flow = f(blow)
+  b = _findBracket(f, init=1., growfactor=2.)
+  sol = root_scalar(f, bracket=b)
+  # root_scalar is supposed to take initial guess x0, but it doesn't seem
+  # to speed up convergence at all? This is frustrating because for balanced
+  # models the solution is 1.0 which we could initialize...
 
-  assert flow > 0 and fhigh < 0
-
-  if coarse:
-    return (np.exp(blow) + np.exp(bhigh)) / 2 * t0
-
-  sol = root_scalar(f, bracket=[blow, bhigh])
-  t1 = np.exp(sol.root) * t0
+  t1 = sol.root * t0
   return t1
 
 
@@ -343,6 +323,18 @@ def rescaleHalflife(prior, scale=1.):
 
 
 def _findBracket(f, init=1., growfactor=2.):
+  """
+  Roughly bracket monotonic `f` defined for positive numbers.
+
+  Returns `[l, h]` such that `l < h` and `f(h) < 0 < f(l)`.
+  Ready to be passed into `scipy.optimize.root_scalar`, etc.
+
+  Starts the bracket at `[init / growfactor, init * growfactor]`
+  and then geometrically (exponentially) grows and shrinks the
+  bracket. For misbehaved functions, these can help you avoid
+  numerical instability. For well-behaved functions, the defaults
+  may be too conservative.
+  """
   # Scan for a bracket.
   factorhigh = growfactor
   factorlow = 1 / factorhigh

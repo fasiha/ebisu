@@ -56,7 +56,7 @@ def binomln(n, k):
   return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
 
 
-def updateRecallFuzzy(prior, result, tnow, rebalance=True, tback=None, q0=None):
+def updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None):
   (alpha, beta, t) = prior
 
   z = result > 0.5
@@ -74,16 +74,16 @@ def updateRecallFuzzy(prior, result, tnow, rebalance=True, tback=None, q0=None):
   den = c * betafn(alpha + dt, beta) + d * (betafn(alpha, beta) if d else 0)
 
   def moment(N, et):
-    num = 0
-    if c != 0:
-      num += c * betafn(alpha + dt + N * dt * et, beta)
+    num = c * betafn(alpha + dt + N * dt * et, beta)
     if d != 0:
       num += d * betafn(alpha + N * dt * et, beta)
     return num / den
 
   if rebalance:
-    from scipy.optimize import newton
-    et = newton(lambda et: moment(1, et) - 0.5, 1 / dt)
+    from scipy.optimize import root_scalar
+    rootfn = lambda et: moment(1, et) - 0.5
+    sol = root_scalar(rootfn, bracket=_findBracket(rootfn, 1 / dt))
+    et = sol.root
     tback = et * tnow
   elif tback:
     et = tback / tnow
@@ -101,48 +101,7 @@ def updateRecallFuzzy(prior, result, tnow, rebalance=True, tback=None, q0=None):
   return (newAlpha, newBeta, tback)
 
 
-# via https://stats.stackexchange.com/q/419197/31187
-def up2(prior, result, tnow, tback=None):
-  (alpha, beta, t) = prior
-  if tback is None:
-    tback = t
-  dt = tnow / t
-  et = tback / tnow
-
-  z = result > 0.5
-  q1 = result if z else 1 - result  # alternatively, max(result, 1-result)
-  q0 = 1 - q1
-
-  c = (alpha * q1 + beta * q0) / (alpha + beta)
-  if z:
-    r = q1 / c
-    s = q0 / c
-  else:
-    r = (1 - q1) / (1 - c)
-    s = (1 - q0) / (1 - c)
-
-  moment = lambda N: logsumexp([
-      betaln(alpha + dt + N * dt * et, beta),
-      betaln(alpha + N * dt * et, beta),
-  ],
-                               b=[r - s, s])
-
-  logDen = moment(0)
-  logmean = moment(1) - logDen
-  mean = np.exp(logmean)
-  logm2 = moment(2) - logDen
-  var = np.exp(logm2) - np.exp(2 * logmean)
-
-  # logm3 = moment(3) - logDen
-  # skewness = (np.exp(logm3) - 3 * mean * var - mean**3) / var**(3 / 2)
-  # print(dict(et=et, skewness=skewness))
-
-  newAlpha, newBeta = _meanVarToBeta(mean, var)
-  proposed = newAlpha, newBeta, tback
-  return proposed
-
-
-def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
+def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as in `ebisu.predictRecall`'s arguments: an object
@@ -182,6 +141,8 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
   exceptions for cases that you think are reasonable.
   """
   assert (0 <= successes and successes <= total and 1 <= total)
+  if total == 1:
+    return updateRecallSingle(prior, successes, tnow, rebalance=rebalance, tback=tback, q0=q0)
 
   (alpha, beta, t) = prior
   dt = tnow / t

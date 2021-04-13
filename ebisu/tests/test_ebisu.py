@@ -157,18 +157,25 @@ class TestEbisu(unittest.TestCase):
 
   def test_fuzzy(self):
     "Binary quizzes are heavily tested above. Now test float/fuzzy quizzes here"
-    fuzzies = np.linspace(0, 1, 11)  # test 0 and 1 too
-    for tnow in np.logspace(-1, 2, 10):
-      for a in np.linspace(2, 100, 5):
-        for b in np.linspace(2, 100, 5):
+    fuzzies = np.linspace(0, 1, 7)  # test 0 and 1 too
+    for tnow in np.logspace(-1, 1, 5):
+      for a in np.linspace(2, 20, 5):
+        for b in np.linspace(2, 20, 5):
           prior = (a, b, 1.0)
           newmodels = [updateRecall(prior, q, 1, tnow) for q in fuzzies]
-          for m in newmodels:
+          for m, q in zip(newmodels, fuzzies):
             # check rebalance is working
             newa, newb, newt = m
             self.assertAlmostEqual(newa, newb)
             self.assertAlmostEqual(newt, modelToPercentileDecay(m))
-          # now the important part: make sure halflife varies smoothly between q=0 and q=1
+
+            # check that the analytical posterior Beta fit versus Monte Carlo
+            if 0 < q and q < 1:
+              mc = updateRecallMonteCarlo(prior, q, 1, tnow, newt, N=1_000_000)
+              self.assertLess(
+                  kl(m, mc), 1e-4, msg=f'prior={prior}; tnow={tnow}; q={q}; m={m}; mc={mc}')
+
+          # also important: make sure halflife varies smoothly between q=0 and q=1
           self.assertTrue(monotonicIncreasing([x for _, _, x in newmodels]))
 
     # make sure `tback` works

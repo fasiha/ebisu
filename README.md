@@ -389,7 +389,7 @@ Note that this relies on \\(n=1\\) quizzes, with a single review per fact.
   - \\(r = q_1 - q_0\\) (1 for a binary non-fuzzy quiz)
   - \\(s = q_0\\) (0 for a binary non-fuzzy quiz).
 
-> Sharp-eyed readers will notice that, for the successful binary quiz and \\(δ ε = 1\\), i.e., when \\(t_' = t\\) and the posterior is moved from the recall at the quiz time back to the time of the initial prior, this posterior is simply a Beta density. We’ll revisit this observation in the appendix.
+> Sharp-eyed readers will notice that, for the successful binary quiz and \\(δ ε = 1\\), i.e., when \\(t' = t\\) and the posterior is moved from the recall at the quiz time back to the time of the initial prior, this posterior is simply a Beta density. We’ll revisit this observation in the appendix.
 
 It’s comforting that these moments for the non-fuzzy binary case agree with those derived for the general \\(n\\) case in the previous section—in the no-noise case, \\(q_x = x\\).
 

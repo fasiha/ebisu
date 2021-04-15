@@ -154,25 +154,66 @@ That is, to fast-forward or rewind \\(p_t\\) to time \\(t_2\\), we raise it to t
 Unfortunately, a Beta-distributed \\(p_t\\) becomes *non*-Beta-distributed when raised to any positive power \\(δ\\). For a quiz with recall probability given by \\(p_t ∼ Beta(12, 12)\\) for \\(t\\) one week after the last review (the middle histogram below), \\(δ > 1\\) shifts the density to the left (lower recall probability) while \\(δ < 1\\) does the opposite. Below shows the histogram of recall probability at the original half-life of seven days compared to that after two days (\\(δ = 0.3\\)) and three weeks (\\(δ  = 3\\)).
 ![figures/pidelta.png](figures/pidelta.png)
 
-We could approximate this \\(δ\\) with a Beta random variable, but especially when over- or under-reviewing, the closest Beta fit is very poor. So let’s derive analytically the probability density function (PDF) for \\(p_t^δ\\). Recall the conventional way to obtain the density of a [nonlinearly-transformed random variable](https://en.wikipedia.org/w/index.php?title=Random_variable&oldid=771423505#Functions_of_random_variables): let \\(x=p_t\\) and \\(y = g(x) = x^δ\\) be the forward transform, so \\(g^{-1}(y) = y^{1/δ}\\) is its inverse. Then, with \\(P_X(x) = Beta(x; α,β)\\),
-\\[P_{Y}(y) = P_{X}(g^{-1}(y)) · \frac{∂}{∂y} g^{-1}(y),\\]
-and this after some Wolfram Alpha and hand-manipulation becomes
-\\[P_{Y}(y) = y^{(α-δ)/δ} · (1-y^{1/δ})^{β-1} / (δ · B(α, β)),\\]
-where \\(B(α, β) = Γ(α) · Γ(β) / Γ(α + β)\\) is [beta function](https://en.wikipedia.org/wiki/Beta_function), also the normalizing denominator in the Beta density (confusing, sorry), and \\(Γ(·)\\) is the [gamma function](https://en.wikipedia.org/wiki/Gamma_function), a generalization of factorial.
-
-> To check this, type in `y^((a-1)/d) * (1 - y^(1/d))^(b-1) / Beta[a,b] * D[y^(1/d), y]` at [Wolfram Alpha](https://www.wolframalpha.com).
-
-Replacing the \\(X\\)’s and \\(Y\\)’s with our usual variables, we have the probability density for \\(p_{t_2} = p_t^δ\\) in terms of the original density for \\(p_t\\):
-\\[P(p_t^δ) = \frac{p^{(α - δ)/δ} · (1-p^{1/δ})^{β-1}}{δ · B(α, β)}.\\]
+We could approximate this \\(δ\\) with a Beta random variable, but especially when over- or under-reviewing, the closest Beta fit is very poor. So let’s derive analytically the probability density function (PDF) for \\(p_t^δ\\). Recall the conventional way to obtain the density of a [nonlinearly-transformed random variable](https://en.wikipedia.org/w/index.php?title=Random_variable&oldid=771423505#Functions_of_random_variables). Since the new random variable
+\\[p_{t_2} = g(p_t) = (p_t)^δ,\\]
+and the inverse of this transformation is 
+\\[p_t = g^{-1}(p_{t_2}) = (p_{t_2})^{1/δ},\\]
+the transformed (exponentiated) random variable has probability density
+\\begin{align}
+  P(p_{t_2}) &= P\left(g^{-1}(p_{t_2})\right) ⋅ \frac{∂}{∂p_{t_2}} g^{-1}(p_{t_2}) \\\\
+             &= Beta(p_{t_2}^{1/δ}; α, β) ⋅ \frac{p_{t_2}^{1/δ - 1}}{δ},
+\\end{align}
+since \\(P(p_t) = Beta(p_t; α, β)\\), the Beta density on the recall probability at time \\(t\\), and \\(\frac{∂}{∂p_{t_2}} g^{-1}(p_{t_2})^{1/δ} = \frac{p_{t_2}^{1/δ - 1}}{δ}\\). Following some algebra, the final density is
+\\[
+  P(p_{t_2}) = P(p_t^\delta) = \frac{p_{t_2}^{α/δ - 1} · (1-p_{t_2}^{1/δ})^{β-1}}{δ · B(α, β)},
+\\]
+where \\(B(α, β) = Γ(α) · Γ(β) / Γ(α + β)\\) is [beta function](https://en.wikipedia.org/wiki/Beta_function) (also the normalizing denominator in the Beta density—confusing, sorry), and \\(Γ(·)\\) is the [gamma function](https://en.wikipedia.org/wiki/Gamma_function), a generalization of factorial.
 
 [Robert Kern noticed](https://github.com/fasiha/ebisu/issues/5) that this is a [generalized Beta of the first kind](https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)), or GB1, random variable:
 \\[p_t^δ ∼ GB1(p; 1/δ, 1, α; β)\\]
 When \\(δ=1\\), that is, at exactly the half-life, recall probability is simply the initial Beta we started with.
 
-
 We will use the density of \\(p_t^δ\\) to reach our two most important goals:
 - what’s the recall probability of a given fact right now?, and
 - how do I update my estimate of that recall probability given quiz results?
+
+> To check the above derivation in [Wolfram Alpha](https://www.wolframalpha.com), type in `p^((a-1)/d) * (1 - p^(1/d))^(b-1) / Beta[a,b] * D[p^(1/d), y]`.
+>
+> To check it in [Sympy](https://live.sympy.org/), copy-paste the following into the Sympy Live Shell (or save it in a file and run):
+> ```py
+> from sympy import symbols, simplify, diff
+> p_1, p_2, a, b, d, den = symbols('p_1 p_2 α β δ den', positive=True, real=True)
+> prior_t = p_1**(a - 1) * (1 - p_1)**(b - 1) / den
+> prior_t2 = simplify(prior_t.subs(p_1, p_2**(1 / d)) * diff(p_2**(1 / d), p_2))
+> prior_t2  # or
+> print(prior_t2)
+> ```
+> which produces `p_2**((α - δ)/δ)*(1 - p_2**(1/δ))**(β - 1)/(den*δ)`.
+>
+> And finally, we can use Monte Carlo to generate random draws from \\(p_t^δ\\), for specific α, β, and δ, and comparing sample moments against the GB1's analytical moments per [Wikipedia](https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)), \\(E\left[(p_{t}^{δ})^N\right]=\frac{B(α + δ N, β)}{B(α, β)}\\):
+> ```py
+> (α, β, δ) = 5, 4, 3
+> import numpy as np
+> from scipy.stats import beta as betarv
+> from scipy.special import beta as betafn
+> prior_t = betarv.rvs(α, β, size=100_000)
+> prior_t2 = prior_t**δ
+> Ns = np.array([1, 2, 3, 4, 5])
+> sampleMoments = [np.mean(prior_t2**N) for N in Ns]
+> analyticalMoments = betafn(α + δ * Ns, β) / betafn(α, β)
+> print(list(zip(sampleMoments, analyticalMoments)))
+> ```
+> which produces this tidy table of the first five non-central moments:
+> 
+> | analytical | sample | % difference |
+> |------------|--------|---------------|
+> | 0.2121 | 0.2122 | 0.042% |
+> | 0.06993 | 0.06991 | -0.02955% |
+> | 0.02941 | 0.02937 | -0.1427% |
+> | 0.01445 | 0.01442 | -0.2167% |
+> | 0.007905 | 0.007889 | -0.2082% |
+>
+> We check both mathematical derivations and their programmatic implementations by comparing them against Monte Carlo as part of an extensive unit test suite in the code below.
 
 ### Recall probability right now
 
@@ -195,7 +236,7 @@ Quiz apps that allow a students to indicate initial familiarity (or lack thereof
 Now, let us turn to the final piece of the math, how to update our prior on a fact’s recall probability when a quiz result arrives.
 
 ### Updating the posterior with quiz results
-Recall that our quiz app might ask the student to exercise the same memory multiple times in one sitting, e.g., conjugating the same verb in two different sentences. Therefore, the student’s recall of that memory is a binomial experiment, which is parameterized by \\(k\\) successes out of \\(n\\) attempts, with \\(0 ≤ k ≤ n\\) and \\(n ≥ 1\\). For many quiz applications, \\(n = 1\\), so this simplifies to a Bernoulli experiment.
+Recall that our quiz app might ask the student to exercise the same memory, one or more times in one sitting (perhaps conjugating the same verb in two different sentences). Therefore, the student’s recall of that memory is a binomial experiment, which is parameterized by \\(k\\) successes out of \\(n\\) attempts, with \\(0 ≤ k ≤ n\\) and \\(n ≥ 1\\). For many quiz applications, \\(n = 1\\), so this simplifies to a Bernoulli experiment.
 
 **Nota bene.** The \\(n\\) individual sub-trials that make up a single binomial experiment are assumed to be independent of each other. If your quiz application tells the user that, for example, they incorrectly conjugated a verb, and then later in the *same* review session, asks the user to conjugate the verb again (perhaps in the context of a different sentence), then the two sub-trials are likely not independent, unless the user forgot that they were just asked about that verb. Please get in touch if you want feedback on whether your quiz app design might be running afoul of this caveat.
 
@@ -279,14 +320,14 @@ To summarize the update step: you started with a flashcard whose memory model wa
 For this section, let's restrict ourselves to \\(n=1\\); a review consists of just one quiz. But imagine if, instead of a Bernoulli trial that yields a binary 0 or 1, you had a “soft-binary” or “fuzzy” quiz result. Could we adjust the Ebisu model to consume such non-binary quiz results? As luck would have it, Stack Exchange user [@mef](https://stats.stackexchange.com/a/419320) has invented a lovely way to model this.
  
 Let \\(x \sim Bernoulli(p)\\) be the true Bernoulli draw, that is, the binary quiz result if there was no ambiguity or fuzziness around the student's performance: \\(x\\) is either 0 or 1. However, rather than observe \\(x\\), we actually observe a “noisy report” \\((z | x) \sim Bernoulli(q_x)\\) where
-- \\(q_1 = p(z = 1 | x = 1)\\) while
-- \\(q_0 = p(z = 1 | x = 0)\\).
+- \\(q_1 = P(z = 1 | x = 1)\\) while
+- \\(q_0 = P(z = 1 | x = 0)\\).
 
 Note that, in the true-binary case, without fuzziness, \\(q_1 = 1\\) and \\(q_0 = 0\\), but in the soft-binary case, these two parameters are independent and free for you to specify as any numbers between 0 and 1 inclusive.
 
 Let’s work through the analysis, and then we’ll consider the question of how a real quiz app might set these parameters.
 
-The posterior
+The posterior at time \\(t_2\\), i.e., at the time of the quiz,
 \\[
   P(p | z) = \\frac{Prior(p) \cdot Lik(z | p)}{\int_0^1 Prior(p) \cdot Lik(z|p) dp}
 \\]
@@ -300,25 +341,53 @@ and then divide:
 \\]
 to get the likelihood. You could have written down last statement, \\(Lik(z | p) = \sum_{x=0}^1 P(z|x) P(x|p)\\), since it follows from definitions but the above long-winded way was how I first saw it, via @mef’s expression for the joint probability.
 
-Let’s break this likelihood into its two cases:
-- \\(Lik(z=0 | p) = P(z=0|x=0) P(x=0|p) + P(z=0|x=1) P(x=1|p) = (1-q_0)(1-p) + (1-q_1) p\\);
-- \\(Lik(z=1| p) = P(z=1|x=0) P(x=0|p) + P(z=1|x=1) P(x=1|p)=q_0 (1-p) + q_1 p\\).
+Let’s break this likelihood into its two cases: first, for observed failed quizzes,
+\\begin{align}
+  Lik(z=0 | p) &= P(z=0|x=0) P(x=0|p) + P(z=0|x=1) P(x=1|p) \\\\
+               &= (1-q_0)(1-p) + (1-q_1) p.
+\\end{align}
+And following the same pattern, for observed successful quizzes:
+\\begin{align}
+  Lik(z=1| p) &= P(z=1|x=0) P(x=0|p) + P(z=1|x=1) P(x=1|p) \\\\
+                 &=q_0 (1-p) + q_1 p\.
+\\end{align}
 
-Massaging this posterior and putting it through the \\(ε=t' / t_2\\) time-travel can be tedious. A useful fact that you arrive at is, if \\(Lik(z|p) = r p + s\\), then the moments of the posterior on \\(p\\), time-traveled to \\(t'\\), are
+Recall that, while the above posterior is on the recall at the time of the quiz \\(t_2\\), we want the flexibility to time-travel it to any time \\(t' = ε ⋅ t_2\\). We’ve done this twice already—first to transform the Beta prior on recall after \\(t\\) to \\(t_2 = δ ⋅ t\\), and then again to transform the *binomial* posterior from the quiz time \\(t_2\\) to any \\(t' = ε ⋅ t_2\\). Let’s do it a third time. The pattern is the same as before:
 \\[
-  E[p_{t'}^N] = \frac{
-    r B(α + δ + N δ ε, β) + s B(α + N δ ε, β)
+  P(p; p_{t'}|z_{t_2}) ∝ Prior(p^{1/ε}) ⋅ Lik(p^{1/ε}) ⋅ \frac{1}{ε} p^{1/ε - 1}
+\\]
+where the \\(∝\\) symbol is read “proportional to” and just means that the expression on the right has to be normalized (divide it by its integral) to ensure the result is a true probability density whose definite integral sums to one.
+
+We can represent the likelihood of any \\(n=1\\) quiz—binary and noisy!—as \\(Lik(z|p) = r p + s\\) for some \\(r\\) and \\(s\\). Then,
+\\[
+  P(p; p_{t'}|z_{t_2}) = \\frac{
+    \\left( r p^{\\frac{α + δ}{δ ε} - 1} + s p^{\\frac{α}{δ ε}-1} \\right) 
+    \\left( 1-p^{\\frac{1}{δ ε}} \\right)^{β - 1}
+  }{
+    δ ε (r B(α + δ, β) + s B(α, β))
+  }.
+\\]
+The normalizing denominator comes from \\(\\int_0^1 p^{a/x - 1} (1-p^{1/x})^{b - 1} dp = x ⋅ B(a, b)\\), which we also used in the binomial case above. This fact is also very helpful to evaluate the moments of this posterior:
+\\[
+  m_N = E\\left[ p_{t'}^N\\right] = \frac{
+    c B(α + δ(1 + N ε), β) + s B(α + δ N ε, β) 
   }{
     r B(α + δ, β) + s B(α, β)
   }.
 \\]
-This is useful because the likelihoods for both cases of \\(z\\) fit this pattern:
-- for \\(z=0\\), \\(r=q_0 - q_1\\) and \\(s=1-q_0\\), while
-- for \\(z=1\\), \\(r=q_1 - q_0\\) and \\(s=q_0\\).
+Note that this relies on \\(n=1\\) quizzes, with a single review per fact.
+- For \\(z=0\\), i.e., a failed quiz, 
+  - \\(r = q_0 - q_1\\) (-1 for a binary non-fuzzy quiz)
+  - \\(s = 1-q_0\\) (1 for a binary non-fuzzy quiz).
+- For \\(z=1\\), a successful quiz,
+  - \\(r = q_1 - q_0\\) (1 for a binary non-fuzzy quiz)
+  - \\(s = q_0\\) (0 for a binary non-fuzzy quiz).
 
-It’s comforting that the above two expressions yield the same moments as the no-noise case described in the previous section with \\(n=1\\) binomial quizzes (i.e., Bernoulli quizzes). As mentioned above, in the no-noise case, \\(q_x = x\\).
+> Sharp-eyed readers will notice that, for the successful binary quiz and \\(δ ε = 1\\), i.e., when \\(t_' = t\\) and the posterior is moved from the recall at the quiz time back to the time of the initial prior, this posterior is simply a Beta density. We’ll revisit this observation in the appendix.
 
-With these expressions, the first and second moments of the posterior, viz., \\(m_1\\) and \\(m_2\\) respectively, can be evaluated for either \\(z\\). The two moments can then be moment-matched to the nearest Beta distribution to yield an updated model—the details of those final steps are the same as the binomial case discussed in the previous section.
+It’s comforting that these moments for the non-fuzzy binary case agree with those derived for the general \\(n\\) case in the previous section—in the no-noise case, \\(q_x = x\\).
+
+With these expressions, the first and second (non-central) moments of the posterior can be evaluated for a given \\(z\\). The two moments can then be moment-matched to the nearest Beta distribution to yield an updated model—the details of those final steps are the same as the binomial case discussed in the previous section.
 
 Let’s consider how a flashcard app might use this statistical machinery for soft-binary quizzes, where the quiz result is a decimal value between 0 and 1, inclusive. A very reasonable convention would be to treat values greater 0.5 as \\(z=1\\) and the rest as \\(z=0\\). But this still leaves open two independent parameters, \\(q_1 = p(z = 1 | x = 1)\\) and \\(q_0 = p(z = 1 | x = 0)\\). These paramters can be seen as,
 - what are the odds that the student really knew the answer but it just slipped her mind, because of factors other than her memory—what she ate just before the quiz, how much coffee she’s had, her stress level, the ambient noise? This is \\(q_1\\).

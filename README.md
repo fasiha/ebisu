@@ -165,9 +165,9 @@ the transformed (exponentiated) random variable has probability density
 \\end{align}
 since \\(P(p_t) = Beta(p_t; α, β)\\), the Beta density on the recall probability at time \\(t\\), and \\(\frac{∂}{∂p_{t_2}} g^{-1}(p_{t_2})^{1/δ} = \frac{p_{t_2}^{1/δ - 1}}{δ}\\). Following some algebra, the final density is
 \\[
-  P(p_{t_2}) = P(p_t^\delta) = \frac{p_{t_2}^{α/δ - 1} · (1-p_{t_2}^{1/δ})^{β-1}}{δ · B(α, β)},
+  P(p; p_t^δ) = \frac{p^{α/δ - 1} · (1-p^{1/δ})^{β-1}}{δ · B(α, β)},
 \\]
-where \\(B(α, β) = Γ(α) · Γ(β) / Γ(α + β)\\) is [beta function](https://en.wikipedia.org/wiki/Beta_function) (also the normalizing denominator in the Beta density—confusing, sorry), and \\(Γ(·)\\) is the [gamma function](https://en.wikipedia.org/wiki/Gamma_function), a generalization of factorial.
+where \\(B(α, β) = Γ(α) · Γ(β) / Γ(α + β)\\) is [beta function](https://en.wikipedia.org/wiki/Beta_function) (also the normalizing denominator in the Beta density—confusing, sorry), and \\(Γ(·)\\) is the [gamma function](https://en.wikipedia.org/wiki/Gamma_function), a generalization of factorial. Throughout this document, I use \\(P(x; X)\\) to denote the density of the random variable \\(X\\) as a function of the algebraic variable \\(x\\).
 
 [Robert Kern noticed](https://github.com/fasiha/ebisu/issues/5) that this is a [generalized Beta of the first kind](https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)), or GB1, random variable:
 \\[p_t^δ ∼ GB1(p; 1/δ, 1, α; β)\\]
@@ -240,7 +240,9 @@ Recall that our quiz app might ask the student to exercise the same memory, one 
 
 **Nota bene.** The \\(n\\) individual sub-trials that make up a single binomial experiment are assumed to be independent of each other. If your quiz application tells the user that, for example, they incorrectly conjugated a verb, and then later in the *same* review session, asks the user to conjugate the verb again (perhaps in the context of a different sentence), then the two sub-trials are likely not independent, unless the user forgot that they were just asked about that verb. Please get in touch if you want feedback on whether your quiz app design might be running afoul of this caveat.
 
-One option could be this: since we have analytical expressions for the mean and variance of the prior on \\(p_t^δ\\), convert these to the [closest Beta distribution](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) and straightforwardly update with the Bernoulli likelihood as mentioned [above](#bernoulli-quizzes), or even the binomial likelihood. However, we can do much better.
+Let us assume that the quiz happens at \\(t_2\\) time units after last recall. We had a prior on the recall probability at this \\(t_2 = δ t\\). Now, given a quiz at \\(t_2\\) that yielded \\(k\\) and \\(n\\), what is the *posterior* on the recall probability? (I will drop all subscripts for the time being but do note that the recall probability \\(p\\), and the quiz results \\(k\\), are indexed by time and should be \\(p_{t_2}\\) and \\(k_{t_2}\\).)
+
+One option could be this: since we have analytical expressions for the mean and variance of the prior on the recall probability’s prior—\\(p_t^δ\\) follows the GB1 density—convert these to the [closest Beta distribution](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters) and straightforwardly update with the Bernoulli or binomial likelihoods as mentioned [above](#bernoulli-quizzes). However, we can do much better.
 
 By application of Bayes rule, the posterior is
 \\[Posterior(p|k, n) = \frac{Prior(p) · Lik(k|p,n)}{\int_0^1 Prior(p) · Lik(k|p,n) \\, dp}.\\]
@@ -270,23 +272,27 @@ for integer \\(n > 0\\).
 
 Putting these two facts to use, we can show that the posterior at time \\(t_2\\) is
 \\[
-  Posterior(p|k, n) = \\frac{
+  Posterior(p; p_{t_2}|k, n) = \\frac{
     \\sum_{i=0}^{n-k} \\binom{n-k}{i} (-1)^i p^{α / δ + k + i - 1} (1-p^{1/δ})^{β - 1}
   }{
     δ \\sum_{i=0}^{n-k} \\binom{n-k}{i} (-1)^i ⋅ B(α + δ (k + i), \\, β)
   }.
 \\]
 
-This is the posterior at time \\(t_2\\), the time of the quiz. I’d like to have a posterior at any arbitrary time \\(t'\\), just in case \\(t_2\\) happens to be very small or very large. It turns out this posterior can be analytically time-transformed just like we did in the [Moving Beta distributions through time](#moving-beta-distributions-through-time) section above, except instead of moving a Beta through time, we move this analytic posterior. Just as we have \\(δ=t_2/t\\) to go from \\(t\\) to \\(t_2\\), let \\(ε=t' / t_2\\) to go from \\(t_2\\) to \\(t'\\).
+We’ve added back the time subscripts to emphasize that this is the posterior on recall probability at time \\(t_2\\), the time of the quiz (though for lightness I left the subscript off \\(k_{t_2}\\) and \\(n_{t_2}\\)). I’d like to have a posterior at any arbitrary time \\(t'\\), just in case \\(t_2\\) happens to be very small or very large. It turns out this posterior can be analytically time-transformed just like we did in the [Moving Beta distributions through time](#moving-beta-distributions-through-time) section above, except instead of moving a Beta through time, we move this analytic posterior. Just as we have \\(δ=t_2/t\\) to go from \\(t\\) to \\(t_2\\), let \\(ε=t' / t_2\\) to go from \\(t_2\\) to \\(t'\\).
 
-Then, \\(P(p_{t'} | k_{t_2}, n_{t_2}) = Posterior(p^{1/ε}|k_{t_2}, n_{t_2}) ⋅ \\frac{1}{ε} p^{1/ε - 1}\\):
-\\[
-  P(p_{t'} | k_{t_2}, n_{t_2}) = \\frac{
+Then, as described above and following the rules for [nonlinear transforms of random variables](https://en.wikipedia.org/w/index.php?title=Random_variable&oldid=771423505#Functions_of_random_variables):
+\\begin{align}
+  P(p; p_{t'} | k_{t_2}, n_{t_2}) 
+  &=
+  Posterior \\left(p^{1/ε}; p_{t_2}|k_{t_2}, n_{t_2} \\right) ⋅ \\frac{1}{ε} p^{1/ε - 1}
+  \\\\
+  &= \\frac{
     \\sum_{i=0}^{n-k} \\binom{n-k}{i} (-1)^i p^{\\frac{α + δ (k + i)}{δ ε} - 1} (1-p^{1/(δε)})^{β - 1}
   }{
     δε \\sum_{i=0}^{n-k} \\binom{n-k}{i} (-1)^i ⋅ B(α + δ (k + i), \\, β)
   }.
-\\]
+\\end{align}
 The denominator is the same in this \\(t'\\)-time-shifted posterior since it’s just a normalizing constant (and not a function of probability \\(p\\)) but the numerator retains the same shape as the original, allowing us to use one of our helpful facts above to derive this transformed posterior’s moments. The \\(N\\)th moment, \\(E[p_{t'}^N] \\), is:
 \\[
   m_N = \frac{
@@ -329,9 +335,9 @@ Let’s work through the analysis, and then we’ll consider the question of how
 
 The posterior at time \\(t_2\\), i.e., at the time of the quiz,
 \\[
-  P(p | z) = \\frac{Prior(p) \cdot Lik(z | p)}{\int_0^1 Prior(p) \cdot Lik(z|p) dp}
+  P(p; p_{t_2} | z_{t_2}) = \\frac{Prior(p) \cdot Lik(z | p)}{\int_0^1 Prior(p) \cdot Lik(z|p) dp}
 \\]
-follows along similar lines as above—the prior is the GB1 prior on the recall probability at time \\(t_2\\), and the denominator above is just the definite integral of the numerator—except with a more complex likelihood. To describe that likelihood, we can take advantage of @mef’s derivation that the joint probability \\(P(p, x, z) = P(z|x) P(x|p) P(p)\\), then marginalize out \\(x\\) and divide by the marginal on \\(p\\). So, first, marginalize:
+follows along similar lines as above in the binomial case—the prior is the GB1 prior on the recall probability at time \\(t_2\\), and the denominator above is just the definite integral of the numerator—except with a different likelihood. To describe that likelihood, we can take advantage of @mef’s derivation that the joint probability \\(P(p, x, z) = P(z|x) P(x|p) P(p)\\), then marginalize out \\(x\\) and divide by the marginal on \\(p\\). So, first, marginalize:
 \\[
   P(p, z) = \sum_{x=0}^1 P(p, x, z) =  P(p) \sum_{x=0}^1 P(z|x) P(x|p),
 \\]
@@ -339,7 +345,7 @@ and then divide:
 \\[
   \frac{P(p, z)}{P(p)} = Lik(z | p) = \sum_{x=0}^1 P(z|x) P(x|p)
 \\]
-to get the likelihood. You could have written down last statement, \\(Lik(z | p) = \sum_{x=0}^1 P(z|x) P(x|p)\\), since it follows from definitions but the above long-winded way was how I first saw it, via @mef’s expression for the joint probability.
+to get the likelihood. You could have written down last statement, \\(Lik(z | p) = \sum_{x=0}^1 P(z|x) P(x|p)\\), since it follows from definitions but the above long-winded way was how I first saw it, via @mef’s expression for the joint probability. (In the above paragraph, I've dropped the \\(t_2\\) subscript, and continue to drop it until we need to talk about recall probabilities at other times.)
 
 Let’s break this likelihood into its two cases: first, for observed failed quizzes,
 \\begin{align}

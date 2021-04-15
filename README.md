@@ -25,6 +25,7 @@
     - [Updating the posterior with quiz results](#updating-the-posterior-with-quiz-results)
     - [Bonus: soft-binary quizzes](#bonus-soft-binary-quizzes)
     - [Bonus: rescaling quiz ease or difficulty](#bonus-rescaling-quiz-ease-or-difficulty)
+    - [Appendix: exact Ebisu posteriors](#appendix-exact-ebisu-posteriors)
   - [Source code](#source-code)
     - [Core library](#core-library)
     - [Miscellaneous functions](#miscellaneous-functions)
@@ -389,7 +390,7 @@ Note that this relies on \\(n=1\\) quizzes, with a single review per fact.
   - \\(r = q_1 - q_0\\) (1 for a binary non-fuzzy quiz)
   - \\(s = q_0\\) (0 for a binary non-fuzzy quiz).
 
-> Sharp-eyed readers will notice that, for the successful binary quiz and \\(δ ε = 1\\), i.e., when \\(t' = t\\) and the posterior is moved from the recall at the quiz time back to the time of the initial prior, this posterior is simply a Beta density. We’ll revisit this observation in the appendix.
+> Sharp-eyed readers will notice that, for the successful binary quiz and \\(δ ε = 1\\), i.e., when \\(t' = t\\) and the posterior is moved from the recall at the quiz time back to the time of the initial prior, this posterior is simply a Beta density. We’ll revisit this observation in the [appendix](#appendix-exact-ebisu-posteriors).
 
 It’s comforting that these moments for the non-fuzzy binary case agree with those derived for the general \\(n\\) case in the previous section—in the no-noise case, \\(q_x = x\\).
 
@@ -437,6 +438,118 @@ As we’ve done before, with these two moments, we can find the closest Beta ran
 All that remains is to mindlessly follow the user’s instructions and scale the halflife by \\(u\\).
 
 In this way, we can rescale an Ebisu model \\((α, β, t)\\) to \\((α_h, α_h, u \cdot h)\\).
+
+### Appendix: exact Ebisu posteriors
+In all of the analysis above, we’ve started with a Beta prior on recall probability at some time \\(t\\), updated that prior with information about quizzes at time \\(t_2\\), only to collapse the resulting posterior back into a Beta random variable representing recall at time \\(t'\\). We do this so that the update step outputs the same model format as its input. However, it’s interesting to avoid approximating the posterior, and see what the exact posterior is after a series of quizzes.
+
+As alluded to above, in certain cases, the posterior can be surprisingly simple when \\(t=t'\\), i.e., \\(δ ε = 1\\). To begin with, let's also restrict ourselves to \\(n=1\\), a single quiz per review, but we will see how that can be readily relaxed for the full binomial case.
+
+After one binary quiz \\(x_1\\) at time \\(t_1 = δ_1 t\\), the posterior is
+\\[
+  P(p; p_t | x_1) ∝
+  \\begin{cases}
+    p^{α  + δ_1 - 1} (1-p)^{β - 1}, 
+      & \\text{if}\\ x_1=1 \\\\
+    p^{α - 1} (1-p)^{β - 1} (1 - p^{δ_1}), 
+      & \\text{if}\\ x_1=0.
+  \\end{cases}
+\\]
+That is, for the successful quiz case, the posterior is just \\(Beta(α + δ_1, β)\\), and for the unsuccessful case, the posterior is a *mixture of two Beta random variables*:
+1. \\(Beta(α, β)\\) with weight \\(\frac{B(α, β)}{B(α, β) - B(α+δ_1, β)}\\) and
+2. \\(Beta(α + δ_1, β)\\) with weight \\(\frac{-B(α+δ_1, β)}{B(α, β) - B(α+δ_1, β)}\\).
+
+(We can obtain these weights by normalizing the full posterior (the weight denominators) and each term after expanding \\(1-p^δ_1\\).)
+
+Usually we think of mixtures as having *positive* weights but this is not a hard requirement (for example, [Müller et al.](https://www.researchgate.net/publication/261045592_Gaussian_mixture_filter_allowing_negative_weights_and_its_application_to_positioning_using_signal_strength_measurements) rely on some negative mixture weights). Weights do have to sum to 1, which is the case for us here.
+
+For one failed quiz, our Beta prior becomes a mixture of two Beta random variables in the posterior. This should suggest that, while another successful quiz might result in a posterior that remains a mixture of two Betas, another *failure* would result in a mixture of *four* Betas. That is indeed the case: if we treat the posterior above \\(P(p; p_t | x_1=0)\\) as the prior and update it after another quiz after \\(t_2=δ_2 t\\) time units, the doubly-updated posterior is:
+\\[
+  P(p; p_t | x_1=0, x_2) ∝
+  \\begin{cases}
+    p^{α  + δ_2 - 1} (1-p)^{β - 1} (1 - p^{δ_1}),
+      & \\text{if}\\ x_2=1 \\\\
+    p^{α - 1} (1-p)^{β - 1} (1 - p^{δ_1}) (1-p^{δ_2}), 
+      & \\text{if}\\ x_2=0.
+  \\end{cases}
+\\]
+With one failed and one successful quiz, the full analytical posterior of recall probability \\(t\\) time units after last recall remains a mixture of two Beta random variables. Meanwhile, the posterior with two failed quizzes has expanded into a mixture of *four* Betas, which can be seen by expanding \\((1 - p^{δ_1}) (1-p^{δ-2})\\).
+
+We can show (quite easily with Sympy) that after \\(M\\) single-quiz reviews that each have a quiz result \\(x_m\\) at a time \\(t_m=δ_m t\\), the full posterior is
+\\[
+  P(p; p_t | x_1, x_2, …, x_M) ∝ p^{α - 1} (1-p)^{β - 1} \prod_m=1^M r_m p^{δ_m} + s,
+\\]
+and since 
+- \\(r_m=1\\) and \\(s_m=0\\) when \\(x_m=1\\) (successful quiz) and
+- \\(r_m=-1\\) and \\(s_m=1\\) when \\(x_m=0\\) (failed quiz),
+
+this can be rewritten as
+\\[
+  P(p; p_t | x_1, x_2, …, x_M) ∝ p^{α + (\sum_{m=1}^M I(x_m) \delta_m) - 1} (1-p)^{β - 1} \prod_{m=1}^M I'(x_m) p^{δ_m},
+\\]
+where \\(I(x)\\) is the indicator function that evaluates to 1 when its argument is 1 and 0 otherwise; and its negation \\(I'(x)\\) evaluates to 0 when its argument is 1 and vice versa. Each successful quiz piles itself into the term on the left, leaving the updated posterior with the same number of mixture components as before. Meanwhile, each failed quiz adds a new term to the right, doubling the number of mixture components.
+
+One way this is useful is, we can use this to double-check our binomial posterior: if \\(n_1>1\\), i.e., more than one quiz in the first review, that is equivalent to \\(M=n_1\\) with \\(δ_1, δ_2, …, δ_{n_1}\\) equal to the same value \\(δ\\). Thus,
+\\[
+  P(p; p_t | k_1, n_1) ∝ p^{α + k \delta - 1} (1-p)^{β - 1} (1 - p^{δ_m})^{n-k},
+\\]
+which is what we saw above.
+
+But this is also useful because now we know that that for true quizzes, we could have exact (no approximation needed) posteriors by fixing \\(δ ε = 1\\). For failures, meanwhile, because the posterior becomes a mixture, no single Beta can capture it perfectly, but the approximation will vary in quality depending on \\(ε\\).
+
+It also opens up the possibility for re-approximating the posterior after some quizzes have happened: we could evaluate the moments of the full posterior after several quizzes (successes and failures) and find the best Beta fit, which may well be a better approximation than the series of serially-computed Beta fits after each quiz. We leave this as future work. The source code of Ebisu, which is given in the next section, will by default pick \\(ε\\) such that the posterior is balanced at its halflife, i.e., the probability of recall after \\(t'\\) time units is 0.5.
+
+> [Sympy](https://www.sympy.org) actually makes this quite easy to re-derive, which is a relief because I can never hang on to papers and it’s tiring to resurrect derivations. The script below has a function to update a symbolic prior through the quiz update and time-travel, so when you run it, it will print out the final posterior after a series of pass/fail quizzes. (It does ignore normalizing constants.) Either run this as a file on your computer or copy-paste this into [Sympy Live](https://live.sympy.org/).
+> ```py
+> from sympy import symbols, simplify
+> 
+> p, a, b, d, e = symbols('p α β δ ε', positive=True, real=True)
+> r, s = symbols('r s', real=True)
+> 
+> timetravel = lambda expr, d: expr.subs(p, p**(1 / d)) * (p**(1 / d - 1))
+> subWithSimp = lambda expr, tiny: expr.subs(tiny, simplify(tiny))
+> resultToCD = {True: {r: 1, s: 0}, False: {r: -1, s: 1}}
+> 
+> 
+> def prior_tToPosterior_t(prior, d, e, result=None, back_to_t=True):
+>   """Move the prior through a result update and time travel to get a posterior.
+> 
+>   `prior`, `d`, and `e` can/should be Sympy expressions.
+>   
+>   Let `result=None` if you want the posterior to keep `r` and `s` terms.
+>   If `result=True` or `False`, the expressions will simplify.
+> 
+>   `back_to_t=True` will replace ε with 1/δ so the posterior applies to recall
+>   at the same time as `prior`. If `back_to_t=False`, leave it as ε.
+>   """
+>   prior_d = simplify(timetravel(prior, d))
+>   likelihood = r * p + s
+>   posterior_d = prior_d * likelihood
+>   posterior_e = timetravel(posterior_d, e)
+>   # replace r & s if result was given
+>   subbed = resultToCD[result] if result in resultToCD else {}
+>   pf = simplify(posterior_e.subs(subbed))  # at the same time as quiz
+>   # move the pass/fail posterior from t_2 (quiz) to t' (t if back_to_t)
+>   pf_t = pf.subs(e, 1 / d if back_to_t else e)
+>   pf_t = subWithSimp(pf_t, d * (1 - 1 / d) - d)
+>   pf_t = subWithSimp(pf_t, d * (1 - e) - d)
+>   return pf_t
+> 
+> 
+> dn = lambda n: symbols('δ_' + str(n), positive=True, real=True)
+> en = lambda n: symbols('ε_' + str(n), positive=True, real=True)
+> 
+> 
+> def quizSeries(prior, quizzes):
+>   "Start with prior and serially update with quiz results"
+>   for n, q in enumerate(quizzes):
+>     prior = simplify(prior_tToPosterior_t(prior, dn(n + 1), en(n + 1), result=q))
+>   return prior
+> 
+> 
+> prior_t = p**(a - 1) * (1 - p)**(b - 1)
+> final = quizSeries(prior_t, [False, False, False, True])
+> final
+> ```
 
 ## Source code
 

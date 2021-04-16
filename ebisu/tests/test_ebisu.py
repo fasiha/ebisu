@@ -157,6 +157,7 @@ class TestEbisu(unittest.TestCase):
 
   def test_fuzzy(self):
     "Binary quizzes are heavily tested above. Now test float/fuzzy quizzes here"
+    global testpoints
     fuzzies = np.linspace(0, 1, 7)  # test 0 and 1 too
     for tnow in np.logspace(-1, 1, 5):
       for a in np.linspace(2, 20, 5):
@@ -174,6 +175,7 @@ class TestEbisu(unittest.TestCase):
               mc = updateRecallMonteCarlo(prior, q, 1, tnow, newt, N=1_000_000)
               self.assertLess(
                   kl(m, mc), 1e-4, msg=f'prior={prior}; tnow={tnow}; q={q}; m={m}; mc={mc}')
+              testpoints += [['update', list(prior), [q, 1, tnow], dict(post=m)]]
 
           # also important: make sure halflife varies smoothly between q=0 and q=1
           self.assertTrue(monotonicIncreasing([x for _, _, x in newmodels]))

@@ -74,7 +74,7 @@ Finally, the [Source Code](#source-code) section presents the literate source of
 
 **Data model** For each fact in your quiz app, you store a model representing a prior distribution. This is a 3-tuple: `(alpha, beta, t)` and you can create a default model for all newly learned facts with `ebisu.defaultModel`. (As detailed in the [Choice of initial model parameters](#choice-of-initial-model-parameters) section, `alpha` and `beta` define a Beta distribution on this fact’s recall probability `t` time units after it’s most recent review.)
 
-**Predict a fact’s current recall probability** `ebisu.predictRecall(prior: tuple, tnow: float) -> float` where `prior` is this fact’s model and `tnow` is the current time elapsed since this fact’s most recent review. `tnow` may be any unit of time, as long as it is consistent with the half life's unit of time. The value returned by `predictRecall` is a probability between 0 and 1.
+**Predict a fact’s current recall probability** `ebisu.predictRecall(prior: tuple, tnow: float) -> float` where `prior` is this fact’s model and `tnow` is the current time elapsed since this fact’s most recent review. `tnow` may be any unit of time, as long as it is consistent with the half life’s unit of time. The value returned by `predictRecall` is a probability between 0 and 1.
 
 **Update a fact’s model with quiz results** `ebisu.updateRecall(prior: tuple, success: int, total: int, tnow: float) -> tuple` where `prior` and `tnow` are as above, and where `success` is the number of times the student successfully exercised this memory during the current review session out of `total` times—this way your quiz app can review the same fact multiple times in one sitting! The returned value is this fact’s new prior model—the old one can be discarded.
 
@@ -324,9 +324,9 @@ To summarize the update step: you started with a flashcard whose memory model wa
 > **Note** The Beta function \\(B(a,b)=Γ(a) Γ(b) / \Gamma(a+b)\\), being a function of a rapidly-growing function like the Gamma function (it is a generalization of factorial), may lose precision in the above expressions for unusual α and β and δ and ε. Addition and subtraction are risky when dealing with floating point numbers that have lost much of their precision. Ebisu takes care to use [log-Beta](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.betaln.html) and [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html) to minimize loss of precision.
 
 ### Bonus: soft-binary quizzes
-For this section, let's restrict ourselves to \\(n=1\\); a review consists of just one quiz. But imagine if, instead of a Bernoulli trial that yields a binary 0 or 1, you had a “soft-binary” or “fuzzy” quiz result. Could we adjust the Ebisu model to consume such non-binary quiz results? As luck would have it, Stack Exchange user [@mef](https://stats.stackexchange.com/a/419320) has invented a lovely way to model this.
+For this section, let’s restrict ourselves to \\(n=1\\); a review consists of just one quiz. But imagine if, instead of a Bernoulli trial that yields a binary 0 or 1, you had a “soft-binary” or “fuzzy” quiz result. Could we adjust the Ebisu model to consume such non-binary quiz results? As luck would have it, Stack Exchange user [@mef](https://stats.stackexchange.com/a/419320) has invented a lovely way to model this.
  
-Let \\(x \sim Bernoulli(p)\\) be the true Bernoulli draw, that is, the binary quiz result if there was no ambiguity or fuzziness around the student's performance: \\(x\\) is either 0 or 1. However, rather than observe \\(x\\), we actually observe a “noisy report” \\((z | x) \sim Bernoulli(q_x)\\) where
+Let \\(x \sim Bernoulli(p)\\) be the true Bernoulli draw, that is, the binary quiz result if there was no ambiguity or fuzziness around the student’s performance: \\(x\\) is either 0 or 1. However, rather than observe \\(x\\), we actually observe a “noisy report” \\((z | x) \sim Bernoulli(q_x)\\) where
 - \\(q_1 = P(z = 1 | x = 1)\\) while
 - \\(q_0 = P(z = 1 | x = 0)\\).
 
@@ -346,7 +346,7 @@ and then divide:
 \\[
   \frac{P(p, z)}{P(p)} = Lik(z | p) = \sum_{x=0}^1 P(z|x) P(x|p)
 \\]
-to get the likelihood. You could have written down last statement, \\(Lik(z | p) = \sum_{x=0}^1 P(z|x) P(x|p)\\), since it follows from definitions but the above long-winded way was how I first saw it, via @mef’s expression for the joint probability. (In the above paragraph, I've dropped the \\(t_2\\) subscript, and continue to drop it until we need to talk about recall probabilities at other times.)
+to get the likelihood. You could have written down last statement, \\(Lik(z | p) = \sum_{x=0}^1 P(z|x) P(x|p)\\), since it follows from definitions but the above long-winded way was how I first saw it, via @mef’s expression for the joint probability. (In the above paragraph, I’ve dropped the \\(t_2\\) subscript, and continue to drop it until we need to talk about recall probabilities at other times.)
 
 Let’s break this likelihood into its two cases: first, for observed failed quizzes,
 \\begin{align}
@@ -405,12 +405,12 @@ One appealing way to set both these parameters for a given fuzzy quiz result is,
 2. \\(q_0 = 1-q_1\\).
 3. Let \\(z = result > 0.5\\).
 
-This algorithm is appealing because the posterior models have halflife that smoothly vary between the hard-fail and the full-pass case. That is, if a quiz's Ebisu model had a halflife of 10 time units, and a hard Bernoulli fail would drop the halflife to 8.5 and a full Bernoulli pass would raise it to 15, fuzzy results between 0 and 1 would yield updated models with halflife smoothly varying between 8.5 and 15, with a fuzzy result of 0.5 yielding a halflife of 10. This is sensible because \\(q_0 = q_1 = 0.5\\) implies your fuzzy quiz result is completely uninformative about your actual memory, so Ebisu has no choice but to leave the model alone.
+This algorithm is appealing because the posterior models have halflife that smoothly vary between the hard-fail and the full-pass case. That is, if a quiz’s Ebisu model had a halflife of 10 time units, and a hard Bernoulli fail would drop the halflife to 8.5 and a full Bernoulli pass would raise it to 15, fuzzy results between 0 and 1 would yield updated models with halflife smoothly varying between 8.5 and 15, with a fuzzy result of 0.5 yielding a halflife of 10. This is sensible because \\(q_0 = q_1 = 0.5\\) implies your fuzzy quiz result is completely uninformative about your actual memory, so Ebisu has no choice but to leave the model alone.
 
 ### Bonus: rescaling quiz ease or difficulty
 Another kind of feedback that users can provide is indication that a quiz was either too late or too early, or in other words, the user wants to see a flashcard more frequently or less frequently than its current trajectory.
 
-There are any number of reasonable reasons why a flashcard's memory model may be miscalibrated. The user may have recently learned several confuser facts that interfere with another flashcard, or the opposite, the user may have obtained an insight that crystallizes several flashcards. The user may add flashcards that they already know quite well. The user may have not studied for a long time and needs Ebisu to rescale its halflife.
+There are any number of reasonable reasons why a flashcard’s memory model may be miscalibrated. The user may have recently learned several confuser facts that interfere with another flashcard, or the opposite, the user may have obtained an insight that crystallizes several flashcards. The user may add flashcards that they already know quite well. The user may have not studied for a long time and needs Ebisu to rescale its halflife.
 
 I have found that anything that quiz apps can do to remove reasons for users to abandon studying is a good thing.
 
@@ -442,7 +442,7 @@ In this way, we can rescale an Ebisu model \\((α, β, t)\\) to \\((α_h, α_h, 
 ### Appendix: exact Ebisu posteriors
 In all of the analysis above, we’ve started with a Beta prior on recall probability at some time \\(t\\), updated that prior with information about quizzes at time \\(t_2\\), only to collapse the resulting posterior back into a Beta random variable representing recall at time \\(t'\\). We do this so that the update step outputs the same model format as its input. However, it’s interesting to avoid approximating the posterior, and see what the exact posterior is after a series of quizzes.
 
-As alluded to above, in certain cases, the posterior can be surprisingly simple when \\(t=t'\\), i.e., \\(δ ε = 1\\). To begin with, let's also restrict ourselves to \\(n=1\\), a single quiz per review, but we will see how that can be readily relaxed for the full binomial case.
+As alluded to above, in certain cases, the posterior can be surprisingly simple when \\(t=t'\\), i.e., \\(δ ε = 1\\). To begin with, let’s also restrict ourselves to \\(n=1\\), a single quiz per review, but we will see how that can be readily relaxed for the full binomial case.
 
 After one binary quiz \\(x_1\\) at time \\(t_1 = δ_1 t\\), the posterior is
 \\[
@@ -636,7 +636,7 @@ Next is the implementation of `updateRecall` (🍌 below), which accepts
   - `tback=None` by default, and
   - `q0=None` by default;
 
-and returns a *new* model, a 3-tuple \\(α_2, β_2, t_2\\), representing an updated Beta prior on recall probability over some new time horizon \\(t_2\\). By default, since `rebalance=True`, we will choose the new time horizon such that the posterior on recall probability at that time horizon is 0.5, i.e., the new time horizon is the new model's *halflife*. Because of how Beta random variables work, this implies that \\(α_2 = β_2\\), and the new recall probability’s probability density is *balanced* around 0.5. This calculation can’t seem to be done analytically, so we do a one-dimensional search to find the appropriate \\(t_2\\). We discuss this search for the halflife below when we come to `modelToPercentileDecay`.
+and returns a *new* model, a 3-tuple \\(α_2, β_2, t_2\\), representing an updated Beta prior on recall probability over some new time horizon \\(t_2\\). By default, since `rebalance=True`, we will choose the new time horizon such that the posterior on recall probability at that time horizon is 0.5, i.e., the new time horizon is the new model’s *halflife*. Because of how Beta random variables work, this implies that \\(α_2 = β_2\\), and the new recall probability’s probability density is *balanced* around 0.5. This calculation can’t seem to be done analytically, so we do a one-dimensional search to find the appropriate \\(t_2\\). We discuss this search for the halflife below when we come to `modelToPercentileDecay`.
 
 (You may choose to skip this rebalancing by passing `rebalance=False`. You may want to provide a *different* time horizon that the new model is calibrated to: pass in a specific `tback` then. Or you may choose to leave `tback=None`, in which case the function will return the new model at the same time horizon as the old model. (Recall from the [appendix])(#appendix-exact-ebisu-posteriors) that this behavior, with `tback = t`, will result in exact zero-approximation updates for flashcards with all successful quizzes.))
 

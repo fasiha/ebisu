@@ -157,7 +157,7 @@
 <h2 id="quickstart">Quickstart</h2>
 <p><strong>Install</strong> <code>pip install ebisu</code> (both Python3 and Python2 ok 🤠).</p>
 <p><strong>Data model</strong> For each fact in your quiz app, you store a model representing a prior distribution. This is a 3-tuple: <code>(alpha, beta, t)</code> and you can create a default model for all newly learned facts with <code>ebisu.defaultModel</code>. (As detailed in the <a href="#choice-of-initial-model-parameters">Choice of initial model parameters</a> section, <code>alpha</code> and <code>beta</code> define a Beta distribution on this fact’s recall probability <code>t</code> time units after it’s most recent review.)</p>
-<p><strong>Predict a fact’s current recall probability</strong> <code>ebisu.predictRecall(prior: tuple, tnow: float) -&gt; float</code> where <code>prior</code> is this fact’s model and <code>tnow</code> is the current time elapsed since this fact’s most recent review. <code>tnow</code> may be any unit of time, as long as it is consistent with the half life's unit of time. The value returned by <code>predictRecall</code> is a probability between 0 and 1.</p>
+<p><strong>Predict a fact’s current recall probability</strong> <code>ebisu.predictRecall(prior: tuple, tnow: float) -&gt; float</code> where <code>prior</code> is this fact’s model and <code>tnow</code> is the current time elapsed since this fact’s most recent review. <code>tnow</code> may be any unit of time, as long as it is consistent with the half life’s unit of time. The value returned by <code>predictRecall</code> is a probability between 0 and 1.</p>
 <p><strong>Update a fact’s model with quiz results</strong> <code>ebisu.updateRecall(prior: tuple, success: int, total: int, tnow: float) -&gt; tuple</code> where <code>prior</code> and <code>tnow</code> are as above, and where <code>success</code> is the number of times the student successfully exercised this memory during the current review session out of <code>total</code> times—this way your quiz app can review the same fact multiple times in one sitting! The returned value is this fact’s new prior model—the old one can be discarded.</p>
 <p><strong>IPython Notebook crash course</strong> For a conversational introduction to the API in the context of a mocked quiz app, see this <a href="./EbisuHowto.ipynb">IPython Notebook crash course</a>.</p>
 <p><strong>Further information</strong> <a href="./doc/doc.md">Module docstrings</a> in a pinch but full details plus literate source below, under <a href="#source-code">Source code</a>.</p>
@@ -3028,7 +3028,7 @@ print(list(zip(sampleMoments, analyticalMoments)))</code></pre>
 </svg></span>, being a function of a rapidly-growing function like the Gamma function (it is a generalization of factorial), may lose precision in the above expressions for unusual α and β and δ and ε. Addition and subtraction are risky when dealing with floating point numbers that have lost much of their precision. Ebisu takes care to use <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.betaln.html">log-Beta</a> and <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html"><code>logsumexp</code></a> to minimize loss of precision.</p>
 </blockquote>
 <h3 id="bonus-soft-binary-quizzes">Bonus: soft-binary quizzes</h3>
-<p>For this section, let's restrict ourselves to <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.656ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2435.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-157-Title">
+<p>For this section, let’s restrict ourselves to <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.656ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2435.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-157-Title">
 <title id="MathJax-SVG-157-Title">n=1</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-6E" x="0" y="0"></use>
@@ -3054,7 +3054,7 @@ print(list(zip(sampleMoments, analyticalMoments)))</code></pre>
  <use xlink:href="#MJMATHI-70" x="6574" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="7078" y="0"></use>
 </g>
-</svg></span> be the true Bernoulli draw, that is, the binary quiz result if there was no ambiguity or fuzziness around the student's performance: <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.33ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 572.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-159-Title">
+</svg></span> be the true Bernoulli draw, that is, the binary quiz result if there was no ambiguity or fuzziness around the student’s performance: <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.33ex" height="1.676ex" style="vertical-align: -0.338ex;" viewBox="0 -576.1 572.5 721.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-159-Title">
 <title id="MathJax-SVG-159-Title">x</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-78" x="0" y="0"></use>
@@ -3411,7 +3411,7 @@ print(list(zip(sampleMoments, analyticalMoments)))</code></pre>
  <use xlink:href="#MJMATHI-70" x="12386" y="0"></use>
  <use xlink:href="#MJMAIN-29" x="12889" y="0"></use>
 </g>
-</svg></span>, since it follows from definitions but the above long-winded way was how I first saw it, via @mef’s expression for the joint probability. (In the above paragraph, I've dropped the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.894ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 815.4 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-175-Title">
+</svg></span>, since it follows from definitions but the above long-winded way was how I first saw it, via @mef’s expression for the joint probability. (In the above paragraph, I’ve dropped the <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1.894ex" height="2.343ex" style="vertical-align: -0.671ex;" viewBox="0 -719.6 815.4 1008.6" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-175-Title">
 <title id="MathJax-SVG-175-Title">t_2</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
@@ -4251,7 +4251,7 @@ print(list(zip(sampleMoments, analyticalMoments)))</code></pre>
 </g>
 </svg></span>.</li>
 </ol>
-<p>This algorithm is appealing because the posterior models have halflife that smoothly vary between the hard-fail and the full-pass case. That is, if a quiz's Ebisu model had a halflife of 10 time units, and a hard Bernoulli fail would drop the halflife to 8.5 and a full Bernoulli pass would raise it to 15, fuzzy results between 0 and 1 would yield updated models with halflife smoothly varying between 8.5 and 15, with a fuzzy result of 0.5 yielding a halflife of 10. This is sensible because <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.351ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 5748.4 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-214-Title">
+<p>This algorithm is appealing because the posterior models have halflife that smoothly vary between the hard-fail and the full-pass case. That is, if a quiz’s Ebisu model had a halflife of 10 time units, and a hard Bernoulli fail would drop the halflife to 8.5 and a full Bernoulli pass would raise it to 15, fuzzy results between 0 and 1 would yield updated models with halflife smoothly varying between 8.5 and 15, with a fuzzy result of 0.5 yielding a halflife of 10. This is sensible because <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="13.351ex" height="2.509ex" style="vertical-align: -0.671ex;" viewBox="0 -791.3 5748.4 1080.4" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-214-Title">
 <title id="MathJax-SVG-214-Title">q_0 = q_1 = 0.5</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-71" x="0" y="0"></use>
@@ -4271,7 +4271,7 @@ print(list(zip(sampleMoments, analyticalMoments)))</code></pre>
 </svg></span> implies your fuzzy quiz result is completely uninformative about your actual memory, so Ebisu has no choice but to leave the model alone.</p>
 <h3 id="bonus-rescaling-quiz-ease-or-difficulty">Bonus: rescaling quiz ease or difficulty</h3>
 <p>Another kind of feedback that users can provide is indication that a quiz was either too late or too early, or in other words, the user wants to see a flashcard more frequently or less frequently than its current trajectory.</p>
-<p>There are any number of reasonable reasons why a flashcard's memory model may be miscalibrated. The user may have recently learned several confuser facts that interfere with another flashcard, or the opposite, the user may have obtained an insight that crystallizes several flashcards. The user may add flashcards that they already know quite well. The user may have not studied for a long time and needs Ebisu to rescale its halflife.</p>
+<p>There are any number of reasonable reasons why a flashcard’s memory model may be miscalibrated. The user may have recently learned several confuser facts that interfere with another flashcard, or the opposite, the user may have obtained an insight that crystallizes several flashcards. The user may add flashcards that they already know quite well. The user may have not studied for a long time and needs Ebisu to rescale its halflife.</p>
 <p>I have found that anything that quiz apps can do to remove reasons for users to abandon studying is a good thing.</p>
 <p>We can handle such explicit feedback quite readily with the GB1 time-traveling framework developed above. Recall that each flashcard has its own Ebisu model <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="7.52ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 3237.8 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-215-Title">
 <title id="MathJax-SVG-215-Title">(α, β, t)</title>
@@ -4682,7 +4682,7 @@ print(list(zip(sampleMoments, analyticalMoments)))</code></pre>
  <use xlink:href="#MJMAIN-3D" x="1188" y="0"></use>
  <use xlink:href="#MJMAIN-31" x="2245" y="0"></use>
 </g>
-</svg></span>. To begin with, let's also restrict ourselves to <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.656ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2435.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-244-Title">
+</svg></span>. To begin with, let’s also restrict ourselves to <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.656ex" height="2.176ex" style="vertical-align: -0.338ex;" viewBox="0 -791.3 2435.1 936.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-244-Title">
 <title id="MathJax-SVG-244-Title">n=1</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-6E" x="0" y="0"></use>
@@ -5793,7 +5793,7 @@ def _cachedBetaln(a, b):
  <use xlink:href="#MJMATHI-74" x="0" y="0"></use>
  <use transform="scale(0.707)" xlink:href="#MJMAIN-32" x="511" y="-213"></use>
 </g>
-</svg></span>. By default, since <code>rebalance=True</code>, we will choose the new time horizon such that the posterior on recall probability at that time horizon is 0.5, i.e., the new time horizon is the new model's <em>halflife</em>. Because of how Beta random variables work, this implies that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="8.01ex" height="2.676ex" style="vertical-align: -0.838ex;" viewBox="0 -791.3 3448.9 1152.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-289-Title">
+</svg></span>. By default, since <code>rebalance=True</code>, we will choose the new time horizon such that the posterior on recall probability at that time horizon is 0.5, i.e., the new time horizon is the new model’s <em>halflife</em>. Because of how Beta random variables work, this implies that <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="8.01ex" height="2.676ex" style="vertical-align: -0.838ex;" viewBox="0 -791.3 3448.9 1152.1" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-289-Title">
 <title id="MathJax-SVG-289-Title">α_2 = β_2</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
  <use xlink:href="#MJMATHI-3B1" x="0" y="0"></use>

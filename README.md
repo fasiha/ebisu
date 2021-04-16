@@ -76,7 +76,7 @@ Finally, the [Source Code](#source-code) section presents the literate source of
 
 **Predict a fact’s current recall probability** `ebisu.predictRecall(prior: tuple, tnow: float) -> float` where `prior` is this fact’s model and `tnow` is the current time elapsed since this fact’s most recent review. `tnow` may be any unit of time, as long as it is consistent with the half life’s unit of time. The value returned by `predictRecall` is a probability between 0 and 1.
 
-**Update a fact’s model with quiz results** `ebisu.updateRecall(prior: tuple, success: int, total: int, tnow: float) -> tuple` where `prior` and `tnow` are as above, and where `success` is the number of times the student successfully exercised this memory during the current review session out of `total` times—this way your quiz app can review the same fact multiple times in one sitting! The returned value is this fact’s new prior model—the old one can be discarded.
+**Update a fact’s model with quiz results** `ebisu.updateRecall(prior: tuple, success: int, total: int, tnow: float) -> tuple` where `prior` and `tnow` are as above, and where `success` is the number of times the student successfully exercised this memory during the current review session out of `total` times—this way your quiz app can review the same fact multiple times in one sitting. Bonus: you can also pass in a floating point `success` between 0 and 1 for soft-binary quizzes! The returned value is this fact’s new prior model—the old one can be discarded.
 
 **IPython Notebook crash course** For a conversational introduction to the API in the context of a mocked quiz app, see this [IPython Notebook crash course](./EbisuHowto.ipynb).
 

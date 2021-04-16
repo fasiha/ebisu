@@ -15,7 +15,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "lodash": "^4.17.4",
+    "lodash": "^4.17.19",
     "mathjax-node-page": "^1.2.7"
   }
 }

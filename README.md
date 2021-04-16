@@ -1098,12 +1098,6 @@ That’s it—that’s all the code in the `ebisu` module!
 ### Test code
 I use the built-in `unittest`, and I can run all the tests from Atom via Hydrogen/Jupyter but for historic reasons I don’t want Jupyter to deal with the `ebisu` namespace, just functions (since most of these functions and tests existed before the module’s layout was decided). So the following is in its own fenced code block that I don’t evaluate in Atom.
 
-```py
-# export ebisu/tests/test_ebisu.py
-from ebisu import *
-from ebisu.alternate import *
-```
-
 In these unit tests, I compare
 - `predictRecall` against `predictRecallMonteCarlo`, and
 - `updateRecall` against `updateRecallMonteCarlo`, for both binomial quizzes and soft-binary quizzes.
@@ -1122,8 +1116,6 @@ One note: the unit tests update a global database of `testpoints` being tested, 
 
 ```py
 # export ebisu/tests/test_ebisu.py
-# -*- coding: utf-8 -*-
-
 from ebisu import *
 from ebisu.alternate import *
 import unittest

@@ -2,11 +2,22 @@
 
 ## 2.1.0: soft-binary quizzes and halflife rescaling
 
+### 1) Soft-binary fuzzy quizzes
+
 `updateRecall` can now take *floating point* quizzes between 0 and 1 (inclusive) as `successes`, to handle the case when your quiz isn’t quite correct or wasn’t fully incorrect. Varying this number between 0 and 1 will smoothly vary the halflife of the updated model. Under the hood, there's a noisy-Bernoulli statistical model: check for the math [here](https://fasiha.github.io/ebisu/#bonus-soft-binary-quizzes).
+
+### 2) New function to explicitly rescale model halflives
 
 A new function has been added to the API, `rescaleHalflife`, for those cases when the halflife of a flashcard is just wrong and you need to multiply it by ten (so you see it less often) or divide it by two (so you see it *more* often).
 
-A behavioral change: `updateRecall` will by default rebalance models, so that updated models will have `α=β` (to within machine precision) and `t` will be the halflife. This does have a performance impact, so I may have to flip the default to *not* always rebalance in a future release if this turns out to be problematic.
+### 3) Behavioral change to `updateRecall`
+`updateRecall` will by default rebalance models, so that updated models will have `α=β` (to within machine precision) and `t` will be the halflife.
+
+(This does have a performance impact, so I may have to flip the default to *not* always rebalance in a future release if this turns out to be problematic.)
+
+(This means running `updateRecall` in 2.1.0 with the same inputs will yield different numbers than 2.0.0. However, the differences are statistically very minor: they both represent very nearly the same probabilistic belief on recall.)
+
+---
 
 Closes long-standing issues [#23](https://github.com/fasiha/ebisu/issues/23) and [#31](https://github.com/fasiha/ebisu/issues/31)—thank you to all participants who weighed in, offered advice, and waited patiently.
 

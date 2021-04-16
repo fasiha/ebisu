@@ -6,7 +6,7 @@
   "author": "Ahmed Fasih <wuzzyview@gmail.com>",
   "license": "Unlicense",
   "scripts": {
-    "doc": "pydoc-markdown -p ebisu > doc/doc.md",
+    "doc": "pydoc-markdown -m ebisu/ebisu > doc/doc.md",
     "build": "node md2code.js",
     "html": "cp header.html index.html && pandoc --no-highlight -t html5 -f markdown_github-hard_line_breaks+yaml_metadata_block+markdown_in_html_blocks+auto_identifiers README.md | sed 's/\\\\&amp;/\\&/g' >> index.html && npx mjpage < index.html > tmp && mv tmp index.html && npm run notebook",
     "test": "npm run build && python3 -m \"nose\" -v && npm run notebook",

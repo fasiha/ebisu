@@ -80,7 +80,7 @@ Finally, the [Source Code](#source-code) section presents the literate source of
 
 **IPython Notebook crash course** For a conversational introduction to the API in the context of a mocked quiz app, see this [IPython Notebook crash course](./EbisuHowto.ipynb).
 
-**Further information** [Module docstrings](https://github.com/fasiha/ebisu/blob/gh-pages/doc/doc.md#ebisu) in a pinch but full details plus literate source below, under [Source code](#source-code).
+**Further information** [Module docstrings](https://github.com/fasiha/ebisu/blob/gh-pages/doc/doc.md) in a pinch but full details plus literate source below, under [Source code](#source-code).
 
 **Alternative implementations** [Ebisu.js](https://fasiha.github.io/ebisu.js/) is a JavaScript port for browser and Node.js. [ebisu-java](https://github.com/fasiha/ebisu-java) is for Java and JVM languages. [ebisu_dart](https://github.com/ttencate/ebisu_dart) is a Dart port for browser and native targets.
 

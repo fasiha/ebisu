@@ -10,7 +10,7 @@ A behavioral change: `updateRecall` will by default rebalance models, so that up
 
 Closes long-standing issues [#23](https://github.com/fasiha/ebisu/issues/23) and [#31](https://github.com/fasiha/ebisu/issues/31)—thank you to all participants who weighed in, offered advice, and waited patiently.
 
-[See all docstrings](https://github.com/fasiha/ebisu/blob/gh-pages/doc/doc.md#ebisu).
+[See all docstrings](https://github.com/fasiha/ebisu/blob/gh-pages/doc/doc.md).
 
 ## 2.0.0: Bernoulli to binomial quizzes
 The API for `updateRecall` has changed because `boolean` results don't make sense for quiz apps that have a sense of "review sessions" in which the same flashcard can be reviewed more than one time, e.g., if a review session consists of conjugating the same verb twice. Therefore, `updateRecall` accepts two integers:

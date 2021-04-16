@@ -1,67 +1,7 @@
-<a name="ebisu"></a>
-# ebisu
+<a name="ebisu/ebisu"></a>
+# ebisu/ebisu
 
-<a name="ebisu.alternate"></a>
-# ebisu.alternate
-
-<a name="ebisu.alternate.predictRecallMode"></a>
-#### predictRecallMode
-
-```python
-predictRecallMode(prior, tnow)
-```
-
-Mode of the immediate recall probability.
-
-Same arguments as `ebisu.predictRecall`, see that docstring for details. A
-returned value of 0 or 1 may indicate divergence.
-
-<a name="ebisu.alternate.predictRecallMedian"></a>
-#### predictRecallMedian
-
-```python
-predictRecallMedian(prior, tnow, percentile=0.5)
-```
-
-Median (or percentile) of the immediate recall probability.
-
-Same arguments as `ebisu.predictRecall`, see that docstring for details.
-
-An extra keyword argument, `percentile`, is a float between 0 and 1, and
-specifies the percentile rather than 50% (median).
-
-<a name="ebisu.alternate.predictRecallMonteCarlo"></a>
-#### predictRecallMonteCarlo
-
-```python
-predictRecallMonteCarlo(prior, tnow, N=1000 * 1000)
-```
-
-Monte Carlo simulation of the immediate recall probability.
-
-Same arguments as `ebisu.predictRecall`, see that docstring for details. An
-extra keyword argument, `N`, specifies the number of samples to draw.
-
-This function returns a dict containing the mean, variance, median, and mode
-of the current recall probability.
-
-<a name="ebisu.alternate.updateRecallMonteCarlo"></a>
-#### updateRecallMonteCarlo
-
-```python
-updateRecallMonteCarlo(prior, k, n, tnow, tback=None, N=10 * 1000 * 1000, q0=None)
-```
-
-Update recall probability with quiz result via Monte Carlo simulation.
-
-Same arguments as `ebisu.updateRecall`, see that docstring for details.
-
-An extra keyword argument `N` specifies the number of samples to draw.
-
-<a name="ebisu.ebisu"></a>
-# ebisu.ebisu
-
-<a name="ebisu.ebisu.predictRecall"></a>
+<a name="ebisu/ebisu.predictRecall"></a>
 #### predictRecall
 
 ```python
@@ -94,7 +34,7 @@ The default is set to false for computational efficiency.
 
 See README for derivation.
 
-<a name="ebisu.ebisu.binomln"></a>
+<a name="ebisu/ebisu.binomln"></a>
 #### binomln
 
 ```python
@@ -103,7 +43,7 @@ binomln(n, k)
 
 Log of scipy.special.binom calculated entirely in the log domain
 
-<a name="ebisu.ebisu.updateRecall"></a>
+<a name="ebisu/ebisu.updateRecall"></a>
 #### updateRecall
 
 ```python
@@ -168,7 +108,7 @@ to call this inside a try-except block and to handle any possible
 by faking a more reasonable `tnow`. Please open an issue if you encounter such
 exceptions for cases that you think are reasonable.
 
-<a name="ebisu.ebisu.modelToPercentileDecay"></a>
+<a name="ebisu/ebisu.modelToPercentileDecay"></a>
 #### modelToPercentileDecay
 
 ```python
@@ -182,7 +122,7 @@ etc., and optionally a `percentile` (defaults to 0.5, the
 half-life), find the time it takes for memory to decay to
 `percentile`.
 
-<a name="ebisu.ebisu.rescaleHalflife"></a>
+<a name="ebisu/ebisu.rescaleHalflife"></a>
 #### rescaleHalflife
 
 ```python
@@ -208,7 +148,7 @@ halflife is the time when recall probability is 0.5, which implies α = β.
 That is the distribution this function returns, except at the *scaled*
 halflife.
 
-<a name="ebisu.ebisu.defaultModel"></a>
+<a name="ebisu/ebisu.defaultModel"></a>
 #### defaultModel
 
 ```python

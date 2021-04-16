@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from scipy.special import betaln, logsumexp
-from scipy.special import beta as betafn
+from scipy.special import betaln, beta as betafn, logsumexp
 import numpy as np
 
 
@@ -54,51 +53,6 @@ def _cachedBetaln(a, b):
 def binomln(n, k):
   "Log of scipy.special.binom calculated entirely in the log domain"
   return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
-
-
-def _updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None):
-  (alpha, beta, t) = prior
-
-  z = result > 0.5
-  q1 = result if z else 1 - result  # alternatively, max(result, 1-result)
-  if q0 is None:
-    q0 = 1 - q1
-
-  dt = tnow / t
-
-  if z == False:
-    c, d = (q0 - q1, 1 - q0)
-  else:
-    c, d = (q1 - q0, q0)
-
-  den = c * betafn(alpha + dt, beta) + d * (betafn(alpha, beta) if d else 0)
-
-  def moment(N, et):
-    num = c * betafn(alpha + dt + N * dt * et, beta)
-    if d != 0:
-      num += d * betafn(alpha + N * dt * et, beta)
-    return num / den
-
-  if rebalance:
-    from scipy.optimize import root_scalar
-    rootfn = lambda et: moment(1, et) - 0.5
-    sol = root_scalar(rootfn, bracket=_findBracket(rootfn, 1 / dt))
-    et = sol.root
-    tback = et * tnow
-  elif tback:
-    et = tback / tnow
-  else:
-    tback = t
-    et = tback / tnow
-
-  mean = moment(1, et)  # could be just a bit away from 0.5 after rebal, so reevaluate
-  secondMoment = moment(2, et)
-
-  var = secondMoment - mean * mean
-  newAlpha, newBeta = _meanVarToBeta(mean, var)
-  assert newAlpha > 0
-  assert newBeta > 0
-  return (newAlpha, newBeta, tback)
 
 
 def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=None):
@@ -204,6 +158,51 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=N
   var = m2 - meanSq
   assert var > 0, message
   newAlpha, newBeta = _meanVarToBeta(mean, var)
+  return (newAlpha, newBeta, tback)
+
+
+def _updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None):
+  (alpha, beta, t) = prior
+
+  z = result > 0.5
+  q1 = result if z else 1 - result  # alternatively, max(result, 1-result)
+  if q0 is None:
+    q0 = 1 - q1
+
+  dt = tnow / t
+
+  if z == False:
+    c, d = (q0 - q1, 1 - q0)
+  else:
+    c, d = (q1 - q0, q0)
+
+  den = c * betafn(alpha + dt, beta) + d * (betafn(alpha, beta) if d else 0)
+
+  def moment(N, et):
+    num = c * betafn(alpha + dt + N * dt * et, beta)
+    if d != 0:
+      num += d * betafn(alpha + N * dt * et, beta)
+    return num / den
+
+  if rebalance:
+    from scipy.optimize import root_scalar
+    rootfn = lambda et: moment(1, et) - 0.5
+    sol = root_scalar(rootfn, bracket=_findBracket(rootfn, 1 / dt))
+    et = sol.root
+    tback = et * tnow
+  elif tback:
+    et = tback / tnow
+  else:
+    tback = t
+    et = tback / tnow
+
+  mean = moment(1, et)  # could be just a bit away from 0.5 after rebal, so reevaluate
+  secondMoment = moment(2, et)
+
+  var = secondMoment - mean * mean
+  newAlpha, newBeta = _meanVarToBeta(mean, var)
+  assert newAlpha > 0
+  assert newBeta > 0
   return (newAlpha, newBeta, tback)
 
 

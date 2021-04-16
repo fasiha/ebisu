@@ -398,7 +398,7 @@ With these expressions, the first and second (non-central) moments of the poster
 
 Let’s consider how a flashcard app might use this statistical machinery for soft-binary quizzes, where the quiz result is a decimal value between 0 and 1, inclusive. A very reasonable convention would be to treat values greater 0.5 as \\(z=1\\) and the rest as \\(z=0\\). But this still leaves open two independent parameters, \\(q_1 = p(z = 1 | x = 1)\\) and \\(q_0 = p(z = 1 | x = 0)\\). These paramters can be seen as,
 - what are the odds that the student really knew the answer but it just slipped her mind, because of factors other than her memory—what she ate just before the quiz, how much coffee she’s had, her stress level, the ambient noise? This is \\(q_1\\).
-- And similarly, suppose the student really had forgotten the answer: what are the odds that she got the quiz right? This is \\(q_0\\), and while it may seem absurd, consider how often you’ve remembered the answer after some struggle and were sure that had circumstances been slightly different, you’d have failed the quiz?
+- And similarly, suppose the student really had forgotten the answer: what are the odds that she got the quiz right? This is \\(q_0\\), and can capture situations like multiple-choice quizzes, or cases where the “successful recall” was actually due to a chance event other than memory recall (perhaps the student saw the answer on the news). Or, consider how often you’ve remembered the answer after considerable struggle but were sure that had circumstances been slightly different, you’d have failed the quiz?
 
 One appealing way to set both these parameters for a given fuzzy quiz result is, given a `0 <= result <= 1`,
 1. set \\(q_1 = \max(result, 1-result)\\), and then
@@ -552,19 +552,7 @@ It also opens up the possibility for re-approximating the posterior after some q
 > ```
 
 ## Source code
-
-Before presenting the source code, I must somewhat apologetically explain a bit more about my workflow in writing and editing this document. I use the [Atom](https://atom.io) text editor with the [Hydrogen](https://atom.io/packages/hydrogen) plugin, which allows Atom to communicate with [Jupyter](http://jupyter.org/) kernels. Jupyter used to be called IPython, and is a standard protocol for programming REPLs to communicate with more modern applications like browsers or text editors. With this setup, I can write code in Atom and send it to a behind-the-scenes Python or Node.js or Haskell or Matlab REPL for evaluation, which sends back the result.
-
-Hydrogen developer Lukas Geiger [recently](https://github.com/nteract/hydrogen/pull/637) added support for evaluating fenced code blocks in Markdown—a long-time dream of mine. This document is a Github-Flavored Markdown file to which I add fenced code blocks. Some of these code blocks I intend to just be demo code, and not end up in the Ebisu library proper, while the code below does need to go into `.py` files.
-
-In order to untangle the code from the Markdown file to runnable files, I wrote a completely ad hoc undocumented Node.js script called [md2code.js](https://github.com/fasiha/ebisu/blob/gh-pages/md2code.js) which
-- slurps the Markdown,
-- looks for fenced code blocks that open with a comment indicating a file destination, e.g., `# export target.py`,
-- prettifies Python with [Yapf](https://github.com/google/yapf), JavaScript with [clang-format](https://clang.llvm.org/docs/ClangFormatStyleOptions.html), etc.,
-- dumps the code block contents into these files (appending after the first code block), and finally,
-- updates the Markdown file itself with this prettified code.
-
-All this enables me to stay in Atom, writing prose and editing/testing code by evaluating fenced code blocks, while also spitting out a proper Python or JavaScript library.
+In keeping with the literate programming theme of this document, I include the source code interleaved with commentary.
 
 ### Core library
 
@@ -576,21 +564,19 @@ from .ebisu import *
 from . import alternate
 ```
 
-The above is in its own fenced code block because I don’t want Hydrogen to evaluate it. In Atom, I don’t work with the Ebisu module—I just interact with the raw functions.
-
 Let’s present our Python implementation of the core Ebisu functions, `predictRecall` and `updateRecall`, and a couple of other related functions that live in the main `ebisu` module. All these functions consume a model encoding a Beta prior on recall probabilities at time \\(t\\), consisting of a 3-tuple containing \\((α, β, t)\\). I could have gone all object-oriented here but I chose to leave all these functions as stand-alone functions that consume and transform this 3-tuple because (1) I’m not an OOP devotee, and (2) I wanted to maximize the transparency of of this implementation so it can readily be ported to non-OOP, non-Pythonic languages.
 
 > **Important** Note how none of these functions deal with *timestamps*. All time is captured in “time since last review”, and your external application has to assign units and store timestamps (as illustrated in the [Ebisu Jupyter Notebook](https://github.com/fasiha/ebisu/blob/gh-pages/EbisuHowto.ipynb)). This is a deliberate choice! Ebisu wants to know as *little* about your facts as possible.
 
-In the [math section](#recall-probability-right-now) above we derived the mean recall probability at time \\(t_2 = t · δ\\) given a model \\(α, β, t\\): \\(E[p_t^δ] = B(α+δ, β)/B(α,β)\\), which is readily computed using Scipy’s log-beta to avoid overflowing and precision-loss in `predictRecall` (🍏 below).
+In the [math section](#recall-probability-right-now) above we derived the mean recall probability at time \\(t_2 = t · δ\\) given a model \\(α, β, t\\): \\(E[p_t^δ] = B(α+δ, β)/B(α,β)\\), which is readily computed using Scipy’s log-beta, avoiding overflowing and precision-loss in `predictRecall` (🍏 below).
 
-As a computational speedup, we can skip the final `exp` that converts the probability from the log-domain to the linear domain as long as we don’t need an actual probability (i.e., a number between 0 and 1). The output of the function will then be a “pseudo-probability” and can be compared to other “pseudo-probabilities” are returned by the function to rank forgetfulness. Taking advantage of this can, for one example, reduce the runtime from 5.69 µs (± 158 ns) to 4.01 µs (± 215 ns), a 1.4× speedup.
+As a computational speedup, we can skip the final `exp` that converts the probability from the log-domain to the linear domain as long as we don’t need an actual probability (i.e., a number between 0 and 1). The output of the function for different models can be directly compared to each other and sorted to rank the risk of forgetting cards. Taking advantage of this optimization can, for one example, reduce the runtime from 5.69 µs (± 158 ns) to 4.01 µs (± 215 ns), a 1.4× speedup.
 
 Another computational speedup is that we can cache calls to \\(B(α,β)\\), which don’t change when the function is called for same quiz repeatedly, as might happen if a quiz app repeatedly asks for the latest recall probability for its flashcards. When the cache is hit, the number of calls to `betaln` drops from two to one. (Python 3.2 got the nice [`functools.lru_cache` decorator](https://docs.python.org/3/library/functools.html#functools.lru_cache) but we forego its use for backwards-compatibility with Python 2.)
 
 ```py
 # export ebisu/ebisu.py #
-from scipy.special import betaln, logsumexp
+from scipy.special import betaln, beta as betafn, logsumexp
 import numpy as np
 
 
@@ -642,13 +628,21 @@ def _cachedBetaln(a, b):
 
 Next is the implementation of `updateRecall` (🍌 below), which accepts
 - a `model` (as above, represents the Beta prior on recall probability at one specific time since the fact’s last review),
-- `successes`: the number of times the student *successfully* exercised this memory, out of
-- `total` trials, and
+- `successes`: the number of times the student *successfully* exercised this memory (possibly float for a fuzzy soft-binary quiz), out of
+- `total` trials (should be 1 if `successes` is a float), and
 - `tnow`, the actual time since last quiz that this quiz was administered,
+- as well as a few optional arguments that power-users may find useful:
+  - `rebalance=True` by default,
+  - `tback=None` by default, and
+  - `q0=None` by default;
 
-and returns a *new* model, representing an updated Beta prior on recall probability over some new time horizon. The function implements the update equations above, with an extra rebalancing stage at the end: if the updated α and β are unbalanced (meaning one is much larger than the other), find the half-life of the proposed update and rerun the update for that half-life. At the half-life, the two parameters of the Beta distribution, α and β, will be equal. (To save a few computations, the half-life is calculated via a coarse search, so the rebalanced α and β will likely not be exactly equal.) To facilitate this final rebalancing step, two additional keyword arguments are needed: the time horizon for the update `tback`, and a `rebalance` flag to forbid more than one level of rebalancing, and all rebalancing is done in a `_rebalance` helper function.
+and returns a *new* model, a 3-tuple \\(α_2, β_2, t_2\\), representing an updated Beta prior on recall probability over some new time horizon \\(t_2\\). By default, since `rebalance=True`, we will choose the new time horizon such that the posterior on recall probability at that time horizon is 0.5, i.e., the new time horizon is the new model's *halflife*. Because of how Beta random variables work, this implies that \\(α_2 = β_2\\), and the new recall probability’s probability density is *balanced* around 0.5. This calculation can’t seem to be done analytically, so we do a one-dimensional search to find the appropriate \\(t_2\\). We discuss this search for the halflife below when we come to `modelToPercentileDecay`.
 
-(The half-life-finding function is described in more detail below.)
+(You may choose to skip this rebalancing by passing `rebalance=False`. You may want to provide a *different* time horizon that the new model is calibrated to: pass in a specific `tback` then. Or you may choose to leave `tback=None`, in which case the function will return the new model at the same time horizon as the old model. (Recall from the [appendix])(#appendix-exact-ebisu-posteriors) that this behavior, with `tback = t`, will result in exact zero-approximation updates for flashcards with all successful quizzes.))
+
+Quiz apps that only have integer quiz results don’t have to worry about the final argument `q0`, which only applies to quiz apps that use `total == 1` and floating `0 <= successes <= 1`. `q0` as described [above](#bonus-soft-binary-quizzes) is the probability that a quiz was “really” a failure but was “scrambled” and resulted in a success—that is, the probability that a student had really forgotten this fact but still got the quiz right (and you can imagine any number of reasons for this). By default, we choose `q0` such that the new model scales smoothly between the hard-fail `successes = 0.0` case and the full-pass `successes = 1.0` case, but you may choose to experiment with different values for `q0` because you don’t like this idea that a quiz success can happen when the memory was actually gone.
+
+I’ve chosen to break up the Bernoulli (binary and soft-binary) and the binomial cases into two separate functions. The main `updateRecall` (🍌) handles the [binomial case](#updating-the-posterior-with-quiz-results), with `total > 1`. If `n == 1`, it will call a helper function `_updateRecallSingle` (🍅 below) that implements the [(noisy-)binary](#bonus-soft-binary-quizzes) update. I feel this is more readable, since computing the moments for the binomial case is more involved than the fuzzy soft-binary case.
 
  The function uses [`logsumexp`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.misc.logsumexp.html), which seeks to mitigate loss of precision when subtract in the log-domain. A helper function finds the Beta distribution that best matches a given mean and variance, `_meanVarToBeta`. Another helper function, `binomln`, computes the logarithm of the binomial expansion, which Scipy does not provide.
 
@@ -659,7 +653,7 @@ def binomln(n, k):
   return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
 
 
-def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
+def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as in `ebisu.predictRecall`'s arguments: an object
@@ -667,24 +661,44 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
   after a fact's most recent review.
 
   `successes` is the number of times the user *successfully* exercised this
-  memory during this review session, out of `total` attempts. Therefore, `0 <=
+  memory during this review session, out of `n` attempts. Therefore, `0 <=
   successes <= total` and `1 <= total`.
 
   If the user was shown this flashcard only once during this review session,
   then `total=1`. If the quiz was a success, then `successes=1`, else
-  `successes=0`.
+  `successes=0`. (See below for fuzzy quizzes.)
   
   If the user was shown this flashcard *multiple* times during the review
   session (e.g., Duolingo-style), then `total` can be greater than 1.
 
-  `tnow` is the time elapsed between this fact's last review and the review
-  being used to update.
+  If `total` is 1, `successes` can be a float between 0 and 1 inclusive. This
+  implies that while there was some "real" quiz result, we only observed a
+  scrambled version of it, which is `successes > 0.5`. A "real" successful quiz
+  has a `max(successes, 1 - successes)` chance of being scrambled such that we
+  observe a failed quiz `successes > 0.5`. E.g., `successes` of 0.9 *and* 0.1
+  imply there was a 10% chance a "real" successful quiz could result in a failed
+  quiz.
 
-  (The keyword arguments `rebalance` and `tback` are intended for internal use.)
+  This noisy quiz model also allows you to specify the related probability that
+  a "real" quiz failure could be scrambled into the successful quiz you observed.
+  Consider "Oh no, if you'd asked me that yesterday, I would have forgotten it."
+  By default, this probability is `1 - max(successes, 1 - successes)` but doesn't
+  need to be that value. Provide `q0` to set this explicitly. See the full Ebisu
+  mathematical analysis for details on this model and why this is called "q0".
+
+  `tnow` is the time elapsed between this fact's last review.
 
   Returns a new object (like `prior`) describing the posterior distribution of
-  recall probability at `tback` (which is an optional input, defaults to
-  `tnow`).
+  recall probability at `tback` time after review.
+  
+  If `rebalance` is True, the new object represents the updated recall
+  probability at *the halflife*, i,e., `tback` such that the expected
+  recall probability is is 0.5. This is the default behavior.
+  
+  Performance-sensitive users might consider disabling rebalancing. In that
+  case, they may pass in the `tback` that the returned model should correspond
+  to. If none is provided, the returned model represets recall at the same time
+  as the input model.
 
   N.B. This function is tested for numerical stability for small `total < 5`. It
   may be unstable for much larger `total`.
@@ -699,45 +713,95 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
   exceptions for cases that you think are reasonable.
   """
   assert (0 <= successes and successes <= total and 1 <= total)
+  if total == 1:
+    return _updateRecallSingle(prior, successes, tnow, rebalance=rebalance, tback=tback, q0=q0)
 
   (alpha, beta, t) = prior
-  if tback is None:
-    tback = t
   dt = tnow / t
-  et = tback / tnow
+  failures = total - successes
+  binomlns = [binomln(failures, i) for i in range(failures + 1)]
 
-  binomlns = [binomln(total - successes, i) for i in range(total - successes + 1)]
-  logDenominator, logMeanNum, logM2Num = [
-      logsumexp([
-          binomlns[i] + betaln(beta, alpha + dt * (successes + i) + m * dt * et)
-          for i in range(total - successes + 1)
-      ],
-                b=[(-1)**i
-                   for i in range(total - successes + 1)])
-      for m in range(3)
-  ]
-  mean = np.exp(logMeanNum - logDenominator)
-  m2 = np.exp(logM2Num - logDenominator)
+  def unnormalizedLogMoment(m, et):
+    return logsumexp([
+        binomlns[i] + betaln(alpha + dt * (successes + i) + m * dt * et, beta)
+        for i in range(failures + 1)
+    ],
+                     b=[(-1)**i for i in range(failures + 1)])
 
+  logDenominator = unnormalizedLogMoment(0, et=0)  # et doesn't matter for 0th moment
   message = dict(
       prior=prior, successes=successes, total=total, tnow=tnow, rebalance=rebalance, tback=tback)
+
+  if rebalance:
+    from scipy.optimize import root_scalar
+    target = np.log(0.5)
+    rootfn = lambda et: (unnormalizedLogMoment(1, et) - logDenominator) - target
+    sol = root_scalar(rootfn, bracket=_findBracket(rootfn, 1 / dt))
+    et = sol.root
+    tback = et * tnow
+  if tback:
+    et = tback / tnow
+  else:
+    tback = t
+    et = tback / tnow
+
+  logMean = unnormalizedLogMoment(1, et) - logDenominator
+  mean = np.exp(logMean)
+  m2 = np.exp(unnormalizedLogMoment(2, et) - logDenominator)
+
   assert mean > 0, message
   assert m2 > 0, message
 
-  meanSq = np.exp(2 * (logMeanNum - logDenominator))
+  meanSq = np.exp(2 * logMean)
   var = m2 - meanSq
   assert var > 0, message
   newAlpha, newBeta = _meanVarToBeta(mean, var)
-  proposed = newAlpha, newBeta, tback
-  return _rebalace(prior, successes, total, tnow, proposed) if rebalance else proposed
+  return (newAlpha, newBeta, tback)
 
 
-def _rebalace(prior, k, n, tnow, proposed):
-  newAlpha, newBeta, _ = proposed
-  if (newAlpha > 2 * newBeta or newBeta > 2 * newAlpha):
-    roughHalflife = modelToPercentileDecay(proposed, coarse=True)
-    return updateRecall(prior, k, n, tnow, rebalance=False, tback=roughHalflife)
-  return proposed
+def _updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None):
+  (alpha, beta, t) = prior
+
+  z = result > 0.5
+  q1 = result if z else 1 - result  # alternatively, max(result, 1-result)
+  if q0 is None:
+    q0 = 1 - q1
+
+  dt = tnow / t
+
+  if z == False:
+    c, d = (q0 - q1, 1 - q0)
+  else:
+    c, d = (q1 - q0, q0)
+
+  den = c * betafn(alpha + dt, beta) + d * (betafn(alpha, beta) if d else 0)
+
+  def moment(N, et):
+    num = c * betafn(alpha + dt + N * dt * et, beta)
+    if d != 0:
+      num += d * betafn(alpha + N * dt * et, beta)
+    return num / den
+
+  if rebalance:
+    from scipy.optimize import root_scalar
+    rootfn = lambda et: moment(1, et) - 0.5
+    sol = root_scalar(rootfn, bracket=_findBracket(rootfn, 1 / dt))
+    et = sol.root
+    tback = et * tnow
+  elif tback:
+    et = tback / tnow
+  else:
+    tback = t
+    et = tback / tnow
+
+  mean = moment(1, et)  # could be just a bit away from 0.5 after rebal, so reevaluate
+  secondMoment = moment(2, et)
+
+  var = secondMoment - mean * mean
+  newAlpha, newBeta = _meanVarToBeta(mean, var)
+  assert newAlpha > 0
+  assert newBeta > 0
+  return (newAlpha, newBeta, tback)
 
 
 def _meanVarToBeta(mean, var):
@@ -749,22 +813,25 @@ def _meanVarToBeta(mean, var):
   return alpha, beta
 ```
 
-Finally we have a couple more helper functions in the main `ebisu` namespace.
+Finally we have some helper functions in the main `ebisu` namespace.
 
-Although our update function above explicitly computes an approximate-half-life for a memory model, it may be very useful to predict when a given memory model expects recall to decay to an arbitrary percentile, not just 50% (i.e., half-life). Besides feedback to users, a quiz app might store the time when each quiz’s recall probability reaches 50%, 5%, 0.05%, …, as a computationally-efficient approximation to the exact recall probability. I am grateful to Robert Kern for contributing the `modelToPercentileDecay` function (🏀 below). It takes a model, and optionally a `percentile` keyword (a number between 0 and 1), as well as a `coarse` flag. The full half-life search does a coarse grid search and then refines that result with numerical optimization. When `coarse=True` (as in the `updateRecall` function above), the final finishing optimization is skipped.
+It can be very useful to predict when a given memory model expects recall to decay to an arbitrary percentile, not just 50% (i.e., half-life). Besides feedback to users, a quiz app might store the time when each quiz’s recall probability reaches 50%, 5%, 0.05%, …, as a computationally-efficient approximation to the exact recall probability. `modelToPercentileDecay` (🏀 below) takes a model and optionally a `percentile` keyword (a number between 0 and 1).
+
+`modelToPercentileDecay` and both update functions above use Scipy’s [`root_scalar`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.root_scalar.html), which needs to be given a bracket to search in. `_findBracket` is a helper function that is used in all three functions, but it’s a general purpose function, designed by Robert Kern, to whom I’m most grateful.
+
+As described in the section above on [rescaling](#bonus-rescaling-quiz-ease-or-difficulty) a model explicitly, sometimes Ebisu just isn’t working and a user might want you to outright expand or reduce the halflife of a model: `rescaleHalflife` does this. It simply takes a model and some number greater than zero, then finds the halflife of the model to rebalance the model, so its \\(α=β\\), using its first two moments. It then returns that model with the original halflife scaled by the number: if the user wants to see this flashcard less frequently, this should be greater than 1. If the user wants to see it more frequently, this should be less than one.
 
 The least important function from a usage point of view is also the most important function for someone getting started with Ebisu: I call it `defaultModel` (🍗 below) and it simply creates a “model” object (a 3-tuple) out of the arguments it’s given. It’s included in the `ebisu` namespace to help developers who totally lack confidence in picking parameters: the only information it absolutely needs is an expected half-life, e.g., four hours or twenty-four hours or however long you expect a newly-learned fact takes to decay to 50% recall.
 
 ```py
 # export ebisu/ebisu.py #
-def modelToPercentileDecay(model, percentile=0.5, coarse=False):
+def modelToPercentileDecay(model, percentile=0.5):
   """When will memory decay to a given percentile? 🏀
   
   Given a memory `model` of the kind consumed by `predictRecall`,
   etc., and optionally a `percentile` (defaults to 0.5, the
   half-life), find the time it takes for memory to decay to
-  `percentile`. If `coarse`, the returned time (in the same units as
-  `model`) is approximate.
+  `percentile`.
   """
   # Use a root-finding routine in log-delta space to find the delta that
   # will cause the GB1 distribution to have a mean of the requested quantile.
@@ -780,37 +847,50 @@ def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   logBab = betaln(alpha, beta)
   logPercentile = np.log(percentile)
 
-  def f(lndelta):
-    logMean = betaln(alpha + np.exp(lndelta), beta) - logBab
+  def f(delta):
+    logMean = betaln(alpha + delta, beta) - logBab
     return logMean - logPercentile
 
-  # Scan for a bracket.
-  bracket_width = 1.0 if coarse else 6.0
-  blow = -bracket_width / 2.0
-  bhigh = bracket_width / 2.0
-  flow = f(blow)
-  fhigh = f(bhigh)
-  while flow > 0 and fhigh > 0:
-    # Move the bracket up.
-    blow = bhigh
-    flow = fhigh
-    bhigh += bracket_width
-    fhigh = f(bhigh)
-  while flow < 0 and fhigh < 0:
-    # Move the bracket down.
-    bhigh = blow
-    fhigh = flow
-    blow -= bracket_width
-    flow = f(blow)
+  b = _findBracket(f, init=1., growfactor=2.)
+  sol = root_scalar(f, bracket=b)
+  # root_scalar is supposed to take initial guess x0, but it doesn't seem
+  # to speed up convergence at all? This is frustrating because for balanced
+  # models the solution is 1.0 which we could initialize...
 
-  assert flow > 0 and fhigh < 0
-
-  if coarse:
-    return (np.exp(blow) + np.exp(bhigh)) / 2 * t0
-
-  sol = root_scalar(f, bracket=[blow, bhigh])
-  t1 = np.exp(sol.root) * t0
+  t1 = sol.root * t0
   return t1
+
+
+def rescaleHalflife(prior, scale=1.):
+  """Given any model, return a new model with the original's halflife scaled.
+  Use this function to adjust the halflife of a model.
+  
+  Perhaps you want to see this flashcard far less, because you *really* know it.
+  `newModel = rescaleHalflife(model, 5)` to shift its memory model out to five
+  times the old halflife.
+  
+  Or if there's a flashcard that suddenly you want to review more frequently,
+  perhaps because you've recently learned a confuser flashcard that interferes
+  with your memory of the first, `newModel = rescaleHalflife(model, 0.1)` will
+  reduce its halflife by a factor of one-tenth.
+
+  Useful tip: the returned model will have matching α = β, where `alpha, beta,
+  newHalflife = newModel`. This happens because we first find the old model's
+  halflife, then we time-shift its probability density to that halflife. The
+  halflife is the time when recall probability is 0.5, which implies α = β.
+  That is the distribution this function returns, except at the *scaled*
+  halflife.
+  """
+  (alpha, beta, t) = prior
+  oldHalflife = modelToPercentileDecay(prior)
+  dt = oldHalflife / t
+
+  logDenominator = betaln(alpha, beta)
+  logm2 = betaln(alpha + 2 * dt, beta) - logDenominator
+  m2 = np.exp(logm2)
+  newAlphaBeta = 1 / (8 * m2 - 2) - 0.5
+  assert newAlphaBeta > 0
+  return (newAlphaBeta, newAlphaBeta, oldHalflife * scale)
 
 
 def defaultModel(t, alpha=3.0, beta=None):
@@ -827,43 +907,67 @@ def defaultModel(t, alpha=3.0, beta=None):
   `alpha`.
   """
   return (alpha, beta or alpha, t)
+
+
+def _findBracket(f, init=1., growfactor=2.):
+  """
+  Roughly bracket monotonic `f` defined for positive numbers.
+
+  Returns `[l, h]` such that `l < h` and `f(h) < 0 < f(l)`.
+  Ready to be passed into `scipy.optimize.root_scalar`, etc.
+
+  Starts the bracket at `[init / growfactor, init * growfactor]`
+  and then geometrically (exponentially) grows and shrinks the
+  bracket by `growthfactor` and `1 / growthfactor` respectively.
+  For misbehaved functions, these can help you avoid numerical
+  instability. For well-behaved functions, the defaults may be
+  too conservative.
+  """
+  factorhigh = growfactor
+  factorlow = 1 / factorhigh
+  blow = factorlow * init
+  bhigh = factorhigh * init
+  flow = f(blow)
+  fhigh = f(bhigh)
+  while flow > 0 and fhigh > 0:
+    # Move the bracket up.
+    blow = bhigh
+    flow = fhigh
+    bhigh *= factorhigh
+    fhigh = f(bhigh)
+  while flow < 0 and fhigh < 0:
+    # Move the bracket down.
+    bhigh = blow
+    fhigh = flow
+    blow *= factorlow
+    flow = f(blow)
+
+  assert flow > 0 and fhigh < 0
+  return [blow, bhigh]
 ```
 
-I would expect all the functions above to be present in all implementations of Ebisu:
-- `predictRecall`, aided by a private helper function `_cachedBetaln`,
-- `updateRecall`, aided by private helper functions `_rebalace` and `_meanVarToBeta`,
-- `modelToPercentileDecay`, and
-- `defaultModel`.
+To be at feature parity with this reference implementation of Ebisu, a port should offer all of the above functions, but only the first two are essential—the rest are merely useful:
+- `predictRecall`, aided by a private helper function `_cachedBetaln`—core,
+- `updateRecall`, aided by private helper functions `_updateRecallSingle` and `_meanVarToBeta`—core,
+- `modelToPercentileDecay`—optional,
+- `rescaleHalflife`—optional, and
+- `defaultModel`—optional.
 
 The functions in the following section are either for illustrative or debugging purposes.
 
 ### Miscellaneous functions
 I wrote a number of other functions that help provide insight or help debug the above functions in the main `ebisu` workspace but are not necessary for an actual implementation. These are in the `ebisu.alternate` submodule and not nearly as much time has been spent on polish or optimization as the above core functions. However they are very helpful in unit tests.
 
-```py
-# export ebisu/alternate.py #
-from .ebisu import _meanVarToBeta
-```
-
 `predictRecallMode` and `predictRecallMedian` return the mode and median of the recall probability prior rewound or fast-forwarded to the current time. That is, they return the mode/median of the random variable \\(p_t^δ\\) whose mean is returned by `predictRecall` (🍏 above). Recall that \\(δ = t / t_{now}\\).
 
 Both median and mode, like the mean, have analytical expressions. The mode is a little dangerous: the distribution can blow up to infinity at 0 or 1 when \\(δ\\) is either much smaller or much larger than 1, in which case the analytical expression for mode may yield nonsense—I have a number of not-very-rigorous checks to attempt to detect this. The median is computed with a inverse incomplete Beta function ([`betaincinv`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.betaincinv.html)), and could replace the mean as `predictRecall`’s return value in a future version of Ebisu.
 
-`predictRecallMonteCarlo` is the simplest function. It evaluates the mean, variance, mode (via histogram), and median of \\(p_t^δ\\) by drawing samples from the Beta prior on \\(p_t\\) and raising them to the \\(δ\\)-power. The unit tests for `predictRecall` in the next section use this Monte Carlo to test both derivations and implementations. While fool-proof, Monte Carlo simulation is obviously far too computationally-burdensome for regular use.
+`predictRecallMonteCarlo` is the simplest function but most useful. It evaluates the mean, variance, mode (via histogram), and median of \\(p_t^δ\\) by drawing samples from the Beta prior on \\(p_t\\) and raising them to the \\(δ\\)-power. While easy to implement and verify, Monte Carlo simulation is obviously far too computationally-burdensome for regular use.
 
 ```py
 # export ebisu/alternate.py #
+from .ebisu import _meanVarToBeta
 import numpy as np
-
-
-def _logsubexp(a, b):
-  """Evaluate `log(exp(a) - exp(b))` preserving accuracy.
-
-  Subtract log-domain numbers and return in the log-domain.
-  Wraps `scipy.special.logsumexp`.
-  """
-  from scipy.special import logsumexp
-  return logsumexp([a, b], b=[1, -1])
 
 
 def predictRecallMode(prior, tnow):
@@ -939,18 +1043,18 @@ def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
       var=np.var(tnowPrior))
 ```
 
-Next we have a Monte Carlo approach to `updateRecall` (🍌 above), the deceptively-simple `updateRecallMonteCarlo`. Like `predictRecallMonteCarlo` above, it draws samples from the Beta distribution in `model` and propagates them through Ebbinghaus’ forgetting curve to the time specified. To model the likelihood update from the quiz result, it assigns weights to each sample—each weight is that sample’s probability according to the binomial likelihood. (This is equivalent to multiplying the prior with the likelihood—and we needn’t bother with the marginal because it’s just a normalizing factor which would scale all weights equally. I am grateful to [mxwsn](https://stats.stackexchange.com/q/273221/31187) for suggesting this elegant approach.) It then applies Ebbinghaus again to move the distribution to `tback`. Finally, the ensemble is collapsed to a weighted mean and variance to be converted to a Beta distribution.
+Next we have a Monte Carlo approach to `updateRecall` (🍌 above), the deceptively-simple `updateRecallMonteCarlo`. Like `predictRecallMonteCarlo` above, it draws samples from the Beta distribution in `model` and propagates them through Ebbinghaus’ forgetting curve to the time specified. To model the likelihood update from the quiz result, it assigns weights to each sample—each weight is that sample’s probability according to either the binomial or the fuzzy soft-binary likelihood. (This is equivalent to multiplying the prior with the likelihood—and we needn’t bother with the marginal because it’s just a normalizing factor which would scale all weights equally. I am grateful to [mxwsn](https://stats.stackexchange.com/q/273221/31187) for suggesting this elegant approach.) It then applies Ebbinghaus again to move the distribution to `tback`. Finally, the ensemble is collapsed to a weighted mean and variance to be converted to a Beta distribution.
 
 ```py
 # export ebisu/alternate.py #
-def updateRecallMonteCarlo(prior, k, n, tnow, tback=None, N=10 * 1000 * 1000):
+def updateRecallMonteCarlo(prior, k, n, tnow, tback=None, N=10 * 1000 * 1000, q0=None):
   """Update recall probability with quiz result via Monte Carlo simulation.
 
   Same arguments as `ebisu.updateRecall`, see that docstring for details.
 
   An extra keyword argument `N` specifies the number of samples to draw.
   """
-  # [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&oldid=769806318#Properties_of_the_Bernoulli_Distribution, third equation
+  # [likelihood] https://en.wikipedia.org/w/index.php?title=Binomial_distribution&oldid=1016760882#Probability_mass_function
   # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
   # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
   import scipy.stats as stats
@@ -963,8 +1067,18 @@ def updateRecallMonteCarlo(prior, k, n, tnow, tback=None, N=10 * 1000 * 1000):
   tPrior = stats.beta.rvs(alpha, beta, size=N)
   tnowPrior = tPrior**(tnow / t)
 
-  # This is the Bernoulli likelihood [bernoulliLikelihood]
-  weights = binom(n, k) * (tnowPrior)**k * ((1 - tnowPrior)**(n - k))
+  if type(k) == int:
+    # This is the Binomial likelihood [likelihood]
+    weights = binom(n, k) * (tnowPrior)**k * ((1 - tnowPrior)**(n - k))
+  elif 0 <= k and k <= 1:
+    # float
+    q1 = max(k, 1 - k)
+    q0 = 1 - q1 if q0 is None else q0
+    z = k > 0.5  # "observed" quiz result
+    if z:
+      weights = q0 * (1 - tnowPrior) + q1 * tnowPrior
+    else:
+      weights = (1 - q0) * (1 - tnowPrior) + (1 - q1) * tnowPrior
 
   # Now propagate this posterior to the tback
   tbackPrior = tPrior**(tback / t)
@@ -992,9 +1106,9 @@ from ebisu.alternate import *
 
 In these unit tests, I compare
 - `predictRecall` against `predictRecallMonteCarlo`, and
-- `updateRecall` against `updateRecallMonteCarlo`.
+- `updateRecall` against `updateRecallMonteCarlo`, for both binomial quizzes and soft-binary quizzes.
 
-I also want to make sure that `predictRecall` and `updateRecall` both produce sane values when extremely under- and over-reviewing (i.e., immediately after review as well as far into the future) and for a range of `successes` and `total` reviews per quiz session. And we should also exercise `modelToPercentileDecay`.
+I also want to make sure that `predictRecall` and `updateRecall` both produce sane values when extremely under- and over-reviewing (i.e., immediately after review as well as far into the future) and for a range of `successes` and `total` reviews per quiz session. And we should also exercise `modelToPercentileDecay` and `rescaleHalflife`.
 
 For testing `updateRecall`, since all functions return a Beta distribution, I compare the resulting distributions in terms of [Kullback–Leibler divergence](https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Quantities_of_information_.28entropy.29) (actually, the symmetric distance version), which is a nice way to measure the difference between two probability distributions. There is also a little unit test for my implementation for the KL divergence on Beta distributions.
 
@@ -1008,8 +1122,14 @@ One note: the unit tests update a global database of `testpoints` being tested, 
 
 ```py
 # export ebisu/tests/test_ebisu.py
+# -*- coding: utf-8 -*-
+
+from ebisu import *
+from ebisu.alternate import *
 import unittest
 import numpy as np
+
+np.seterr(all='raise')
 
 
 def relerr(dirt, gold):
@@ -1116,6 +1236,11 @@ class TestEbisu(unittest.TestCase):
     inner(3.3, 4.4, 1., [0.1, 1., 9.5])
     inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
 
+    # make sure all is well for balanced models where we know the halflife already
+    for t in np.logspace(-1, 2, 10):
+      for ab in np.linspace(2, 10, 5):
+        self.assertAlmostEqual(modelToPercentileDecay((ab, ab, t)), t)
+
   def test_asymptotic(self):
     """Failing quizzes in far future shouldn't modify model when updating.
     Passing quizzes right away shouldn't modify model when updating.
@@ -1124,13 +1249,11 @@ class TestEbisu(unittest.TestCase):
     def inner(a, b, n=1):
       prior = (a, b, 1.0)
       hl = modelToPercentileDecay(prior)
-      ts = np.linspace(.001, 1000, 101)
-      passhl = np.vectorize(
-          lambda tnow: modelToPercentileDecay(updateRecall(prior, n, n, tnow, 1.0)))(
-              ts)
-      failhl = np.vectorize(
-          lambda tnow: modelToPercentileDecay(updateRecall(prior, 0, n, tnow, 1.0)))(
-              ts)
+      ts = np.linspace(.001, 1000, 21) * hl
+      passhl = np.vectorize(lambda tnow: modelToPercentileDecay(updateRecall(prior, n, n, tnow)))(
+          ts)
+      failhl = np.vectorize(lambda tnow: modelToPercentileDecay(updateRecall(prior, 0, n, tnow)))(
+          ts)
       self.assertTrue(monotonicIncreasing(passhl))
       self.assertTrue(monotonicIncreasing(failhl))
       # Passing should only increase halflife
@@ -1142,13 +1265,61 @@ class TestEbisu(unittest.TestCase):
       for b in [2., 20, 200]:
         inner(a, b, n=1)
 
+  def test_rescale(self):
+    "Test rescaleHalflife"
+    pre = (3., 4., 1.)
+    oldhl = modelToPercentileDecay(pre)
+    for u in [0.1, 1., 10.]:
+      post = rescaleHalflife(pre, u)
+      self.assertAlmostEqual(modelToPercentileDecay(post), oldhl * u)
+
+    # don't change halflife: in this case, predictions should be really close
+    post = rescaleHalflife(pre, 1.0)
+    for tnow in [1e-2, .1, 1., 10., 100.]:
+      self.assertAlmostEqual(
+          predictRecall(pre, tnow, exact=True), predictRecall(post, tnow, exact=True), delta=1e-3)
+
+  def test_fuzzy(self):
+    "Binary quizzes are heavily tested above. Now test float/fuzzy quizzes here"
+    fuzzies = np.linspace(0, 1, 7)  # test 0 and 1 too
+    for tnow in np.logspace(-1, 1, 5):
+      for a in np.linspace(2, 20, 5):
+        for b in np.linspace(2, 20, 5):
+          prior = (a, b, 1.0)
+          newmodels = [updateRecall(prior, q, 1, tnow) for q in fuzzies]
+          for m, q in zip(newmodels, fuzzies):
+            # check rebalance is working
+            newa, newb, newt = m
+            self.assertAlmostEqual(newa, newb)
+            self.assertAlmostEqual(newt, modelToPercentileDecay(m))
+
+            # check that the analytical posterior Beta fit versus Monte Carlo
+            if 0 < q and q < 1:
+              mc = updateRecallMonteCarlo(prior, q, 1, tnow, newt, N=1_000_000)
+              self.assertLess(
+                  kl(m, mc), 1e-4, msg=f'prior={prior}; tnow={tnow}; q={q}; m={m}; mc={mc}')
+
+          # also important: make sure halflife varies smoothly between q=0 and q=1
+          self.assertTrue(monotonicIncreasing([x for _, _, x in newmodels]))
+
+    # make sure `tback` works
+    prior = (3., 4., 10)
+    tback = 5.
+    post = updateRecall(prior, 1, 1, 1., rebalance=False, tback=tback)
+    self.assertAlmostEqual(post[2], tback)
+    # and default `tback` if everything is omitted is original `t`
+    post = updateRecall(prior, 1, 1, 1., rebalance=False)
+    self.assertAlmostEqual(post[2], prior[2])
+
 
 def monotonicIncreasing(v):
-  return np.all(np.diff(v) >= -np.spacing(1.) * 1e8)
+  # allow a tiny bit of negative slope
+  return np.all(np.diff(v) >= -1e-6)
 
 
 def monotonicDecreasing(v):
-  return np.all(np.diff(v) <= np.spacing(1.) * 1e8)
+  # same as above, allow a tiny bit of positive slope
+  return np.all(np.diff(v) <= 1e-6)
 
 
 if __name__ == '__main__':

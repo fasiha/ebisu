@@ -207,14 +207,6 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=N
   return (newAlpha, newBeta, tback)
 
 
-def _rebalace(prior, k, n, tnow, proposed):
-  newAlpha, newBeta, _ = proposed
-  if (newAlpha > 2 * newBeta or newBeta > 2 * newAlpha):
-    roughHalflife = modelToPercentileDecay(proposed, coarse=True)
-    return updateRecall(prior, k, n, tnow, rebalance=False, tback=roughHalflife)
-  return proposed
-
-
 def _meanVarToBeta(mean, var):
   """Fit a Beta distribution to a mean and variance."""
   # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
@@ -260,6 +252,38 @@ def modelToPercentileDecay(model, percentile=0.5):
   return t1
 
 
+def rescaleHalflife(prior, scale=1.):
+  """Given any model, return a new model with the original's halflife scaled.
+  Use this function to adjust the halflife of a model.
+  
+  Perhaps you want to see this flashcard far less, because you *really* know it.
+  `newModel = rescaleHalflife(model, 5)` to shift its memory model out to five
+  times the old halflife.
+  
+  Or if there's a flashcard that suddenly you want to review more frequently,
+  perhaps because you've recently learned a confuser flashcard that interferes
+  with your memory of the first, `newModel = rescaleHalflife(model, 0.1)` will
+  reduce its halflife by a factor of one-tenth.
+
+  Useful tip: the returned model will have matching α = β, where `alpha, beta,
+  newHalflife = newModel`. This happens because we first find the old model's
+  halflife, then we time-shift its probability density to that halflife. The
+  halflife is the time when recall probability is 0.5, which implies α = β.
+  That is the distribution this function returns, except at the *scaled*
+  halflife.
+  """
+  (alpha, beta, t) = prior
+  oldHalflife = modelToPercentileDecay(prior)
+  dt = oldHalflife / t
+
+  logDenominator = betaln(alpha, beta)
+  logm2 = betaln(alpha + 2 * dt, beta) - logDenominator
+  m2 = np.exp(logm2)
+  newAlphaBeta = 1 / (8 * m2 - 2) - 0.5
+  assert newAlphaBeta > 0
+  return (newAlphaBeta, newAlphaBeta, oldHalflife * scale)
+
+
 def defaultModel(t, alpha=3.0, beta=None):
   """Convert recall probability prior's raw parameters into a model object. 🍗
 
@@ -274,33 +298,6 @@ def defaultModel(t, alpha=3.0, beta=None):
   `alpha`.
   """
   return (alpha, beta or alpha, t)
-
-
-def rescaleHalflife(prior, scale=1.):
-  """Given any model, return a new model with the original's halflife scaled.
-  Use this function to adjust the halflife of a model.
-  Perhaps you want to see this flashcard far less, because you *really* know it.
-  `newModel = rescaleHalflife(model, 5)` to shift its memory model out to five
-  times the old halflife.
-  Or if there's a flashcard that suddenly you want to review more frequently,
-  perhaps because you've recently learned a confuser flashcard that interferes
-  with your memory of the first, `newModel = rescaleHalflife(model, 0.1)` will
-  reduce its halflife by a factor of one-tenth.
-  Useful tip: the returned model will have matching α = β, where `alpha, beta,
-  newHalflife = newModel`. This happens because we first find the old model's
-  halflife, then we time-shift its probability density to that halflife. That's
-  the distribution this function returns, except at the *scaled* halflife.
-  """
-  (alpha, beta, t) = prior
-  oldHalflife = modelToPercentileDecay(prior)
-  dt = oldHalflife / t
-
-  logDenominator = betaln(alpha, beta)
-  logm2 = betaln(alpha + 2 * dt, beta) - logDenominator
-  m2 = np.exp(logm2)
-  newAlphaBeta = 1 / (8 * m2 - 2) - 0.5
-  assert newAlphaBeta > 0
-  return (newAlphaBeta, newAlphaBeta, oldHalflife * scale)
 
 
 def _findBracket(f, init=1., growfactor=2.):

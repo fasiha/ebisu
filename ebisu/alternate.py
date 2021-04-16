@@ -4,16 +4,6 @@ from .ebisu import _meanVarToBeta
 import numpy as np
 
 
-def _logsubexp(a, b):
-  """Evaluate `log(exp(a) - exp(b))` preserving accuracy.
-
-  Subtract log-domain numbers and return in the log-domain.
-  Wraps `scipy.special.logsumexp`.
-  """
-  from scipy.special import logsumexp
-  return logsumexp([a, b], b=[1, -1])
-
-
 def predictRecallMode(prior, tnow):
   """Mode of the immediate recall probability.
 

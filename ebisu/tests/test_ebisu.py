@@ -5,6 +5,8 @@ from ebisu.alternate import *
 import unittest
 import numpy as np
 
+np.seterr(all='raise')
+
 
 def relerr(dirt, gold):
   return abs(dirt - gold) / abs(gold)
@@ -110,6 +112,11 @@ class TestEbisu(unittest.TestCase):
     inner(3.3, 4.4, 1., [0.1, 1., 9.5])
     inner(34.4, 3.4, 1., [0.1, 1., 5.5, 50.])
 
+    # make sure all is well for balanced models where we know the halflife already
+    for t in np.logspace(-1, 2, 10):
+      for ab in np.linspace(2, 10, 5):
+        self.assertAlmostEqual(modelToPercentileDecay((ab, ab, t)), t)
+
   def test_asymptotic(self):
     """Failing quizzes in far future shouldn't modify model when updating.
     Passing quizzes right away shouldn't modify model when updating.
@@ -118,13 +125,11 @@ class TestEbisu(unittest.TestCase):
     def inner(a, b, n=1):
       prior = (a, b, 1.0)
       hl = modelToPercentileDecay(prior)
-      ts = np.linspace(.001, 1000, 101)
-      passhl = np.vectorize(
-          lambda tnow: modelToPercentileDecay(updateRecall(prior, n, n, tnow, 1.0)))(
-              ts)
-      failhl = np.vectorize(
-          lambda tnow: modelToPercentileDecay(updateRecall(prior, 0, n, tnow, 1.0)))(
-              ts)
+      ts = np.linspace(.001, 1000, 21) * hl
+      passhl = np.vectorize(lambda tnow: modelToPercentileDecay(updateRecall(prior, n, n, tnow)))(
+          ts)
+      failhl = np.vectorize(lambda tnow: modelToPercentileDecay(updateRecall(prior, 0, n, tnow)))(
+          ts)
       self.assertTrue(monotonicIncreasing(passhl))
       self.assertTrue(monotonicIncreasing(failhl))
       # Passing should only increase halflife
@@ -136,13 +141,63 @@ class TestEbisu(unittest.TestCase):
       for b in [2., 20, 200]:
         inner(a, b, n=1)
 
+  def test_rescale(self):
+    "Test rescaleHalflife"
+    pre = (3., 4., 1.)
+    oldhl = modelToPercentileDecay(pre)
+    for u in [0.1, 1., 10.]:
+      post = rescaleHalflife(pre, u)
+      self.assertAlmostEqual(modelToPercentileDecay(post), oldhl * u)
+
+    # don't change halflife: in this case, predictions should be really close
+    post = rescaleHalflife(pre, 1.0)
+    for tnow in [1e-2, .1, 1., 10., 100.]:
+      self.assertAlmostEqual(
+          predictRecall(pre, tnow, exact=True), predictRecall(post, tnow, exact=True), delta=1e-3)
+
+  def test_fuzzy(self):
+    "Binary quizzes are heavily tested above. Now test float/fuzzy quizzes here"
+    global testpoints
+    fuzzies = np.linspace(0, 1, 7)  # test 0 and 1 too
+    for tnow in np.logspace(-1, 1, 5):
+      for a in np.linspace(2, 20, 5):
+        for b in np.linspace(2, 20, 5):
+          prior = (a, b, 1.0)
+          newmodels = [updateRecall(prior, q, 1, tnow) for q in fuzzies]
+          for m, q in zip(newmodels, fuzzies):
+            # check rebalance is working
+            newa, newb, newt = m
+            self.assertAlmostEqual(newa, newb)
+            self.assertAlmostEqual(newt, modelToPercentileDecay(m))
+
+            # check that the analytical posterior Beta fit versus Monte Carlo
+            if 0 < q and q < 1:
+              mc = updateRecallMonteCarlo(prior, q, 1, tnow, newt, N=1_000_000)
+              self.assertLess(
+                  kl(m, mc), 1e-4, msg=f'prior={prior}; tnow={tnow}; q={q}; m={m}; mc={mc}')
+              testpoints += [['update', list(prior), [q, 1, tnow], dict(post=m)]]
+
+          # also important: make sure halflife varies smoothly between q=0 and q=1
+          self.assertTrue(monotonicIncreasing([x for _, _, x in newmodels]))
+
+    # make sure `tback` works
+    prior = (3., 4., 10)
+    tback = 5.
+    post = updateRecall(prior, 1, 1, 1., rebalance=False, tback=tback)
+    self.assertAlmostEqual(post[2], tback)
+    # and default `tback` if everything is omitted is original `t`
+    post = updateRecall(prior, 1, 1, 1., rebalance=False)
+    self.assertAlmostEqual(post[2], prior[2])
+
 
 def monotonicIncreasing(v):
-  return np.all(np.diff(v) >= -np.spacing(1.) * 1e8)
+  # allow a tiny bit of negative slope
+  return np.all(np.diff(v) >= -1e-6)
 
 
 def monotonicDecreasing(v):
-  return np.all(np.diff(v) <= np.spacing(1.) * 1e8)
+  # same as above, allow a tiny bit of positive slope
+  return np.all(np.diff(v) <= 1e-6)
 
 
 if __name__ == '__main__':

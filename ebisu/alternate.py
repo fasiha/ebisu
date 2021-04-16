@@ -4,16 +4,6 @@ from .ebisu import _meanVarToBeta
 import numpy as np
 
 
-def _logsubexp(a, b):
-  """Evaluate `log(exp(a) - exp(b))` preserving accuracy.
-
-  Subtract log-domain numbers and return in the log-domain.
-  Wraps `scipy.special.logsumexp`.
-  """
-  from scipy.special import logsumexp
-  return logsumexp([a, b], b=[1, -1])
-
-
 def predictRecallMode(prior, tnow):
   """Mode of the immediate recall probability.
 
@@ -85,14 +75,16 @@ def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
       median=np.median(tnowPrior),
       mode=bincenters[freqs.argmax()],
       var=np.var(tnowPrior))
-def updateRecallMonteCarlo(prior, k, n, tnow, tback=None, N=10 * 1000 * 1000):
+
+
+def updateRecallMonteCarlo(prior, k, n, tnow, tback=None, N=10 * 1000 * 1000, q0=None):
   """Update recall probability with quiz result via Monte Carlo simulation.
 
   Same arguments as `ebisu.updateRecall`, see that docstring for details.
 
   An extra keyword argument `N` specifies the number of samples to draw.
   """
-  # [bernoulliLikelihood] https://en.wikipedia.org/w/index.php?title=Bernoulli_distribution&oldid=769806318#Properties_of_the_Bernoulli_Distribution, third equation
+  # [likelihood] https://en.wikipedia.org/w/index.php?title=Binomial_distribution&oldid=1016760882#Probability_mass_function
   # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
   # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
   import scipy.stats as stats
@@ -105,8 +97,18 @@ def updateRecallMonteCarlo(prior, k, n, tnow, tback=None, N=10 * 1000 * 1000):
   tPrior = stats.beta.rvs(alpha, beta, size=N)
   tnowPrior = tPrior**(tnow / t)
 
-  # This is the Bernoulli likelihood [bernoulliLikelihood]
-  weights = binom(n, k) * (tnowPrior)**k * ((1 - tnowPrior)**(n - k))
+  if type(k) == int:
+    # This is the Binomial likelihood [likelihood]
+    weights = binom(n, k) * (tnowPrior)**k * ((1 - tnowPrior)**(n - k))
+  elif 0 <= k and k <= 1:
+    # float
+    q1 = max(k, 1 - k)
+    q0 = 1 - q1 if q0 is None else q0
+    z = k > 0.5  # "observed" quiz result
+    if z:
+      weights = q0 * (1 - tnowPrior) + q1 * tnowPrior
+    else:
+      weights = (1 - q0) * (1 - tnowPrior) + (1 - q1) * tnowPrior
 
   # Now propagate this posterior to the tback
   tbackPrior = tPrior**(tback / t)

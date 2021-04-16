@@ -11,6 +11,7 @@ var fencepos =
 
 var seen = new Set([]);
 var replacement = [];
+var fnames = [];
 _.chunk(fencepos, 2).forEach(([[_, i], [__, j]]) => {
   var language = lines[i].match(/```([^\s]+)/);
   language = language ? language[1] : language;
@@ -18,6 +19,7 @@ _.chunk(fencepos, 2).forEach(([[_, i], [__, j]]) => {
   var fname = null;
   if (lines[i + 1].indexOf('# export') === 0) {
     fname = lines[i + 1].match(/# export ([^\s]+)/)[1];
+    fnames.push(fname);
   }
   var contentStart = i + 1 + (fname === null ? 0 : 1);
   var contents = lines.slice(contentStart, j).join('');
@@ -52,3 +54,10 @@ for (var ri = replacement.length - 1; ri >= 0; ri--) {
   lines[r.contentStart] = r.contents;
 }
 fs.writeFileSync('README.md', lines.join(''))
+
+// run a final Yapf on the final files. Ensures newlines between functions, etc.
+for (let fname of fnames) {
+  let contents = fs.readFileSync(fname, 'utf8');
+  contents = spawnSync('yapf', [], {input: contents, encoding: 'utf8'}).stdout;
+  fs.writeFileSync(fname, contents);
+}

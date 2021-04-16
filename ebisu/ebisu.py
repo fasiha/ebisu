@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from scipy.special import betaln, logsumexp
+from scipy.special import betaln, beta as betafn, logsumexp
 import numpy as np
 
 
@@ -48,12 +48,14 @@ def _cachedBetaln(a, b):
   x = betaln(a, b)
   _BETALNCACHE[(a, b)] = x
   return x
+
+
 def binomln(n, k):
   "Log of scipy.special.binom calculated entirely in the log domain"
   return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
 
 
-def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
+def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=None):
   """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as in `ebisu.predictRecall`'s arguments: an object
@@ -66,19 +68,39 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
 
   If the user was shown this flashcard only once during this review session,
   then `total=1`. If the quiz was a success, then `successes=1`, else
-  `successes=0`.
+  `successes=0`. (See below for fuzzy quizzes.)
   
   If the user was shown this flashcard *multiple* times during the review
   session (e.g., Duolingo-style), then `total` can be greater than 1.
 
-  `tnow` is the time elapsed between this fact's last review and the review
-  being used to update.
+  If `total` is 1, `successes` can be a float between 0 and 1 inclusive. This
+  implies that while there was some "real" quiz result, we only observed a
+  scrambled version of it, which is `successes > 0.5`. A "real" successful quiz
+  has a `max(successes, 1 - successes)` chance of being scrambled such that we
+  observe a failed quiz `successes > 0.5`. E.g., `successes` of 0.9 *and* 0.1
+  imply there was a 10% chance a "real" successful quiz could result in a failed
+  quiz.
 
-  (The keyword arguments `rebalance` and `tback` are intended for internal use.)
+  This noisy quiz model also allows you to specify the related probability that
+  a "real" quiz failure could be scrambled into the successful quiz you observed.
+  Consider "Oh no, if you'd asked me that yesterday, I would have forgotten it."
+  By default, this probability is `1 - max(successes, 1 - successes)` but doesn't
+  need to be that value. Provide `q0` to set this explicitly. See the full Ebisu
+  mathematical analysis for details on this model and why this is called "q0".
+
+  `tnow` is the time elapsed between this fact's last review.
 
   Returns a new object (like `prior`) describing the posterior distribution of
-  recall probability at `tback` (which is an optional input, defaults to
-  `tnow`).
+  recall probability at `tback` time after review.
+  
+  If `rebalance` is True, the new object represents the updated recall
+  probability at *the halflife*, i,e., `tback` such that the expected
+  recall probability is is 0.5. This is the default behavior.
+  
+  Performance-sensitive users might consider disabling rebalancing. In that
+  case, they may pass in the `tback` that the returned model should correspond
+  to. If none is provided, the returned model represets recall at the same time
+  as the input model.
 
   N.B. This function is tested for numerical stability for small `total < 5`. It
   may be unstable for much larger `total`.
@@ -93,45 +115,95 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None):
   exceptions for cases that you think are reasonable.
   """
   assert (0 <= successes and successes <= total and 1 <= total)
+  if total == 1:
+    return _updateRecallSingle(prior, successes, tnow, rebalance=rebalance, tback=tback, q0=q0)
 
   (alpha, beta, t) = prior
-  if tback is None:
-    tback = t
   dt = tnow / t
-  et = tback / tnow
+  failures = total - successes
+  binomlns = [binomln(failures, i) for i in range(failures + 1)]
 
-  binomlns = [binomln(total - successes, i) for i in range(total - successes + 1)]
-  logDenominator, logMeanNum, logM2Num = [
-      logsumexp([
-          binomlns[i] + betaln(beta, alpha + dt * (successes + i) + m * dt * et)
-          for i in range(total - successes + 1)
-      ],
-                b=[(-1)**i
-                   for i in range(total - successes + 1)])
-      for m in range(3)
-  ]
-  mean = np.exp(logMeanNum - logDenominator)
-  m2 = np.exp(logM2Num - logDenominator)
+  def unnormalizedLogMoment(m, et):
+    return logsumexp([
+        binomlns[i] + betaln(alpha + dt * (successes + i) + m * dt * et, beta)
+        for i in range(failures + 1)
+    ],
+                     b=[(-1)**i for i in range(failures + 1)])
 
+  logDenominator = unnormalizedLogMoment(0, et=0)  # et doesn't matter for 0th moment
   message = dict(
       prior=prior, successes=successes, total=total, tnow=tnow, rebalance=rebalance, tback=tback)
+
+  if rebalance:
+    from scipy.optimize import root_scalar
+    target = np.log(0.5)
+    rootfn = lambda et: (unnormalizedLogMoment(1, et) - logDenominator) - target
+    sol = root_scalar(rootfn, bracket=_findBracket(rootfn, 1 / dt))
+    et = sol.root
+    tback = et * tnow
+  if tback:
+    et = tback / tnow
+  else:
+    tback = t
+    et = tback / tnow
+
+  logMean = unnormalizedLogMoment(1, et) - logDenominator
+  mean = np.exp(logMean)
+  m2 = np.exp(unnormalizedLogMoment(2, et) - logDenominator)
+
   assert mean > 0, message
   assert m2 > 0, message
 
-  meanSq = np.exp(2 * (logMeanNum - logDenominator))
+  meanSq = np.exp(2 * logMean)
   var = m2 - meanSq
   assert var > 0, message
   newAlpha, newBeta = _meanVarToBeta(mean, var)
-  proposed = newAlpha, newBeta, tback
-  return _rebalace(prior, successes, total, tnow, proposed) if rebalance else proposed
+  return (newAlpha, newBeta, tback)
 
 
-def _rebalace(prior, k, n, tnow, proposed):
-  newAlpha, newBeta, _ = proposed
-  if (newAlpha > 2 * newBeta or newBeta > 2 * newAlpha):
-    roughHalflife = modelToPercentileDecay(proposed, coarse=True)
-    return updateRecall(prior, k, n, tnow, rebalance=False, tback=roughHalflife)
-  return proposed
+def _updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None):
+  (alpha, beta, t) = prior
+
+  z = result > 0.5
+  q1 = result if z else 1 - result  # alternatively, max(result, 1-result)
+  if q0 is None:
+    q0 = 1 - q1
+
+  dt = tnow / t
+
+  if z == False:
+    c, d = (q0 - q1, 1 - q0)
+  else:
+    c, d = (q1 - q0, q0)
+
+  den = c * betafn(alpha + dt, beta) + d * (betafn(alpha, beta) if d else 0)
+
+  def moment(N, et):
+    num = c * betafn(alpha + dt + N * dt * et, beta)
+    if d != 0:
+      num += d * betafn(alpha + N * dt * et, beta)
+    return num / den
+
+  if rebalance:
+    from scipy.optimize import root_scalar
+    rootfn = lambda et: moment(1, et) - 0.5
+    sol = root_scalar(rootfn, bracket=_findBracket(rootfn, 1 / dt))
+    et = sol.root
+    tback = et * tnow
+  elif tback:
+    et = tback / tnow
+  else:
+    tback = t
+    et = tback / tnow
+
+  mean = moment(1, et)  # could be just a bit away from 0.5 after rebal, so reevaluate
+  secondMoment = moment(2, et)
+
+  var = secondMoment - mean * mean
+  newAlpha, newBeta = _meanVarToBeta(mean, var)
+  assert newAlpha > 0
+  assert newBeta > 0
+  return (newAlpha, newBeta, tback)
 
 
 def _meanVarToBeta(mean, var):
@@ -141,14 +213,15 @@ def _meanVarToBeta(mean, var):
   alpha = mean * tmp
   beta = (1 - mean) * tmp
   return alpha, beta
-def modelToPercentileDecay(model, percentile=0.5, coarse=False):
+
+
+def modelToPercentileDecay(model, percentile=0.5):
   """When will memory decay to a given percentile? 🏀
   
   Given a memory `model` of the kind consumed by `predictRecall`,
   etc., and optionally a `percentile` (defaults to 0.5, the
   half-life), find the time it takes for memory to decay to
-  `percentile`. If `coarse`, the returned time (in the same units as
-  `model`) is approximate.
+  `percentile`.
   """
   # Use a root-finding routine in log-delta space to find the delta that
   # will cause the GB1 distribution to have a mean of the requested quantile.
@@ -164,37 +237,50 @@ def modelToPercentileDecay(model, percentile=0.5, coarse=False):
   logBab = betaln(alpha, beta)
   logPercentile = np.log(percentile)
 
-  def f(lndelta):
-    logMean = betaln(alpha + np.exp(lndelta), beta) - logBab
+  def f(delta):
+    logMean = betaln(alpha + delta, beta) - logBab
     return logMean - logPercentile
 
-  # Scan for a bracket.
-  bracket_width = 1.0 if coarse else 6.0
-  blow = -bracket_width / 2.0
-  bhigh = bracket_width / 2.0
-  flow = f(blow)
-  fhigh = f(bhigh)
-  while flow > 0 and fhigh > 0:
-    # Move the bracket up.
-    blow = bhigh
-    flow = fhigh
-    bhigh += bracket_width
-    fhigh = f(bhigh)
-  while flow < 0 and fhigh < 0:
-    # Move the bracket down.
-    bhigh = blow
-    fhigh = flow
-    blow -= bracket_width
-    flow = f(blow)
+  b = _findBracket(f, init=1., growfactor=2.)
+  sol = root_scalar(f, bracket=b)
+  # root_scalar is supposed to take initial guess x0, but it doesn't seem
+  # to speed up convergence at all? This is frustrating because for balanced
+  # models the solution is 1.0 which we could initialize...
 
-  assert flow > 0 and fhigh < 0
-
-  if coarse:
-    return (np.exp(blow) + np.exp(bhigh)) / 2 * t0
-
-  sol = root_scalar(f, bracket=[blow, bhigh])
-  t1 = np.exp(sol.root) * t0
+  t1 = sol.root * t0
   return t1
+
+
+def rescaleHalflife(prior, scale=1.):
+  """Given any model, return a new model with the original's halflife scaled.
+  Use this function to adjust the halflife of a model.
+  
+  Perhaps you want to see this flashcard far less, because you *really* know it.
+  `newModel = rescaleHalflife(model, 5)` to shift its memory model out to five
+  times the old halflife.
+  
+  Or if there's a flashcard that suddenly you want to review more frequently,
+  perhaps because you've recently learned a confuser flashcard that interferes
+  with your memory of the first, `newModel = rescaleHalflife(model, 0.1)` will
+  reduce its halflife by a factor of one-tenth.
+
+  Useful tip: the returned model will have matching α = β, where `alpha, beta,
+  newHalflife = newModel`. This happens because we first find the old model's
+  halflife, then we time-shift its probability density to that halflife. The
+  halflife is the time when recall probability is 0.5, which implies α = β.
+  That is the distribution this function returns, except at the *scaled*
+  halflife.
+  """
+  (alpha, beta, t) = prior
+  oldHalflife = modelToPercentileDecay(prior)
+  dt = oldHalflife / t
+
+  logDenominator = betaln(alpha, beta)
+  logm2 = betaln(alpha + 2 * dt, beta) - logDenominator
+  m2 = np.exp(logm2)
+  newAlphaBeta = 1 / (8 * m2 - 2) - 0.5
+  assert newAlphaBeta > 0
+  return (newAlphaBeta, newAlphaBeta, oldHalflife * scale)
 
 
 def defaultModel(t, alpha=3.0, beta=None):
@@ -211,3 +297,40 @@ def defaultModel(t, alpha=3.0, beta=None):
   `alpha`.
   """
   return (alpha, beta or alpha, t)
+
+
+def _findBracket(f, init=1., growfactor=2.):
+  """
+  Roughly bracket monotonic `f` defined for positive numbers.
+
+  Returns `[l, h]` such that `l < h` and `f(h) < 0 < f(l)`.
+  Ready to be passed into `scipy.optimize.root_scalar`, etc.
+
+  Starts the bracket at `[init / growfactor, init * growfactor]`
+  and then geometrically (exponentially) grows and shrinks the
+  bracket by `growthfactor` and `1 / growthfactor` respectively.
+  For misbehaved functions, these can help you avoid numerical
+  instability. For well-behaved functions, the defaults may be
+  too conservative.
+  """
+  factorhigh = growfactor
+  factorlow = 1 / factorhigh
+  blow = factorlow * init
+  bhigh = factorhigh * init
+  flow = f(blow)
+  fhigh = f(bhigh)
+  while flow > 0 and fhigh > 0:
+    # Move the bracket up.
+    blow = bhigh
+    flow = fhigh
+    bhigh *= factorhigh
+    fhigh = f(bhigh)
+  while flow < 0 and fhigh < 0:
+    # Move the bracket down.
+    bhigh = blow
+    fhigh = flow
+    blow *= factorlow
+    flow = f(blow)
+
+  assert flow > 0 and fhigh < 0
+  return [blow, bhigh]

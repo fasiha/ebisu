@@ -1,5 +1,15 @@
 # Changes to Ebisu
 
+## 2.1.0: soft-binary quizzes and halflife rescaling
+
+`updateRecall` can now take *floating point* quizzes between 0 and 1 (inclusive) as `successes`, to handle the case when your quiz isn’t quite correct or wasn’t fully incorrect. Varying this number between 0 and 1 will smoothly vary the halflife of the updated model. Under the hood, there's a noisy-Bernoulli statistical model.
+
+A new function has been added to the API, `rescaleHalflife`, for those cases when the halflife of a flashcard is just wrong and you need to multiply it by ten (so you see it less often) or divide it by two (so you see it *more* often).
+
+A behavioral change: `updateRecall` will by default rebalance models, so that updated models will have `α=β` (to within machine precision) and `t` will be the halflife. This does have a performance impact, so I may have to flip the default to *not* always rebalance in a future release if this turns out to be problematic.
+
+Closes long-standing issues [#23](https://github.com/fasiha/ebisu/issues/23) and [#31](https://github.com/fasiha/ebisu/issues/31)—thank you to all participants who weighed in, offered advice, and waited patiently.
+
 ## 2.0.0: Bernoulli to binomial quizzes
 The API for `updateRecall` has changed because `boolean` results don't make sense for quiz apps that have a sense of "review sessions" in which the same flashcard can be reviewed more than one time, e.g., if a review session consists of conjugating the same verb twice. Therefore, `updateRecall` accepts two integers:
 - `successes`, the number of times the user correctly produced the memory encoded in this flashcard, out of

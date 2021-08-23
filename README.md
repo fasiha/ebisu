@@ -476,7 +476,7 @@ With one failed and one successful quiz, the full analytical posterior of recall
 
 We can show (quite easily with Sympy) that after \\(M\\) single-quiz reviews that each have a quiz result \\(x_m\\) at a time \\(t_m=δ_m t\\), the full posterior is
 \\[
-  P(p; p_t | x_1, x_2, …, x_M) ∝ p^{α - 1} (1-p)^{β - 1} \prod_{m=1}^M r_m p^{δ_m} + s,
+  P(p; p_t | x_1, x_2, …, x_M) ∝ p^{α - 1} (1-p)^{β - 1} \prod_{m=1}^M r_m p^{δ_m} + s_m,
 \\]
 and since 
 - \\(r_m=1\\) and \\(s_m=0\\) when \\(x_m=1\\) (successful quiz) and
@@ -484,13 +484,13 @@ and since
 
 this can be rewritten as
 \\[
-  P(p; p_t | x_1, x_2, …, x_M) ∝ p^{α + (\sum_{m=1}^M I(x_m) \delta_m) - 1} (1-p)^{β - 1} \prod_{m=1}^M I'(x_m) p^{δ_m},
+  P(p; p_t | x_1, x_2, …, x_M) ∝ p^{α + \left( \sum_{m=1}^M I(x_m) \delta_m \right) - 1} (1-p)^{β - 1} \prod_{m=1}^M I'(x_m) (1-p^{δ_m}),
 \\]
 where \\(I(x)\\) is the indicator function that evaluates to 1 when its argument is 1 and 0 otherwise; and its negation \\(I'(x)\\) evaluates to 0 when its argument is 1 and vice versa. Each successful quiz piles itself into the term on the left, leaving the updated posterior with the same number of mixture components as before. Meanwhile, each failed quiz adds a new term to the right, doubling the number of mixture components.
 
 One way this is useful is, we can use this to double-check our binomial posterior: if \\(n_1>1\\), i.e., more than one quiz in the first review, that is equivalent to \\(M=n_1\\) with \\(δ_1, δ_2, …, δ_{n_1}\\) equal to the same value \\(δ\\). Thus,
 \\[
-  P(p; p_t | k_1, n_1) ∝ p^{α + k \delta - 1} (1-p)^{β - 1} (1 - p^{δ_m})^{n-k},
+  P(p; p_t | k_1, n_1) ∝ p^{α + k \delta - 1} (1-p)^{β - 1} (1 - p^{δ})^{n-k},
 \\]
 which is what we saw above.
 

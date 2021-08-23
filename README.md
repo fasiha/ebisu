@@ -476,7 +476,7 @@ With one failed and one successful quiz, the full analytical posterior of recall
 
 We can show (quite easily with Sympy) that after \\(M\\) single-quiz reviews that each have a quiz result \\(x_m\\) at a time \\(t_m=δ_m t\\), the full posterior is
 \\[
-  P(p; p_t | x_1, x_2, …, x_M) ∝ p^{α - 1} (1-p)^{β - 1} \prod_m=1^M r_m p^{δ_m} + s,
+  P(p; p_t | x_1, x_2, …, x_M) ∝ p^{α - 1} (1-p)^{β - 1} \prod_{m=1}^M r_m p^{δ_m} + s,
 \\]
 and since 
 - \\(r_m=1\\) and \\(s_m=0\\) when \\(x_m=1\\) (successful quiz) and

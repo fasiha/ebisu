@@ -3,52 +3,37 @@ import numpy as np  # type:ignore
 from scipy.stats import gamma as gammarv  # type: ignore
 from scipy.stats import uniform as uniformrv  # type: ignore
 from scipy.special import gammaln, logsumexp  #type: ignore
-from typing import Any, Union, Callable
+from typing import Any, Union, Optional, Callable
 from copy import deepcopy
 
-from ebisu.ebisuHelpers import _currentHalflifePrior, _gammaUpdateBinomial, _gammaUpdateNoisy, _intGammaPdfExp, posterior, clampLerp, success, timeMs
-from ebisu.gammaDistribution import _gammaToMean, _meanVarToGamma, _weightedGammaEstimate
-from ebisu.models import BinomialResult, GammaUpdate, Model, NoisyBinaryResult, Predict, Probability, Quiz, Result
+from ebisu.ebisuHelpers import (currentHalflifePrior, gammaUpdateBinomial, gammaUpdateNoisy,
+                                _intGammaPdfExp, posterior, clampLerp, success, timeMs)
+from ebisu.gammaDistribution import (gammaToMean, meanVarToGamma, _weightedGammaEstimate)
+from ebisu.models import (BinomialResult, Model, NoisyBinaryResult, Predict, Probability, Quiz,
+                          Result)
 
 logsumexp: Callable = logsumexp
 
 
-def initModel(initHlPrior: Union[tuple[float, float], None] = None,
-              boostPrior: Union[tuple[float, float], None] = None,
-              initHlMean: Union[float, None] = None,
-              initHlStd: Union[float, None] = None,
-              boostMean: Union[float, None] = None,
-              boostStd: Union[float, None] = None,
-              now: Union[float, None] = None) -> Model:
+def initModel(initHlMean: float, initHlStd: float, boostMean: float, boostStd: float,
+              now: Optional[float]) -> Model:
   """
   Create brand new Ebisu model
 
-  Must provide either `initHlPrior` (Gamma random variable's α and β) or both
-  `initHlMean` and `initHlStd` (Gamma random variable's mean and standard
-  deviation, in hours), and similarly for `boostPrior` vs `boostMean` and
-  `boostStd` (unitless).
+  Provide the mean and standard deviation for the initial halflife (units of
+  hours) and boost (unitless).
+  
+  Optional: provide the timestamp in milliseconds since the Unix epoch.
   """
-  if initHlPrior:
-    hl0 = initHlPrior
-  elif initHlMean is not None and initHlStd is not None:
-    hl0 = _meanVarToGamma(initHlMean, initHlStd**2)
-  else:
-    raise ValueError('init halflife prior not specified')
-
-  if boostPrior:
-    b = boostPrior
-  elif boostMean is not None and boostStd is not None:
-    b = _meanVarToGamma(boostMean, boostStd**2)
-  else:
-    raise ValueError('boost prior not specified')
-
-  assert _gammaToMean(*hl0) > 0, 'init halflife mean should be positive'
-  assert _gammaToMean(*b) >= 1.0, 'boost mean should be >= 1'
+  hl0 = meanVarToGamma(initHlMean, initHlStd**2)
+  b = meanVarToGamma(boostMean, boostStd**2)
+  assert gammaToMean(*hl0) > 0, 'init halflife mean should be positive'
+  assert gammaToMean(*b) >= 1.0, 'boost mean should be >= 1'
   now = now or timeMs()
   return Model(
       quiz=Quiz(results=[], startStrengths=[], startTimestampMs=[now]),
       prob=Probability(initHlPrior=hl0, boostPrior=b, initHl=hl0, boost=b),
-      pred=Predict(lastEncounterMs=now, currentHalflifeHours=_gammaToMean(*hl0), logStrength=0.0))
+      pred=Predict(lastEncounterMs=now, currentHalflifeHours=gammaToMean(*hl0), logStrength=0.0))
 
 
 def resetHalflife(
@@ -65,7 +50,7 @@ def resetHalflife(
   ret.quiz.startStrengths.append([])
   ret.quiz.startTimestampMs.append(now)
 
-  ret.prob.initHlPrior = _meanVarToGamma(initHlMean, initHlStd**2)
+  ret.prob.initHlPrior = meanVarToGamma(initHlMean, initHlStd**2)
   ret.pred.currentHalflifeHours = initHlMean
   ret.pred.lastEncounterMs = now
   ret.pred.logStrength = np.log(strength)
@@ -83,7 +68,7 @@ def updateRecall(
     right=1.0,
 ) -> Model:
   now = now or timeMs()
-  (a, b), totalBoost = _currentHalflifePrior(model)
+  (a, b), totalBoost = currentHalflifePrior(model)
   t = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   resultObj: Union[NoisyBinaryResult, BinomialResult]
 
@@ -92,7 +77,7 @@ def updateRecall(
     q1 = max(successes, 1 - successes)  # between 0.5 and 1
     q0 = 1 - q1 if q0 is None else q0  # either the input argument OR between 0 and 0.5
     z = successes >= 0.5
-    updated = _gammaUpdateNoisy(a, b, t, q1, q0, z)
+    updated = gammaUpdateNoisy(a, b, t, q1, q0, z)
     resultObj = NoisyBinaryResult(result=successes, q1=q1, q0=q0, hoursElapsed=t)
 
   else:  # int, or float outside (0, 1) band
@@ -101,7 +86,7 @@ def updateRecall(
     assert total > 0, "positive binomial trials"
     k = int(successes)
     n = total
-    updated = _gammaUpdateBinomial(a, b, t, k, n)
+    updated = gammaUpdateBinomial(a, b, t, k, n)
     resultObj = BinomialResult(successes=k, total=n, hoursElapsed=t)
 
   mean, newAlpha, newBeta = (updated.mean, updated.a, updated.b)
@@ -109,7 +94,7 @@ def updateRecall(
   ret = deepcopy(model)  # clone
   ret.prob.initHl = (newAlpha, newBeta * totalBoost)
   _appendQuizImpure(ret, resultObj, reinforcement)
-  boostMean = _gammaToMean(*ret.prob.boost)
+  boostMean = gammaToMean(*ret.prob.boost)
   if success(resultObj):
     boostedHl = mean * clampLerp(left * model.pred.currentHalflifeHours,
                                  right * model.pred.currentHalflifeHours, 1, max(1.0, boostMean), t)
@@ -127,9 +112,9 @@ def updateRecall(
 
 
 def _expand(thresh: float, minBoost: float, minHalflife: float, maxBoost: float, maxHalflife: float,
-            n: int, lpVector):
-  bvec = np.linspace(minBoost, maxBoost, int(np.sqrt(n)))
-  hvec = np.linspace(minHalflife, maxHalflife, int(np.sqrt(n)))
+            size: int, lpVector):
+  bvec = np.linspace(minBoost, maxBoost, int(np.sqrt(size)))
+  hvec = np.linspace(minHalflife, maxHalflife, int(np.sqrt(size)))
   bs, hs = np.meshgrid(bvec, hvec)
   posteriors = lpVector(bs, hs)
   nz0, nz1 = np.nonzero(np.diff(np.sign(posteriors - np.max(posteriors) + abs(thresh)), axis=1))
@@ -246,7 +231,7 @@ def updateRecallHistoryDebug(
   ret.prob.boost = (betterFit['alphax'], betterFit['betax'])
   ret.prob.initHl = (betterFit['alphay'], betterFit['betay'])
   # update SQL-friendly scalars
-  bmean, hmean = [_gammaToMean(*prior) for prior in [ret.prob.boost, ret.prob.initHl]]
+  bmean, hmean = [gammaToMean(*prior) for prior in [ret.prob.boost, ret.prob.initHl]]
   _, extra = posterior(bmean, hmean, ret, left, right, extra=True)  # type: ignore
   ret.pred.currentHalflifeHours = extra['currentHalflife']
   return ret, dict(
@@ -315,8 +300,8 @@ def _fitJointToTwoGammas(x: Union[list[float], np.ndarray],
       betax=betax,
       alphay=alphay,
       betay=betay,
-      meanX=_gammaToMean(alphax, betax),
-      meanY=_gammaToMean(alphay, betay))
+      meanX=gammaToMean(alphax, betax),
+      meanY=gammaToMean(alphay, betay))
 
 
 def _monteCarloImprove(generateX: Callable[[int], np.ndarray],
@@ -356,7 +341,7 @@ def _predictRecallBayesian(model: Model, now: Union[float, None] = None, logDoma
   now = now or timeMs()
   elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
 
-  (a, b), _totalBoost = _currentHalflifePrior(model)
+  (a, b), _totalBoost = currentHalflifePrior(model)
   logPrecall = _intGammaPdfExp(
       a, b, elapsedHours * LN2,
       logDomain=True) + a * np.log(b) - gammaln(a) + model.pred.logStrength

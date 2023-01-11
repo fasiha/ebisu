@@ -1,24 +1,27 @@
+from typing import Callable
 from scipy.optimize import minimize  #type:ignore
 from scipy.special import gammaln, logsumexp  #type: ignore
 import numpy as np
 from math import fsum
+
+logsumexp: Callable = logsumexp
 
 
 def gammaToMode(a, b):
   return (a - b) / b if a >= 1 else 0
 
 
-def _gammaToMean(alpha: float, beta: float) -> float:
+def gammaToMean(alpha: float, beta: float) -> float:
   return alpha / beta
 
 
-def _meanVarToGamma(mean, var) -> tuple[float, float]:
+def meanVarToGamma(mean, var) -> tuple[float, float]:
   a = mean**2 / var
   b = mean / var
   return a, b
 
 
-def _logmeanlogVarToGamma(logmean, logvar) -> tuple[float, float]:
+def logmeanlogVarToGamma(logmean, logvar) -> tuple[float, float]:
   loga = 2 * logmean - logvar
   logb = logmean - logvar
   return np.exp(loga), np.exp(logb)
@@ -77,3 +80,28 @@ def _weightedGammaEstimateMaxLik(x, w):
 def _weightedGammaEstimateMom(h, logw):
   mean, var, *rest = _weightedMeanVarLogw(logw, h)
   return (mean**2 / var, mean / var)
+
+
+def gammaToStd(a, b):
+  return np.sqrt(a) / b
+
+
+def gammaToVar(a, b):
+  return a / (b)**2
+
+
+def gammaToMeanStd(a, b):
+  return (gammaToMean(a, b), gammaToStd(a, b))
+
+
+def gammaToMeanVar(a, b):
+  return (gammaToMean(a, b), gammaToVar(a, b))
+
+
+def gammaToStats(a: float, b: float):
+  mean = gammaToMean(a, b)
+  var = gammaToVar(a, b)
+  k = a
+  t = 1 / b
+  m2 = t**2 * k * (k + 1)  # second non-central moment
+  return (mean, var, m2, np.sqrt(m2))

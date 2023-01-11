@@ -4,7 +4,7 @@ from math import fsum
 from typing import Callable, Union
 import numpy as np
 from time import time_ns
-from ebisu.gammaDistribution import _gammaToMean, _logmeanlogVarToGamma, _meanVarToGamma, _weightedMeanVarLogw
+from ebisu.gammaDistribution import gammaToMean, logmeanlogVarToGamma, meanVarToGamma, _weightedMeanVarLogw
 
 from ebisu.models import BinomialResult, GammaUpdate, Model, NoisyBinaryResult, Result
 
@@ -102,7 +102,7 @@ def _binomln(n, k):
   return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
 
 
-def _gammaUpdateBinomial(a: float, b: float, t: float, k: int, n: int) -> GammaUpdate:
+def gammaUpdateBinomial(a: float, b: float, t: float, k: int, n: int) -> GammaUpdate:
   """Core Ebisu v2-style Bayesian update on binomial quizzes
 
   Assuming a halflife $h ~ Gamma(a, b)$ and a Binomial quiz at time $t$
@@ -129,7 +129,7 @@ def _gammaUpdateBinomial(a: float, b: float, t: float, k: int, n: int) -> GammaU
   logmean = logmoment(1) - logm0
   logm2 = logmoment(2) - logm0
   logvar = logsumexp([logm2, 2 * logmean], b=[1, -1])
-  newAlpha, newBeta = _logmeanlogVarToGamma(logmean, logvar)
+  newAlpha, newBeta = logmeanlogVarToGamma(logmean, logvar)
 
   return GammaUpdate(a=newAlpha, b=newBeta, mean=np.exp(logmean))
 
@@ -153,14 +153,14 @@ def _intGammaPdfExp(a: float, b: float, c: float, logDomain: bool):
   return LN2 + np.log(c / b) * (a * 0.5) + np.log(kve(a, z)) - z
 
 
-def _currentHalflifePrior(model: Model) -> tuple[tuple[float, float], float]:
+def currentHalflifePrior(model: Model) -> tuple[tuple[float, float], float]:
   # if X ~ Gamma(a, b), (c*X) ~ Gamma(a, b/c)
   a0, b0 = model.prob.initHl
-  boosted = model.pred.currentHalflifeHours / _gammaToMean(a0, b0)
+  boosted = model.pred.currentHalflifeHours / gammaToMean(a0, b0)
   return (a0, b0 / boosted), boosted
 
 
-def _gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: bool) -> GammaUpdate:
+def gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: bool) -> GammaUpdate:
   """Core Ebisu v2-style Bayesian update on noisy binary quizzes
 
   Assuming a halflife $h ~ Gamma(a, b)$, a hidden quiz result $x ~
@@ -174,7 +174,7 @@ def _gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: boo
   q0, q1$, as are data $t, z$. Only $x$, the true quiz result is
   unknown, as well as of course the true halflife.
 
-  See also `_gammaUpdateBinomial`.
+  See also `gammaUpdateBinomial`.
   """
   qz = (q0, q1) if z else (1 - q0, 1 - q1)
 
@@ -186,7 +186,7 @@ def _gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: boo
   mean = moment(1) / m0
   m2 = moment(2) / m0
   var = m2 - mean**2
-  newAlpha, newBeta = _meanVarToGamma(mean, var)
+  newAlpha, newBeta = meanVarToGamma(mean, var)
   return GammaUpdate(a=newAlpha, b=newBeta, mean=mean)
 
 

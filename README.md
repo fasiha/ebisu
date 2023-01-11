@@ -46,31 +46,34 @@ Consider a student memorizing a set of facts.
 - Which facts need reviewing?
 - How does the student’s performance on a review change the fact’s future review schedule?
 
-Ebisu is a public-domain library that answers these two questions. It is intended to be used by software developers writing quiz apps, and provides a simple API to deal with these two aspects of scheduling quizzes:
+Ebisu is a public-domain library that answers these two questions. It is intended to be used by software developers writing quiz apps, and provides a simple API to deal with these two aspects of scheduling quizzes, centered on two functions:
 - `predictRecall` gives the current recall probability for a given fact.
 - `updateRecall` adjusts the belief about future recall probability given a quiz result.
 
-Don’t worry, there are more functions in the actual API to do more complicated things but Behind these two simple functions, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and exponential forgetting.
+Behind this simple API, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and exponential forgetting.
 
 With this system, quiz applications can move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today; an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed.
 
 Ebisu also enables apps to provide an infinite stream of quizzes for students who are cramming. Thus, Ebisu intelligently handles over-reviewing as well as under-reviewing.
 
-This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as source code for a Python implementation (requires Scipy and Numpy). Separate implementations in other languages are detailed below.
+This document contains both a detailed mathematical description of the underlying algorithm as well as the software API it exports. Separate implementations in other languages are detailed below.
 
 The next section is a [Quickstart](#quickstart) guide to setup and usage. See this if you know you want to use Ebisu in your app.
 
 Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other scheduling algorithms and describe, non-technically, why you should use it.
 
-Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like Beta-distributed random variables, conjugate priors, and marginalization, this is for you. You’ll also find the key formulas that implement `predictRecall` and `updateRecall` here.
+Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like Gamma-distributed random variables, importance sampling, and maximum likelihood, this is for you.
 
-> Nerdy details in a nutshell: Ebisu begins by positing a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probability at a certain time. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it requires only a few [Beta function](http://mathworld.wolfram.com/BetaFunction.html) evaluations to predict the current recall probability. Next, a *quiz* is modeled as a [binomial trial](https://en.wikipedia.org/wiki/Binomial_distribution) whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the non-standard posterior with a new Beta distribution by matching its mean and variance, which are also analytically tractable, and require a few evaluations of the Beta function.
-
-Finally, the [Source Code](#source-code) section presents the literate source of the library, including several tests to validate the math.
+> Nerdy details in a nutshell: Ebisu begins by you positing [Gamma](https://en.wikipedia.org/wiki/Gamma_distribution) priors on (1) the memory halflife of a newly-learned fact, as well as (2) a boost factor that governs how quickly that memory strengthens after each successful review. This allows you to easily find the facts that are most in danger of forgetting, via simple arithmetic. Next, a future *quiz* is modeled as a [binomial](https://en.wikipedia.org/wiki/Binomial_distribution) or noisy Bernoulli trial whose underlying probability is an exponential function of the halflife and the time elapsed since the fact was last reviewed. Ebisu then does a Bayesian update of the halflife, either using the boost as a static factor or jointly updating both halflife and boost. The static update is quite fast, involving an evaluation of the [Gamma function](https://en.wikipedia.org/wiki/Gamma_function) and the [Bessel function of the second kind](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.kve.html). The joint update more expensive and involves fitting the bivariate posterior to a bivariate Gamma distribution followed by importance sampling.
+ 
+Finally, in the [Source Code](#source-code) section, we describe the software testing done to validate the math, including comparing Ebisu’s updates to
+1. vanilla Monte Carlo,
+2. numerical integration, and
+3. MCMC (Markov-chain Monte Carlo) via [Stan](https://mc-stan.org).
 
 ## Quickstart
 
-**Install** `pip install ebisu` (both Python3 and Python2 ok 🤠).
+**Install** `python -m pip install ebisu`
 
 **Data model** For each fact in your quiz app, you store a model representing a prior distribution. This is a 3-tuple: `(alpha, beta, t)` and you can create a default model for all newly learned facts with `ebisu.defaultModel`. (As detailed in the [Choice of initial model parameters](#choice-of-initial-model-parameters) section, `alpha` and `beta` define a Beta distribution on this fact’s recall probability `t` time units after it’s most recent review.)
 

@@ -50,7 +50,7 @@ Ebisu is a public-domain library that answers these two questions. It is intende
 - `predictRecall` gives the current recall probability for a given fact.
 - `updateRecall` adjusts the belief about future recall probability given a quiz result.
 
-Behind these two simple functions, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and exponential forgetting.
+Don’t worry, there are more functions in the actual API to do more complicated things but Behind these two simple functions, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and exponential forgetting.
 
 With this system, quiz applications can move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today; an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed.
 

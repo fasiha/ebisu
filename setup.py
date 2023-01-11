@@ -12,9 +12,9 @@ setup(name='ebisu',
       author_email='wuzzyview@gmail.com',
       license='Unlicense',
       packages=['ebisu'],
-      test_suite='nose.collector',
-      tests_require=['nose'],
+      test_suite='unittest',
       install_requires=[
-          'scipy', 'numpy'
+          'scipy', 'numpy', 'dataclasses-json'
       ],
+      extras_require={'stan': ['cmdstanpy']},
       zip_safe=True)

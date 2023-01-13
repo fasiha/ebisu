@@ -1,19 +1,17 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Union
-from dataclasses_json import dataclass_json
+from dataclasses_json import DataClassJsonMixin, config
 
 
-@dataclass_json
 @dataclass
-class BinomialResult:
+class BinomialResult(DataClassJsonMixin):
   successes: int
   total: int
   hoursElapsed: float
 
 
-@dataclass_json
 @dataclass
-class NoisyBinaryResult:
+class NoisyBinaryResult(DataClassJsonMixin):
   result: float
   q1: float
   q0: float
@@ -23,10 +21,18 @@ class NoisyBinaryResult:
 Result = Union[BinomialResult, NoisyBinaryResult]
 
 
-@dataclass_json
+def cleanup(results):
+  """Workaround for dataclasses-json unable to handle Union inside List
+  
+  See https://github.com/lidatong/dataclasses-json/issues/239"""
+  return [[NoisyBinaryResult(**res) if 'q1' in res else BinomialResult(**res)
+           for res in lst]
+          for lst in results]
+
+
 @dataclass
-class Quiz:
-  results: list[list[Result]]
+class Quiz(DataClassJsonMixin):
+  results: list[list[Result]] = field(metadata=config(decoder=cleanup))
 
   # 0 < x <= 1 (reinforcement). Same length/sub-lengths as `results`
   startStrengths: list[list[float]]
@@ -36,9 +42,8 @@ class Quiz:
   startTimestampMs: list[float]
 
 
-@dataclass_json
 @dataclass
-class Probability:
+class Probability(DataClassJsonMixin):
   # priors: fixed at model creation time
   initHlPrior: tuple[float, float]  # alpha and beta
   boostPrior: tuple[float, float]  # alpha and beta
@@ -51,9 +56,8 @@ class Probability:
   # (`updateRecallHistory`), we need to know what to start from.
 
 
-@dataclass_json
 @dataclass
-class Predict:
+class Predict(DataClassJsonMixin):
   # just for developer ease, these can be stored in SQL, etc.
   lastEncounterMs: float  # milliseconds since unix epoch
   currentHalflifeHours: float  # mean (so _currentHalflifePrior works). Same units as `elapseds`
@@ -63,13 +67,11 @@ class Predict:
   # where NOW_MS is milliseconds since Unix epoch.
 
 
-@dataclass_json
 @dataclass
-class Model:
+class Model(DataClassJsonMixin):
   quiz: Quiz
   prob: Probability
   pred: Predict
-
 
 
 @dataclass

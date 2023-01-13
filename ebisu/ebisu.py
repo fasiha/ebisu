@@ -15,8 +15,13 @@ from ebisu.models import (BinomialResult, Model, NoisyBinaryResult, Predict, Pro
 logsumexp: Callable = logsumexp
 
 
-def initModel(initHlMean: float, initHlStd: float, boostMean: float, boostStd: float,
-              now: Optional[float]) -> Model:
+def initModel(
+    initHlMean: float,
+    initHlStd: float,
+    boostMean: float,
+    boostStd: float,
+    now: Optional[float] = None,
+) -> Model:
   """
   Create brand new Ebisu model
 

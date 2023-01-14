@@ -50,7 +50,7 @@ def initModel(
 def resetHalflife(
     model: Model,
     initHlMean: float,
-    initHlStd: float,
+    initHlStd: Optional[float] = None,
     now: Optional[float] = None,
     strength: float = 1.0,
 ) -> Model:
@@ -61,7 +61,7 @@ def resetHalflife(
   ret.quiz.startStrengths.append([])
   ret.quiz.startTimestampMs.append(now)
 
-  ret.prob.initHlPrior = meanVarToGamma(initHlMean, initHlStd**2)
+  ret.prob.initHlPrior = meanVarToGamma(initHlMean, (initHlStd or 0.5 * initHlMean)**2)
   ret.pred.currentHalflifeHours = initHlMean
   ret.pred.lastEncounterMs = now
   ret.pred.logStrength = np.log(strength)
@@ -72,11 +72,11 @@ def updateRecall(
     model: Model,
     successes: Union[float, int],
     total: int = 1,
-    now: Optional[float] = None,
     q0: Optional[float] = None,
-    reinforcement: float = 1.0,
     left=0.3,
     right=1.0,
+    now: Optional[float] = None,
+    reinforcement: float = 1.0,
 ) -> Model:
   now = now or timeMs()
   (a, b), totalBoost = currentHalflifePrior(model)

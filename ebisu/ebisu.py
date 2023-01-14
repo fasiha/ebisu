@@ -17,9 +17,9 @@ logsumexp: Callable = logsumexp
 
 def initModel(
     initHlMean: float,
-    initHlStd: float,
     boostMean: float,
-    boostStd: float,
+    initHlStd: Optional[float] = None,
+    boostStd: Optional[float] = None,
     now: Optional[float] = None,
 ) -> Model:
   """
@@ -27,9 +27,15 @@ def initModel(
 
   Provide the mean and standard deviation for the initial halflife (units of
   hours) and boost (unitless).
+
+  If you're really lazy and omit standard deviations, we'll pick them to be half
+  their respective means (ensures a nice densityw ith non-zero mode and positive
+  second-derivative at 0, though you'd get this for `std <= mean / sqrt(2)`).
   
-  Optional: provide the timestamp in milliseconds since the Unix epoch.
+  Optional `now`: milliseconds since the Unix epoch when the fact was learned.
   """
+  initHlStd = initHlStd or initHlMean * 0.5
+  boostStd = boostStd or boostMean * 0.5
   hl0 = meanVarToGamma(initHlMean, initHlStd**2)
   b = meanVarToGamma(boostMean, boostStd**2)
   assert gammaToMean(*hl0) > 0, 'init halflife mean should be positive'
@@ -45,7 +51,7 @@ def resetHalflife(
     model: Model,
     initHlMean: float,
     initHlStd: float,
-    now: Union[float, None] = None,
+    now: Optional[float] = None,
     strength: float = 1.0,
 ) -> Model:
   now = now or timeMs()
@@ -66,8 +72,8 @@ def updateRecall(
     model: Model,
     successes: Union[float, int],
     total: int = 1,
-    now: Union[None, float] = None,
-    q0: Union[None, float] = None,
+    now: Optional[float] = None,
+    q0: Optional[float] = None,
     reinforcement: float = 1.0,
     left=0.3,
     right=1.0,
@@ -264,10 +270,6 @@ def _appendQuizImpure(model: Model, result: Result, startStrength: float) -> Non
     model.quiz.startStrengths[-1].append(startStrength)
 
 
-LN2 = np.log(2)
-HOURS_PER_MILLISECONDS = 1 / 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec
-
-
 def _fitJointToTwoGammas(x: Union[list[float], np.ndarray],
                          y: Union[list[float], np.ndarray],
                          logPosterior: Union[list[float], np.ndarray],
@@ -335,14 +337,22 @@ def _monteCarloImprove(generateX: Callable[[int], np.ndarray],
       ys=y)
 
 
-def predictRecall(model: Model, now: Union[float, None] = None, logDomain=True) -> float:
+LN2 = np.log(2)
+HOURS_PER_MILLISECONDS = 1 / 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec
+
+
+def predictRecall(
+    model: Model,
+    now: Optional[float] = None,
+    logDomain=True,
+) -> float:
   now = now or timeMs()
   elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   logPrecall = -elapsedHours / model.pred.currentHalflifeHours * LN2 + model.pred.logStrength
   return logPrecall if logDomain else np.exp(logPrecall)
 
 
-def _predictRecallBayesian(model: Model, now: Union[float, None] = None, logDomain=True) -> float:
+def _predictRecallBayesian(model: Model, now: Optional[float] = None, logDomain=True) -> float:
   now = now or timeMs()
   elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
 

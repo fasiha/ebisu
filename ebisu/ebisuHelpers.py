@@ -59,6 +59,7 @@ def posterior(b: float, h: float, ret: Model, left: float, right: float, extra=F
 
   loglik = []
   currHalflife = h
+  halflives = [currHalflife]
   for res in ret.quiz.results[-1]:
     logPrecall = -res.hoursElapsed / currHalflife * LN2
     if isinstance(res, NoisyBinaryResult):
@@ -75,9 +76,10 @@ def posterior(b: float, h: float, ret: Model, left: float, right: float, extra=F
     if success(res):
       currHalflife *= clampLerp(left * currHalflife, right * currHalflife, 1, max(1, b),
                                 res.hoursElapsed)
+    halflives.append(currHalflife)
   logposterior = fsum(loglik + [logprior])
   if extra:
-    return logposterior, dict(currentHalflife=currHalflife)
+    return logposterior, dict(currentHalflife=currHalflife, loglik=loglik, halflives=halflives)
   return logposterior
 
 

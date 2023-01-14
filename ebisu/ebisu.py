@@ -83,8 +83,8 @@ def updateRecall(
   t = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   resultObj: Union[NoisyBinaryResult, BinomialResult]
 
-  if (0 < successes < 1):
-    assert total == 1, "float `successes` implies total==1"
+  if total == 1:
+    assert (0 <= successes <= 1), "`total=1` implies successes in [0, 1]"
     q1 = max(successes, 1 - successes)  # between 0.5 and 1
     q0 = 1 - q1 if q0 is None else q0  # either the input argument OR between 0 and 0.5
     z = successes >= 0.5
@@ -92,7 +92,7 @@ def updateRecall(
     resultObj = NoisyBinaryResult(result=successes, q1=q1, q0=q0, hoursElapsed=t)
 
   else:  # int, or float outside (0, 1) band
-    assert successes == np.floor(successes), "float `successes` must be between 0 and 1"
+    assert successes == np.floor(successes), "float `successes` must have `total=1`"
     assert successes >= 0, "negative `successes` meaningless"
     assert total > 0, "positive binomial trials"
     k = int(successes)

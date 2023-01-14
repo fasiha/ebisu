@@ -19,7 +19,7 @@ import mpmath as mp  # type:ignore
 import csv
 import io
 
-from ebisu.ebisuHelpers import currentHalflifePrior, _enrichDebug, gammaUpdateBinomial, gammaUpdateNoisy, _logBinomPmfLogp, posterior, timeMs
+from ebisu.ebisuHelpers import currentHalflifePrior, _enrichDebug, gammaUpdateBinomial, gammaUpdateNoisy, posterior, timeMs
 from ebisu.gammaDistribution import gammaToMean, meanVarToGamma, _weightedMeanVarLogw, gammaToStats, gammaToStd
 
 results: dict[Union[str, tuple], Any] = dict()
@@ -96,6 +96,16 @@ def numericalIntegration(upd: ebisu.Model, maxdegree: int, left=0.3, right=1.0, 
           (hl0MeanInt, hl0VarInt, hSecondMoment, sqrt(hSecondMoment))]
 
 
+def logBinomPmfLogp(n: int, k: int, logp: float) -> float:
+  "repeated from Ebisu to use np.log etc."
+  assert (n >= k >= 0)
+  logcomb = ebisu.ebisuHelpers._logComb(n, k)
+  if n - k > 0:
+    logq = np.log(-np.expm1(logp))
+    return logcomb + k * logp + (n - k) * logq
+  return logcomb + k * logp
+
+
 def fullBinomialMonteCarlo(
     hlPrior: tuple[float, float],
     bPrior: tuple[float, float],
@@ -115,7 +125,7 @@ def fullBinomialMonteCarlo(
     logps = -t / hls * np.log(2)
     success = ebisu.success(res)
     if isinstance(res, ebisu.BinomialResult):
-      logweights += _logBinomPmfLogp(res.total, res.successes, logps)
+      logweights += logBinomPmfLogp(res.total, res.successes, logps)
       # This is the likelihood of observing the data, and is more accurate than
       # `binomrv.logpmf(k, n, pRecall)` since `pRecall` is already in log domain
     else:

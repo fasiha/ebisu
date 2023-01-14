@@ -1,6 +1,6 @@
 from scipy.special import kv, kve, gammaln, gamma, betaln, logsumexp  #type: ignore
 from functools import cache
-from math import fsum
+from math import fsum, exp, log, expm1
 from typing import Callable, Union
 import numpy as np
 from time import time_ns
@@ -26,8 +26,12 @@ def _noisyHelper(z: bool, q1: float, q0: float) -> tuple[float, float]:
   return (_logBernPmf(z, q1), _logBernPmf(z, q0))
 
 
+def _safeLog(x):
+  return (x == 0 and -np.inf) or (x == 1 and 0) or log(x)
+
+
 def _logBernPmf(z: Union[int, bool], p: float) -> float:
-  return np.log(p) if z else np.log(1 - p)
+  return _safeLog(p) if z else _safeLog(1 - p)
 
 
 @cache
@@ -43,7 +47,7 @@ def _logBinomPmfLogp(n: int, k: int, logp: float) -> float:
   assert (n >= k >= 0)
   logcomb = _logComb(n, k)
   if n - k > 0:
-    logq = np.log(-np.expm1(logp))
+    logq = log(-expm1(logp))
     return logcomb + k * logp + (n - k) * logq
   return logcomb + k * logp
 
@@ -53,8 +57,8 @@ def posterior(b: float, h: float, ret: Model, left: float, right: float, extra=F
   ab, bb = ret.prob.boostPrior
   ah, bh = ret.prob.initHlPrior
 
-  logb = np.log(b)
-  logh = np.log(h)
+  logb = log(b)
+  logh = log(h)
   logprior = -bb * b - bh * h + (ab - 1) * logb + (ah - 1) * logh
 
   loglik = []
@@ -65,11 +69,10 @@ def posterior(b: float, h: float, ret: Model, left: float, right: float, extra=F
     if isinstance(res, NoisyBinaryResult):
       # noisy binary/Bernoulli
       q1LogPmf, q0LogPmf = _noisyBinaryToLogPmfs(res)
-      logPfail = np.log(-np.expm1(logPrecall))
+      logPfail = log(-expm1(logPrecall))
       # Stan has this nice function, log_mix, which is perfect for this...
-      loglik.append(np.log(np.exp(logPrecall + q1LogPmf) + np.exp(logPfail + q0LogPmf)))
-      # logsumexp is 3x slower??
-      # loglik.append(logsumexp([logPrecall + q1LogPmf, logPfail + q0LogPmf]))
+      # Scipy logsumexp here is much slower??
+      loglik.append(_logaddexp(logPrecall + q1LogPmf, logPfail + q0LogPmf))
     else:
       # binomial
       loglik.append(_logBinomPmfLogp(res.total, res.successes, logPrecall))
@@ -101,7 +104,7 @@ def clampLerp(x1: float, x2: float, y1: float, y2: float, x: float) -> float:
 @cache
 def _binomln(n, k):
   "Log of scipy.special.binom calculated entirely in the log domain"
-  return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
+  return -betaln(1 + n - k, 1 + k) - log(n + 1)
 
 
 def gammaUpdateBinomial(a: float, b: float, t: float, k: int, n: int) -> GammaUpdate:
@@ -140,7 +143,7 @@ def _intGammaPdf(a: float, b: float, logDomain: bool):
   # \int_0^∞ h^(a-1) \exp(-b h) dh$, via Wolfram Alpha, etc.
   if not logDomain:
     return b**(-a) * gamma(a)
-  return -a * np.log(b) + gammaln(a)
+  return -a * log(b) + gammaln(a)
 
 
 def _intGammaPdfExp(a: float, b: float, c: float, logDomain: bool):
@@ -152,7 +155,7 @@ def _intGammaPdfExp(a: float, b: float, c: float, logDomain: bool):
   if not logDomain:
     return 2 * (c / b)**(a * 0.5) * kv(a, z)
   # `kve = kv * exp(z)` -> `log(kve) = log(kv) + z` -> `log(kv) = log(kve) - z`
-  return LN2 + np.log(c / b) * (a * 0.5) + np.log(kve(a, z)) - z
+  return LN2 + log(c / b) * (a * 0.5) + log(kve(a, z)) - z
 
 
 def currentHalflifePrior(model: Model) -> tuple[tuple[float, float], float]:
@@ -203,3 +206,10 @@ def _enrichDebug(fullDebug):
 def _kishLog(logweights) -> float:
   "kish effective sample fraction, given log-weights"
   return np.exp(2 * logsumexp(logweights) - logsumexp(2 * logweights)) / logweights.size
+
+
+def _logaddexp(x, y):
+  "This is ~50x faster than Scipy logsumexp and 2x faster than Numpy logaddexp"
+  a_max = max(x, y)
+  s = abs(exp(y - a_max) + exp(x - a_max))
+  return log(s) + a_max

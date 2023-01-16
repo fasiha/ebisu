@@ -1,7 +1,6 @@
 # Ebisu: intelligent quiz scheduling
 
 - [Ebisu: intelligent quiz scheduling](#ebisu-intelligent-quiz-scheduling)
-  - [Quick links](#quick-links)
   - [Introduction](#introduction)
   - [Install](#install)
   - [API Quickstart](#api-quickstart)
@@ -10,17 +9,17 @@
     - [Quick-update halflife after a quiz](#quick-update-halflife-after-a-quiz)
     - [Fully-update halflife and boost](#fully-update-halflife-and-boost)
     - [Reset a model to a new halflife](#reset-a-model-to-a-new-halflife)
+  - [How it works](#how-it-works)
   - [Math](#math)
   - [Acknowledgments](#acknowledgments)
 
-## Quick links
+
+## Introduction
 - [Literate document](https://fasiha.github.io/ebisu/)
 - [GitHub repo](https://github.com/fasiha/ebisu)
 - [PyPI package](https://pypi.python.org/pypi/ebisu/)
 - [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md)
 - [Contact](https://fasiha.github.io/#contact)
-
-## Introduction
 
 Consider a student memorizing a set of facts.
 
@@ -39,7 +38,7 @@ Ebisu also enables apps to provide an infinite stream of quizzes for students wh
 
 This document contains both a detailed mathematical description of the underlying algorithm as well as the software API it exports. Separate implementations in other languages are detailed below.
 
-The next section is a [Quickstart](#quickstart) guide to setup and usage. See this if you know you want to use Ebisu in your app.
+The next sections are installation and an [API Quickstart](#qpi-quickstart). See these if you know you want to use Ebisu in your app.
 
 Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other scheduling algorithms and describe, non-technically, why you should use it.
 
@@ -188,6 +187,31 @@ This function is a backdoor around that. It keeps all the old quiz data but rein
 > You might not need this function. If it turns out you just initialized the model with a bad mean/standard deviation for halfife and boost (perhaps they were too narrow and the new quiz data cannot overcome the prior?), you can just reset `Model.prob.initHlPrior` and `Model.prob.boostPrior` and rerun `updateModelHistory` to see if thath elps.
 
 That's it. Five functions in the API.
+
+## How it works
+
+There are many scheduling schemes, e.g.,
+
+- [Anki](https://apps.ankiweb.net/), an open-source Python flashcard app (and a closed-source mobile app),
+- the [SuperMemo](https://www.supermemo.com/help/smalg.htm) family of algorithms ([Anki’s](https://apps.ankiweb.net/docs/manual.html#what-algorithm) is a derivative of SM-2),
+- [Memrise.com](https://www.memrise.com), a closed-source webapp,
+- [Duolingo](https://www.duolingo.com/) has published a [blog entry](http://making.duolingo.com/how-we-learn-how-you-learn) and a [conference paper/code repo](https://github.com/duolingo/halflife-regression) on their half-life regression technique,
+- the Leitner and Pimsleur spacing schemes (also discussed in some length in Duolingo’s paper).
+- Also worth noting is Michael Mozer’s team’s Bayesian multiscale models, e.g., [Mozer, Pashler, Cepeda, Lindsey, and Vul](http://www.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/MozerPashlerCepedaLindseyVul2009.pdf)’s 2009 <cite>NIPS</cite> paper and subsequent work.
+
+Many of these are inspired by Hermann Ebbinghaus’ discovery of the [exponential forgetting curve](https://en.wikipedia.org/w/index.php?title=Forgetting_curve&oldid=766120598#History), published in 1885, when he was thirty-five. He [memorized random](https://en.wikipedia.org/w/index.php?title=Hermann_Ebbinghaus&oldid=773908952#Research_on_memory) consonant–vowel–consonant trigrams (‘PED’, e.g.) and found, among other things, that his recall decayed exponentially with some time-constant.
+
+Anki and SuperMemo use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little [field guide](https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174) to Anki’s, with links to the source code—since they are optimized to minimize daily review time while maximizing retention. However, because each fact has simply a date of next review, these algorithms do not gracefully accommodate over- or under-reviewing. Even when used as prescribed, they can schedule many facts for review on one day but few on others. (I must note that all three of these issues—over-reviewing (cramming), under-reviewing, and lumpy reviews—have well-supported solutions in Anki by tweaking the rules and third-party plugins.)
+
+Duolingo’s half-life regression explicitly models the probability of you recalling a fact as \\(2^{-Δ/h}\\), where Δ is the time since your last review and \\(h\\) is a *half-life*. In this model, your chances of passing a quiz after \\(h\\) days is 50%, which drops to 25% after \\(2 h\\) days. They estimate this half-life by combining your past performance and fact metadata in a large-scale machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.
+
+The Mozer group’s algorithms also fit a hierarchical Bayesian model that links quiz performance to memory, taking into account inter-fact and inter-student variability, but the training step is again computationally-intensive.
+
+Like Duolingo and Mozer’s approaches, Ebisu explicitly tracks the exponential forgetting curve to provide a list of facts sorted by most to least likely to be forgotten. However, Ebisu formulates the problem very differently—while memory is understood to decay exponentially, Ebisu posits a *probability distribution* on the half-life and uses quiz results to update its beliefs in a fully Bayesian way. These updates, while definitely more computationally-burdensome than Anki’s scheduler, are much lighter-weight than Duolingo’s industrial-strength approach.
+
+This gives small quiz apps the same intelligent scheduling as Duolingo’s approach—real-time recall probabilities for any fact—but with quick incorporation of quiz results, even on mobile apps.
+
+This allows Ebisu to seamlessly handle the over-reviewing and under-reviewing case (cramming and lazing, respectively), while also moving away from 
 
 ## Math
 (Forthcoming.)

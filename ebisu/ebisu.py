@@ -253,6 +253,7 @@ def updateRecallHistoryDebug(
       posteriors=posteriors,
       size=size,
       likelihoodFitSize=likelihoodFitSize,
+      extra=extra,
   )
 
 

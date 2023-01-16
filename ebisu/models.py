@@ -32,6 +32,7 @@ def cleanup(results):
 
 @dataclass
 class Quiz(DataClassJsonMixin):
+  version: int
   results: list[list[Result]] = field(metadata=config(decoder=cleanup))
 
   # 0 < x <= 1 (reinforcement). Same length/sub-lengths as `results`
@@ -44,6 +45,7 @@ class Quiz(DataClassJsonMixin):
 
 @dataclass
 class Probability(DataClassJsonMixin):
+  version: int
   # priors: fixed at model creation time
   initHlPrior: tuple[float, float]  # alpha and beta
   boostPrior: tuple[float, float]  # alpha and beta
@@ -58,6 +60,7 @@ class Probability(DataClassJsonMixin):
 
 @dataclass
 class Predict(DataClassJsonMixin):
+  version: int
   # just for developer ease, these can be stored in SQL, etc.
   lastEncounterMs: float  # milliseconds since unix epoch
   currentHalflifeHours: float  # mean (so _currentHalflifePrior works). Same units as `elapseds`

@@ -52,6 +52,35 @@ def _logBinomPmfLogp(n: int, k: int, logp: float) -> float:
   return logcomb + k * logp
 
 
+def posterior2(ret: Model, wmax, wmaxBetaPriors, hs, extra=False):
+  from scipy.stats import beta as betarv  #type: ignore
+  logprior = betarv.logpdf(wmax, *wmaxBetaPriors)
+
+  n = hs.size
+  # ws = 1 + (wmax - 1) / (n - 1) * np.arange(n) # linear
+  tau = -(n - 1) / np.log(wmax + 1e-12)  # exp
+  ws = np.exp(-np.arange(n) / tau)
+
+  loglik = []
+  for res in ret.quiz.results[-1] if len(ret.quiz.results) else []:
+    logPrecall = np.log(np.max(ws * np.exp2(-res.hoursElapsed / hs)))
+
+    if isinstance(res, NoisyBinaryResult):
+      # noisy binary/Bernoulli
+      q1LogPmf, q0LogPmf = _noisyBinaryToLogPmfs(res)
+      logPfail = log(-expm1(logPrecall))
+      # Stan has this nice function, log_mix, which is perfect for this...
+      # Scipy logsumexp here is much slower??
+      loglik.append(_logaddexp(logPrecall + q1LogPmf, logPfail + q0LogPmf))
+    else:
+      # binomial
+      loglik.append(_logBinomPmfLogp(res.total, res.successes, logPrecall))
+  logposterior = fsum(loglik + [logprior])
+  if extra:
+    return logposterior, dict(loglik=loglik)
+  return logposterior
+
+
 def posterior(b: float, h: float, ret: Model, left: float, right: float, extra=False):
   "log posterior up to a constant offset"
   ab, bb = ret.prob.boostPrior

@@ -42,9 +42,10 @@ def initModel(
   assert gammaToMean(*b) >= 1.0, 'boost mean should be >= 1'
   now = now or timeMs()
   return Model(
-      quiz=Quiz(results=[], startStrengths=[], startTimestampMs=[now]),
-      prob=Probability(initHlPrior=hl0, boostPrior=b, initHl=hl0, boost=b),
-      pred=Predict(lastEncounterMs=now, currentHalflifeHours=gammaToMean(*hl0), logStrength=0.0))
+      quiz=Quiz(version=1, results=[], startStrengths=[], startTimestampMs=[now]),
+      prob=Probability(version=1, initHlPrior=hl0, boostPrior=b, initHl=hl0, boost=b),
+      pred=Predict(
+          version=1, lastEncounterMs=now, currentHalflifeHours=gammaToMean(*hl0), logStrength=0.0))
 
 
 def resetHalflife(

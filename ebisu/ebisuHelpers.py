@@ -1,14 +1,11 @@
-from scipy.special import gammaln, logsumexp  #type: ignore
+from scipy.special import gammaln  #type: ignore
 from functools import cache
 from math import fsum, exp, log, expm1
 from typing import Callable, Union
 import numpy as np
 from time import time_ns
 
-from ebisu.models import Model, NoisyBinaryResult
-
-LN2 = np.log(2)
-logsumexp: Callable = logsumexp
+from .models import Model, NoisyBinaryResult
 
 
 def timeMs() -> float:

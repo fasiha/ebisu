@@ -5,6 +5,7 @@ import pylab as plt  # type:ignore
 import typing
 
 import ebisu
+import ebisu3gammas
 import utils
 
 plt.ion()
@@ -13,7 +14,7 @@ ConvertAnkiMode = typing.Literal['approx', 'binary']
 MILLISECONDS_PER_HOUR = 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec
 
 wmaxs = np.linspace(0, 1, 101)
-n = 5
+n = 10
 hs = np.logspace(0, 4, n)
 
 
@@ -41,66 +42,54 @@ if __name__ == '__main__':
   df = utils.sqliteToDf('collection.anki2', True)
   print(f'loaded SQL data, {len(df)} rows')
 
-  train, TEST_TRAIN = utils.traintest(df)
+  train, TEST_TRAIN = utils.traintest(df, noPerfectCardsInTraining=False)
   print(f'split flashcards into train/test, {len(train)} cards in train set')
+
+  model = ebisu.initModel(wmax=.5, now=origNow)
 
   fracs = [0.8]
   # fracs = [0.9]
-  # fracs = [0.8, 0.85, 0.9, 0.95]
-  models = []
-  model = ebisu.initModel(wmax=.1, now=origNow)
-  for card in [next(t for t in train if t.fractionCorrect > frac) for frac in fracs]:
+  fracs = [0.8, 0.85, 0.9, 0.95, 1.]
+  for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
     hlMeanStd = (10., 10 * .7)
     boostMeanStd = (3, 3 * .7)
     convertMode: ConvertAnkiMode = 'binary'
 
     now = origNow
     model = ebisu.initModel(wmax=.1, now=now)
-    models = [model]
-
-    USE_ANKI = not False
-
-    ress = [1] * 10
-    hours = [6.0] * len(ress)
-    for ankiResult, elapsedTime in (zip(card.results, card.dts_hours) if USE_ANKI else zip(
-        ress, hours)):
-      now += elapsedTime * MILLISECONDS_PER_HOUR
-      s, t = convertAnkiResultToBinomial(ankiResult, convertMode)
-      model = ebisu.updateRecall(model, successes=s, total=t, now=now)
-      models.append(model)
+    model3 = ebisu3gammas.initModel(
+        initHlMean=hlMeanStd[0],
+        boostMean=boostMeanStd[0],
+        initHlStd=hlMeanStd[1],
+        boostStd=boostMeanStd[1],
+        now=now)
 
     logliks = []
     wmaxMaps = []
-    for thisModel, thisQuiz in zip(models, model.quiz.results[0]):
-      p1 = (
-          ebisu.predictRecall(
-              thisModel,
-              thisModel.pred.lastEncounterMs + thisQuiz.hoursElapsed * 3600e3,
-              logDomain=False))
+    for ankiResult, elapsedTime in zip(card.results, card.dts_hours):
+      now += elapsedTime * MILLISECONDS_PER_HOUR
+      s, t = convertAnkiResultToBinomial(ankiResult, convertMode)
 
-      res = [
-          ebisu.success(m)
-          for m in (thisModel.quiz.results[-1] if len(thisModel.quiz.results) else [])
-      ]
-      successes = sum(res)
-      ab = (max(2, successes), max(2, len(res) - successes))
-      ps = [ebisu.ebisuHelpers.posterior(thisModel, wmax, ab, hs)[0] for wmax in wmaxs]
-      wmaxMap = wmaxs[np.argmax(ps)]
-      wmaxMaps.append(wmaxMap)
+      p1 = ebisu.predictRecall(
+          model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
 
-      n = hs.size
-      # ws = 1 + (wmaxMap - 1) / (n - 1) * np.arange(n) # linear
-      tau = -(n - 1) / np.log(wmaxMap)  # exp
-      ws = np.exp(-np.arange(n) / tau)
-
-      p2 = np.max(ws * np.exp2(-thisQuiz.hoursElapsed / hs))
+      p2 = ebisu3gammas.predictRecall(
+          model3, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
 
       pRecallForModels = [p1, p2]
+
+      tmp = ebisu.updateRecall(model, successes=s, total=t, now=now)
+      thisQuiz = tmp.quiz.results[-1][-1]
+
       ll = tuple(np.log(p) if ebisu.success(thisQuiz) else np.log(1 - p) for p in pRecallForModels)
       logliks.append(ll)
       print(
-          f'{ebisu.success(thisQuiz)}/{thisQuiz.hoursElapsed:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[f"{l:.3f}" for l in ll]}'
+          f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[f"{l:.3f}" for l in ll]}'
       )
+
+      model = ebisu.updateRecall(model, successes=s, total=t, now=now)
+      model3 = ebisu3gammas.updateRecall(model3, successes=s, total=t, now=now)
+      model3 = ebisu3gammas.updateRecallHistory(model3, size=1000)
 
     loglikFinal = np.sum(np.array(logliks), axis=0)
     print(f'{loglikFinal=}, {card.key=}')

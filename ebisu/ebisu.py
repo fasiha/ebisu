@@ -50,7 +50,7 @@ def updateRecall(
     successes: Union[float, int],
     total: int = 1,
     q0: Optional[float] = None,
-    n: int = 5,
+    n: int = 10,
     wmaxPrior: Optional[tuple[float, float]] = None,
     now: Optional[float] = None,
 ) -> Model:
@@ -64,13 +64,11 @@ def updateRecall(
     q0 = 1 - q1 if q0 is None else q0  # either the input argument OR between 0 and 0.5
     resultObj = NoisyBinaryResult(result=successes, q1=q1, q0=q0, hoursElapsed=t)
 
-  else:  # int, or float outside (0, 1) band
+  else:
     assert successes == np.floor(successes), "float `successes` must have `total=1`"
     assert successes >= 0, "negative `successes` meaningless"
     assert total > 0, "positive binomial trials"
-    k = int(successes)
-    n = total
-    resultObj = BinomialResult(successes=k, total=n, hoursElapsed=t)
+    resultObj = BinomialResult(successes=int(successes), total=total, hoursElapsed=t)
 
   ret = deepcopy(model)  # clone
   _appendQuizImpure(ret, resultObj)

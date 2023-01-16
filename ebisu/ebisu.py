@@ -8,6 +8,8 @@ from ebisu.models import BinomialResult, Model, NoisyBinaryResult, success, Pred
 
 def initModel(
     wmax: float,
+    hmax: float = 1e5,  # 1e5 hours = 11+ years
+    n: int = 10,  # only used for initial predictRecall. Can change in updateRecall
     now: Optional[float] = None,
 ) -> Model:
   """
@@ -26,9 +28,8 @@ def initModel(
   wmax = wmax or np.spacing(1)
   now = now or timeMs()
 
-  n = 5  # this doesn't lock us in, we can change # of halflives in updateRecall
-  hs = np.logspace(0, 4, n)
-  tau = -(n - 1) / np.log(wmax)
+  hs = np.logspace(0, np.log10(hmax), n)
+  tau = -(n - 1) / (np.log(wmax) or np.spacing(1))
   ws = np.exp(-np.arange(n) / tau)
   log2ws = np.log2(ws)
   return Model(
@@ -78,7 +79,7 @@ def updateRecall(
     successes = sum(res)
     wmaxPrior = (max(2, successes), max(2, len(res) - successes))
 
-  hs = np.logspace(0, 4, n)
+  hs = np.logspace(0, np.log10(ret.pred.hmax), n)
   wmaxs = np.linspace(0, 1, 101)
 
   ps = [posterior(ret, wmax, wmaxPrior, hs)[0] for wmax in wmaxs]
@@ -86,10 +87,9 @@ def updateRecall(
 
   ret.pred.lastEncounterMs = now
   ret.pred.wmax = wmaxMap
-  ret.pred.hmax = hs[-1]
   ret.pred.hs = hs.tolist()
 
-  tau = -(n - 1) / np.log(wmaxMap)
+  tau = -(n - 1) / (np.log(wmaxMap) or np.spacing(1))
   ws = np.exp(-np.arange(n) / tau)
 
   ret.pred.log2ws = np.log2(ws)

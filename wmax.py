@@ -46,23 +46,26 @@ if __name__ == '__main__':
   print(f'split flashcards into train/test, {len(train)} cards in train set')
 
   model = ebisu.initModel(wmax=.5, now=origNow)
+  card = None
+  models = []
 
   fracs = [0.8]
-  # fracs = [0.9]
-  fracs = [0.8, 0.85, 0.9, 0.95, 1.]
+  fracs = [1.0]
+  # fracs = [0.8, 0.85, 0.9, 0.95, 1.]
   for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
     hlMeanStd = (10., 10 * .7)
     boostMeanStd = (3, 3 * .7)
     convertMode: ConvertAnkiMode = 'binary'
 
     now = origNow
-    model = ebisu.initModel(wmax=.1, now=now)
+    model = ebisu.initModel(wmax=.5, now=now)
     model3 = ebisu3gammas.initModel(
         initHlMean=hlMeanStd[0],
         boostMean=boostMeanStd[0],
         initHlStd=hlMeanStd[1],
         boostStd=boostMeanStd[1],
         now=now)
+    models.append((model, model3))
 
     logliks = []
     wmaxMaps = []
@@ -84,18 +87,24 @@ if __name__ == '__main__':
       ll = tuple(np.log(p) if ebisu.success(thisQuiz) else np.log(1 - p) for p in pRecallForModels)
       logliks.append(ll)
       print(
-          f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[f"{l:.3f}" for l in ll]}'
+          f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[round(l,3) for l in ll]} (wmax={model.pred.wmax:0.3f}, hl={model3.pred.currentHalflifeHours:0.3f})'
       )
 
-      model = ebisu.updateRecall(model, successes=s, total=t, now=now)
+      wmaxMaps.append(model.pred.wmax)
+      model = ebisu.updateRecall(
+          model, successes=s, total=t, now=now, wmaxPrior=[None, (3, 1.5)][0])
       model3 = ebisu3gammas.updateRecall(model3, successes=s, total=t, now=now)
       model3 = ebisu3gammas.updateRecallHistory(model3, size=1000)
+      models.append((model, model3))
+
+    wmaxMaps.append(model.pred.wmax)
 
     loglikFinal = np.sum(np.array(logliks), axis=0)
     print(f'{loglikFinal=}, {card.key=}')
 
   wmaxBetaPriors = (9, 3)
   wmaxBetaPriors = (3, 3)
+  wmaxBetaPriors = (3, 1)
   ps = np.array(
       [ebisu.ebisuHelpers.posterior(model, wmax, wmaxBetaPriors, hs)[0] for wmax in wmaxs])
 
@@ -112,6 +121,7 @@ if __name__ == '__main__':
     plt.plot(wmaxs[imax], v[imax], 'bo')
 
   plt.legend()
+  assert card
   plt.title(f'card {card.key}, {n=}')
 
   ###

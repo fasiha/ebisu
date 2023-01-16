@@ -1,7 +1,7 @@
 from scipy.special import gammaln  #type: ignore
 from functools import cache
 from math import fsum, exp, log, expm1
-from typing import Callable, Union
+from typing import Union
 import numpy as np
 from time import time_ns
 

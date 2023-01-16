@@ -35,50 +35,35 @@ class Quiz(DataClassJsonMixin):
   version: int
   results: list[list[Result]] = field(metadata=config(decoder=cleanup))
 
-  # 0 < x <= 1 (reinforcement). Same length/sub-lengths as `results`
-  startStrengths: list[list[float]]
-
   # same length as `results`. Timestamp of the first item in each sub-array of
   # `results`
   startTimestampMs: list[float]
 
 
 @dataclass
-class Probability(DataClassJsonMixin):
-  version: int
-  # priors: fixed at model creation time
-  initHlPrior: tuple[float, float]  # alpha and beta
-  boostPrior: tuple[float, float]  # alpha and beta
-
-  # posteriors: these change after quizzes
-  initHl: tuple[float, float]  # alpha and beta
-  boost: tuple[float, float]  # alpha and beta
-  # we need both prior (belief before any quizzes are received) and posterior
-  # (after quizzes) because when updating using all history
-  # (`updateRecallHistory`), we need to know what to start from.
-
-
-@dataclass
 class Predict(DataClassJsonMixin):
   version: int
-  # just for developer ease, these can be stored in SQL, etc.
   lastEncounterMs: float  # milliseconds since unix epoch
-  currentHalflifeHours: float  # mean (so _currentHalflifePrior works). Same units as `elapseds`
-  logStrength: float
+  wmax: float  # weight for max halflife (it's actually the smallest weight), between 0 and 1
+  hmax: float  # max halflife, in hours
+  log2ws: list[float]
+  hs: list[float]  # same length as log2ws
   # recall probability is proportional to:
-  # `logStrength - ((NOW_MS - lastEncounterMs) * HOURS_PER_MILLISECONDS) / currentHalflifeHours`
+  # `MAX(log2ws - ((NOW_MS - lastEncounterMs) * HOURS_PER_MILLISECONDS / hs)`
   # where NOW_MS is milliseconds since Unix epoch.
 
 
 @dataclass
 class Model(DataClassJsonMixin):
+  version: int
   quiz: Quiz
-  prob: Probability
   pred: Predict
 
 
-@dataclass
-class GammaUpdate:
-  a: float
-  b: float
-  mean: float
+def success(res: Result) -> bool:
+  if isinstance(res, NoisyBinaryResult):
+    return res.result > 0.5
+  elif isinstance(res, BinomialResult):
+    return res.successes * 2 > res.total
+  else:
+    raise Exception("unknown result type")

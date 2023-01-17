@@ -5,7 +5,7 @@ from typing import Union
 import numpy as np
 from time import time_ns
 
-from .models import Model, NoisyBinaryResult
+from .models import BinomialResult, Model, NoisyBinaryResult
 
 
 def timeMs() -> float:
@@ -68,9 +68,11 @@ def posterior(ret: Model, wmax, wmaxBetaPriors, hs, extra=False):
       # Stan has this nice function, log_mix, which is perfect for this...
       # Scipy logsumexp here is much slower??
       loglik.append(_logaddexp(logPrecall + q1LogPmf, logPfail + q0LogPmf))
-    else:
+    elif isinstance(res, BinomialResult):
       # binomial
       loglik.append(_logBinomPmfLogp(res.total, res.successes, logPrecall))
+    else:
+      raise Exception('unknown quiz type')
   logposterior = fsum(loglik + [logprior])
   return logposterior, dict(loglik=loglik)
 

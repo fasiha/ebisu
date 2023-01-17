@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Union
+from typing import Literal, Optional, Union
 from dataclasses_json import DataClassJsonMixin, config
 
 
@@ -40,6 +40,9 @@ class Quiz(DataClassJsonMixin):
   startTimestampMs: list[float]
 
 
+WeightsFormat = Literal['exp', 'rational']
+
+
 @dataclass
 class Predict(DataClassJsonMixin):
   version: int
@@ -48,6 +51,9 @@ class Predict(DataClassJsonMixin):
   hmax: float  # max halflife, in hours
   log2ws: list[float]
   hs: list[float]  # same length as log2ws
+
+  format: WeightsFormat
+  m: Optional[float]
   # recall probability is proportional to:
   # `MAX(log2ws - ((NOW_MS - lastEncounterMs) * HOURS_PER_MILLISECONDS / hs)`
   # where NOW_MS is milliseconds since Unix epoch.

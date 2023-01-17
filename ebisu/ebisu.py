@@ -3,13 +3,15 @@ from copy import deepcopy
 from typing import Union, Optional
 
 from ebisu.ebisuHelpers import posterior, timeMs
-from ebisu.models import BinomialResult, Model, NoisyBinaryResult, success, Predict, Quiz, Result
+from ebisu.models import BinomialResult, Model, NoisyBinaryResult, WeightsFormat, success, Predict, Quiz, Result
 
 
 def initModel(
     wmax: float,
     hmax: float = 1e5,  # 1e5 hours = 11+ years
     n: int = 10,  # only used for initial predictRecall. Can change in updateRecall
+    format: WeightsFormat = "exp",
+    m: Optional[float] = None,
     now: Optional[float] = None,
 ) -> Model:
   """
@@ -29,8 +31,7 @@ def initModel(
   now = now or timeMs()
 
   hs = np.logspace(0, np.log10(hmax), n)
-  ws = _makeWs(n, wmax)
-  log2ws = np.log2(ws)
+  ws = _makeWs(n, wmax, format, m)
   return Model(
       version=1,
       quiz=Quiz(version=1, results=[], startTimestampMs=[now]),
@@ -39,8 +40,11 @@ def initModel(
           lastEncounterMs=now,
           wmax=wmax,
           hmax=hs[-1],
-          log2ws=log2ws,
+          log2ws=np.log2(ws).tolist(),
           hs=hs.tolist(),
+          # custom
+          format=format,
+          m=m,
       ),
   )
 
@@ -88,16 +92,20 @@ def updateRecall(
   ret.pred.wmax = wmaxMap
   ret.pred.hs = hs.tolist()
 
-  ws = _makeWs(n, wmaxMap)
-  ret.pred.log2ws = np.log2(ws)
+  ws = _makeWs(n, wmaxMap, model.pred.format, model.pred.m)
+  ret.pred.log2ws = np.log2(ws).tolist()
 
   return ret
 
 
-def _makeWs(n: int, wmax: float):
-  tau = -(n - 1) / (np.log(wmax) or np.spacing(1))
-  ws = np.exp(-np.arange(n) / tau)
-  return ws
+def _makeWs(n: int, wmax: float, format: WeightsFormat, m: Optional[float] = None) -> np.ndarray:
+  if format == "exp":
+    tau = -(n - 1) / (np.log(wmax) or np.spacing(1))
+    return np.exp(-np.arange(n) / tau)
+  elif format == "rational":
+    assert m and (m > 0), "m must be positive"
+    return 1 + (wmax - 1) * (np.arange(n) / (n - 1))**m
+  raise Exception('unknown format')
 
 
 def _appendQuizImpure(model: Model, result: Result) -> None:

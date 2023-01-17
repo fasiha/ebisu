@@ -50,19 +50,33 @@ if __name__ == '__main__':
 
   fracs = [0.8]
   # fracs = [1.0]
-  # fracs = [0.8, 0.85, 0.9, 0.95, 1.]
-  for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
+  fracs = [0.8, 0.85, 0.9, 0.95, 1.]
+  # for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
+  for card in train:
     hlMeanStd = (10., 10 * .7)
     boostMeanStd = (3, 3 * .7)
     convertMode: ConvertAnkiMode = 'binary'
     now = origNow
 
+    ePredictor, v3Predictor = [
+        lambda model, elapsedTime: ebisu.predictRecall(
+            model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False),
+        lambda model, elapsedTime: ebisu3gammas.predictRecall(
+            model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False),
+    ]
+    eUpdator, v3Updator = [
+        lambda model, s, t, now: ebisu.updateRecall(
+            model, successes=s, total=t, now=now, wmaxPrior=[None, (3, 1.5)][0]),
+        lambda model, s, t, now: ebisu3gammas.updateRecallHistory(
+            ebisu3gammas.updateRecall(model, successes=s, total=t, now=now), size=1000),
+    ]
     models = [
-        ebisu.initModel(
-            wmax=.5,
-            now=now,
-            # format="rational",
-        ),
+        ebisu.initModel(wmax=.5, now=now),
+        ebisu.initModel(wmax=.5, now=now, format="rational", m=0.25),
+        ebisu.initModel(wmax=.5, now=now, format="rational", m=0.5),
+        ebisu.initModel(wmax=.5, now=now, format="rational", m=1),
+        ebisu.initModel(wmax=.5, now=now, format="rational", m=2),
+        ebisu.initModel(wmax=.5, now=now, format="rational", m=4),
         ebisu3gammas.initModel(
             initHlMean=hlMeanStd[0],
             boostMean=boostMeanStd[0],
@@ -70,18 +84,10 @@ if __name__ == '__main__':
             boostStd=boostMeanStd[1],
             now=now),
     ]
-    predictors = [
-        lambda model, elapsedTime: ebisu.predictRecall(
-            model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False),
-        lambda model, elapsedTime: ebisu3gammas.predictRecall(
-            model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False),
-    ]
-    updators = [
-        lambda model, s, t, now: ebisu.updateRecall(
-            model, successes=s, total=t, now=now, wmaxPrior=[None, (3, 1.5)][0]),
-        lambda model, s, t, now: ebisu3gammas.updateRecallHistory(
-            ebisu3gammas.updateRecall(model, successes=s, total=t, now=now), size=1000),
-    ]
+    modelsInit = models
+
+    predictors = [ePredictor] * (len(models) - 1) + [v3Predictor]
+    updators = [eUpdator] * (len(models) - 1) + [v3Updator]
 
     logliks = []
     for ankiResult, elapsedTime in zip(card.results, card.dts_hours):
@@ -93,14 +99,14 @@ if __name__ == '__main__':
       success = s * 2 > t
       ll = tuple(np.log(p) if success else np.log(1 - p) for p in pRecallForModels)
       logliks.append(ll)
-      print(
-          f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[round(l,3) for l in ll]} (wmax={models[0].pred.wmax:0.3f}, hl={models[1].pred.currentHalflifeHours:0.3f})'
-      )
+      # print(
+      #     f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[round(l,3) for l in ll]}'
+      # )
 
       models = [update(model, s, t, now) for model, update in zip(models, updators)]
 
-    loglikFinal = np.sum(np.array(logliks), axis=0)
-    print(f'{loglikFinal=}, {card.key=}')
+    loglikFinal = np.sum(np.array(logliks), axis=0).tolist()
+    print(f'loglikFinal={[round(p,3) for p in loglikFinal]}, {card.key=}')
 
   assert models
   model: ebisu.Model = models[0]

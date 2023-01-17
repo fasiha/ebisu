@@ -29,8 +29,7 @@ def initModel(
   now = now or timeMs()
 
   hs = np.logspace(0, np.log10(hmax), n)
-  tau = -(n - 1) / (np.log(wmax) or np.spacing(1))
-  ws = np.exp(-np.arange(n) / tau)
+  ws = _makeWs(n, wmax)
   log2ws = np.log2(ws)
   return Model(
       version=1,
@@ -89,12 +88,16 @@ def updateRecall(
   ret.pred.wmax = wmaxMap
   ret.pred.hs = hs.tolist()
 
-  tau = -(n - 1) / (np.log(wmaxMap) or np.spacing(1))
-  ws = np.exp(-np.arange(n) / tau)
-
+  ws = _makeWs(n, wmaxMap)
   ret.pred.log2ws = np.log2(ws)
 
   return ret
+
+
+def _makeWs(n: int, wmax: float):
+  tau = -(n - 1) / (np.log(wmax) or np.spacing(1))
+  ws = np.exp(-np.arange(n) / tau)
+  return ws
 
 
 def _appendQuizImpure(model: Model, result: Result) -> None:

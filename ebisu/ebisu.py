@@ -1,3 +1,4 @@
+from math import log2
 import numpy as np
 from copy import deepcopy
 from typing import Union, Optional
@@ -127,3 +128,10 @@ def predictRecall(
   elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   logPrecall = max([log2w - elapsedHours / h for log2w, h in zip(model.pred.log2ws, model.pred.hs)])
   return logPrecall if logDomain else np.exp2(logPrecall)
+
+
+def hoursToRecallDecay(model: Model, percentile=0.5):
+  assert (0 < percentile <= 1), "percentile must be in (0, 1]"
+  lp = log2(percentile)
+  return max((lw - lp) * h for lw, h in zip(model.pred.log2ws, model.pred.hs))
+  # max above will ALWAYS get at least one result given p ∈ (0, 1]

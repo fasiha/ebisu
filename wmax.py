@@ -53,7 +53,7 @@ if __name__ == '__main__':
   fracs = [0.8, 0.85, 0.9, 0.95, 1.]
   # for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
   for card in train:
-    hlMeanStd = (10., 10 * .7)
+    hlMeanStd = (24., 24 * .7)
     boostMeanStd = (3, 3 * .7)
     convertMode: ConvertAnkiMode = 'binary'
     now = origNow
@@ -71,12 +71,12 @@ if __name__ == '__main__':
             ebisu3gammas.updateRecall(model, successes=s, total=t, now=now), size=1000),
     ]
     models = [
-        ebisu.initModel(wmax=.5, now=now),
-        ebisu.initModel(wmax=.5, now=now, format="rational", m=0.25),
-        ebisu.initModel(wmax=.5, now=now, format="rational", m=0.5),
-        ebisu.initModel(wmax=.5, now=now, format="rational", m=1),
-        ebisu.initModel(wmax=.5, now=now, format="rational", m=2),
-        ebisu.initModel(wmax=.5, now=now, format="rational", m=4),
+        ebisu.initModel(wmaxMean=.5, now=now),
+        ebisu.initModel(wmaxMean=.5, now=now, format="rational", m=0.25),
+        ebisu.initModel(wmaxMean=.5, now=now, format="rational", m=0.5),
+        ebisu.initModel(wmaxMean=.5, now=now, format="rational", m=1),
+        ebisu.initModel(wmaxMean=.5, now=now, format="rational", m=2),
+        ebisu.initModel(wmaxMean=.5, now=now, format="rational", m=4),
         ebisu3gammas.initModel(
             initHlMean=hlMeanStd[0],
             boostMean=boostMeanStd[0],
@@ -138,7 +138,7 @@ if __name__ == '__main__':
   tau = -(n - 1) / np.log(.1)
   ws = np.exp(-np.arange(n) / tau)
 
-  ts = np.linspace(0, 1000, 501)
+  ts = np.linspace(0, 1000, 5001)
   arr = np.exp2(-ts[:, np.newaxis] * (1 / hs[np.newaxis, :])) * ws
 
   plt.figure()

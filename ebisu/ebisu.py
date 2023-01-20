@@ -2,15 +2,16 @@ from math import log2
 import numpy as np
 from copy import deepcopy
 from typing import Union, Optional
+from scipy.optimize import minimize_scalar  # type: ignore
 
 from ebisu.ebisuHelpers import posterior, timeMs
 from ebisu.models import BinomialResult, Model, NoisyBinaryResult, WeightsFormat, success, Predict, Quiz, Result
 
 
 def initModel(
-    wmax: float,
+    wmaxMean: float,
     hmax: float = 1e5,  # 1e5 hours = 11+ years
-    n: int = 10,  # only used for initial predictRecall. Can change in updateRecall
+    n: int = 10,
     format: WeightsFormat = "exp",
     m: Optional[float] = None,
     now: Optional[float] = None,
@@ -18,28 +19,21 @@ def initModel(
   """
   Create brand new Ebisu model
 
-  Provide the mean and standard deviation for the initial halflife (units of
-  hours) and boost (unitless).
-
-  If you're really lazy and omit standard deviations, we'll pick them to be half
-  their respective means (ensures a nice densityw ith non-zero mode and positive
-  second-derivative at 0, though you'd get this for `std <= mean / sqrt(2)`).
-  
   Optional `now`: milliseconds since the Unix epoch when the fact was learned.
   """
-  assert 0 <= wmax <= 1, 'wmax should be between 0 and 1'
-  wmax = wmax or np.spacing(1)
+  assert 0 <= wmaxMean <= 1, 'wmaxMean should be between 0 and 1'
+  wmaxMean = wmaxMean or np.spacing(1)
   now = now or timeMs()
 
   hs = np.logspace(0, np.log10(hmax), n)
-  ws = _makeWs(n, wmax, format, m)
+  ws = _makeWs(n, wmaxMean, format, m)
   return Model(
       version=1,
       quiz=Quiz(version=1, results=[[]], startTimestampMs=[now]),
       pred=Predict(
           version=1,
           lastEncounterMs=now,
-          wmax=wmax,
+          wmaxMean=wmaxMean,
           hmax=hs[-1],
           log2ws=np.log2(ws).tolist(),
           hs=hs.tolist(),
@@ -55,7 +49,6 @@ def updateRecall(
     successes: Union[float, int],
     total: int = 1,
     q0: Optional[float] = None,
-    n: int = 10,
     wmaxPrior: Optional[tuple[float, float]] = None,
     now: Optional[float] = None,
 ) -> Model:
@@ -80,19 +73,17 @@ def updateRecall(
 
   if wmaxPrior is None:
     # lol assume all quiz results are success with beta=2
-    wmaxPrior = (max(2, len(ret.quiz.results[-1])), 2)
+    wmaxPrior = (max(2.0, len(ret.quiz.results[-1])), 2.0)
 
-  hs = np.logspace(0, np.log10(ret.pred.hmax), n)
-  wmaxs = np.linspace(0, 1, 101)
-
-  ps = [posterior(ret, wmax, wmaxPrior, hs)[0] for wmax in wmaxs]
-  wmaxMap = wmaxs[np.argmax(ps)]
+  hs = np.array(ret.pred.hs)
+  res = minimize_scalar(lambda wmax: -(posterior(ret, wmax, wmaxPrior, hs)[0]), [0, 1], [0, 1])
+  wmaxMap = res.x
 
   ret.pred.lastEncounterMs = now
-  ret.pred.wmax = wmaxMap
+  ret.pred.wmaxMean = wmaxMap
   ret.pred.hs = hs.tolist()
 
-  ws = _makeWs(n, wmaxMap, model.pred.format, model.pred.m)
+  ws = _makeWs(len(hs), wmaxMap, model.pred.format, model.pred.m)
   ret.pred.log2ws = np.log2(ws).tolist()
 
   return ret

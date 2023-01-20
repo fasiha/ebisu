@@ -47,7 +47,7 @@ WeightsFormat = Literal['exp', 'rational']
 class Predict(DataClassJsonMixin):
   version: int
   lastEncounterMs: float  # milliseconds since unix epoch
-  wmax: float  # weight for max halflife (it's actually the smallest weight), between 0 and 1
+  wmaxMean: float  # weight for max halflife (it's actually the smallest weight), between 0 and 1
   hmax: float  # max halflife, in hours
   log2ws: list[float]
   hs: list[float]  # same length as log2ws

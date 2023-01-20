@@ -48,12 +48,16 @@ def _logBinomPmfLogp(n: int, k: int, logp: float) -> float:
   return logcomb + k * logp
 
 
-def posterior(ret: Model, wmax, wmaxBetaPriors, hs, extra=False):
+def posterior(
+    ret: Model,
+    wmax: float,
+    wmaxBetaPriors: tuple[float, float],
+    hs: np.ndarray,
+):
   from scipy.stats import beta as betarv  #type: ignore
   logprior = betarv.logpdf(wmax, *wmaxBetaPriors)
 
   n = hs.size
-  # ws = 1 + (wmax - 1) / (n - 1) * np.arange(n) # linear
   tau = -(n - 1) / np.log(wmax + 1e-12)  # exp
   ws = np.exp(-np.arange(n) / tau)
 
@@ -74,7 +78,7 @@ def posterior(ret: Model, wmax, wmaxBetaPriors, hs, extra=False):
     else:
       raise Exception('unknown quiz type')
   logposterior = fsum(loglik + [logprior])
-  return logposterior, dict(loglik=loglik)
+  return logposterior, dict(loglik=loglik, logprior=logprior)
 
 
 def clampLerp(x1: float, x2: float, y1: float, y2: float, x: float) -> float:

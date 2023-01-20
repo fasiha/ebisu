@@ -35,7 +35,7 @@ def initModel(
   ws = _makeWs(n, wmax, format, m)
   return Model(
       version=1,
-      quiz=Quiz(version=1, results=[], startTimestampMs=[now]),
+      quiz=Quiz(version=1, results=[[]], startTimestampMs=[now]),
       pred=Predict(
           version=1,
           lastEncounterMs=now,
@@ -79,9 +79,8 @@ def updateRecall(
   _appendQuizImpure(ret, resultObj)
 
   if wmaxPrior is None:
-    res = [success(m) for m in (ret.quiz.results[-1] if len(ret.quiz.results) else [])]
-    successes = sum(res)
-    wmaxPrior = (max(2, successes), max(2, len(res) - successes))
+    # lol assume all quiz results are success with beta=2
+    wmaxPrior = (max(2, len(ret.quiz.results[-1])), 2)
 
   hs = np.logspace(0, np.log10(ret.pred.hmax), n)
   wmaxs = np.linspace(0, 1, 101)

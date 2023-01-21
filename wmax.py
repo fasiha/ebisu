@@ -51,8 +51,8 @@ if __name__ == '__main__':
   fracs = [0.8]
   # fracs = [1.0]
   fracs = [0.8, 0.85, 0.9, 0.95, 1.]
-  # for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
-  for card in train:
+  for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
+    # for card in train:
     hlMeanStd = (24., 24 * .7)
     boostMeanStd = (3, 3 * .7)
     convertMode: ConvertAnkiMode = 'binary'
@@ -65,18 +65,23 @@ if __name__ == '__main__':
             model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False),
     ]
     eUpdator, v3Updator = [
-        lambda model, s, t, now: ebisu.updateRecall(
-            model, successes=s, total=t, now=now, wmaxPrior=[None, (3, 1.5)][0]),
+        lambda model, s, t, now: ebisu.updateRecall(model, successes=s, total=t, now=now),
         lambda model, s, t, now: ebisu3gammas.updateRecallHistory(
             ebisu3gammas.updateRecall(model, successes=s, total=t, now=now), size=1000),
     ]
+
+    wmaxMean, initHlMean = 0.5, None
+    wmaxMean, initHlMean = None, 12.0
+
     models = [
-        ebisu.initModel(wmaxMean=.5, now=now),
-        ebisu.initModel(wmaxMean=.5, now=now, format="rational", m=0.25),
-        ebisu.initModel(wmaxMean=.5, now=now, format="rational", m=0.5),
-        ebisu.initModel(wmaxMean=.5, now=now, format="rational", m=1),
-        ebisu.initModel(wmaxMean=.5, now=now, format="rational", m=2),
-        ebisu.initModel(wmaxMean=.5, now=now, format="rational", m=4),
+        ebisu.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now),
+        ebisu.initModel(
+            wmaxMean=wmaxMean, initHlMean=initHlMean, now=now, format="rational", m=0.25),
+        ebisu.initModel(
+            wmaxMean=wmaxMean, initHlMean=initHlMean, now=now, format="rational", m=0.5),
+        ebisu.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now, format="rational", m=1),
+        ebisu.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now, format="rational", m=2),
+        ebisu.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now, format="rational", m=4),
         ebisu3gammas.initModel(
             initHlMean=hlMeanStd[0],
             boostMean=boostMeanStd[0],
@@ -99,9 +104,9 @@ if __name__ == '__main__':
       success = s * 2 > t
       ll = tuple(np.log(p) if success else np.log(1 - p) for p in pRecallForModels)
       logliks.append(ll)
-      # print(
-      #     f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[round(l,3) for l in ll]}'
-      # )
+      print(
+          f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[round(l,3) for l in ll]}'
+      )
 
       models = [update(model, s, t, now) for model, update in zip(models, updators)]
 

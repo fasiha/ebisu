@@ -9,7 +9,8 @@ from ebisu.models import BinomialResult, Model, NoisyBinaryResult, WeightsFormat
 
 
 def initModel(
-    wmaxMean: float,
+    wmaxMean: Optional[float] = None,
+    initHlMean: Optional[float] = None,
     hmax: float = 1e5,  # 1e5 hours = 11+ years
     n: int = 10,
     format: WeightsFormat = "exp",
@@ -21,6 +22,13 @@ def initModel(
 
   Optional `now`: milliseconds since the Unix epoch when the fact was learned.
   """
+  if wmaxMean is None:
+    assert initHlMean, "must provide wmaxMean or initHlMean"
+    initWmaxPrior = halflifeToWmaxPrior(initHlMean, hmax, n)
+    wmaxMean = _betaToMean(*initWmaxPrior)
+  else:
+    initWmaxPrior = None
+
   assert 0 <= wmaxMean <= 1, 'wmaxMean should be between 0 and 1'
   wmaxMean = wmaxMean or np.spacing(1)
   now = now if now is not None else timeMs()
@@ -40,7 +48,7 @@ def initModel(
           # custom
           format=format,
           m=m,
-      ),
+          initWmaxPrior=initWmaxPrior),
   )
 
 
@@ -72,8 +80,12 @@ def updateRecall(
   _appendQuizImpure(ret, resultObj)
 
   if wmaxPrior is None:
-    # lol assume all quiz results are success with beta=2
-    wmaxPrior = (max(2.0, len(ret.quiz.results[-1])), 2.0)
+    numQs = len(ret.quiz.results[-1])
+    if ret.pred.initWmaxPrior:
+      amin, bmin = ret.pred.initWmaxPrior
+    else:
+      amin, bmin = 0, 7
+    wmaxPrior = (max(2.0, amin + numQs), max(2.0, bmin - numQs))
 
   hs = np.array(ret.pred.hs)
   res = minimize_scalar(lambda wmax: -(posterior(ret, wmax, wmaxPrior, hs)[0]), [0, 1], [0, 1])
@@ -121,7 +133,7 @@ def predictRecall(
   return logPrecall if logDomain else np.exp2(logPrecall)
 
 
-def hoursToRecallDecay(model: Model, percentile=0.5):
+def hoursForRecallDecay(model: Model, percentile=0.5):
   "How many hours for this model's recall probability to decay to `percentile`?"
   assert (0 < percentile <= 1), "percentile must be in (0, 1]"
   lp = log2(percentile)
@@ -130,7 +142,27 @@ def hoursToRecallDecay(model: Model, percentile=0.5):
 
 
 def halflifeToWmax(h: float, hmax: float = 1e5, n: int = 10):
-  res = minimize_scalar(lambda w: abs(h - hoursToRecallDecay(initModel(w, hmax=hmax, n=n))), [0, 1],
-                        [0, 1])
+  res = minimize_scalar(lambda w: abs(h - hoursForRecallDecay(initModel(w, hmax=hmax, n=n))),
+                        [0, 1], [0, 1])
   assert res.success, "wmax found s.t. h is a halflife"
   return res.x
+
+
+def halflifeToWmaxPrior(h: float, hmax: float = 1e5, n: int = 10):
+  wmaxMean = halflifeToWmax(h, hmax, n)
+  # find (α, β) such that Beta(α, β) is lowest variance AND α>=2, β>=2
+
+  # following are solutions for μ = a/(a+b) such that a=2 and b=2, which will
+  # be the maximum-var solution (proof by handwaving)
+  b = -2 + 2 / wmaxMean  # beta = 2
+  if b >= 2:
+    return (2.0, b)
+
+  a = -2 * wmaxMean / (wmaxMean - 1)  # alpha = 2
+  if a >= 2:
+    return (a, 2.0)
+  raise Exception('unable to find prior')
+
+
+def _betaToMean(a: float, b: float) -> float:
+  return a / (a + b)

@@ -23,7 +23,7 @@ def initModel(
   """
   assert 0 <= wmaxMean <= 1, 'wmaxMean should be between 0 and 1'
   wmaxMean = wmaxMean or np.spacing(1)
-  now = now or timeMs()
+  now = now if now is not None else timeMs()
 
   hs = np.logspace(0, np.log10(hmax), n)
   ws = _makeWs(n, wmaxMean, format, m)
@@ -114,14 +114,23 @@ def predictRecall(
     now: Optional[float] = None,
     logDomain=True,
 ) -> float:
-  now = now or timeMs()
+  now = now if now is not None else timeMs()
   elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
-  logPrecall = max([log2w - elapsedHours / h for log2w, h in zip(model.pred.log2ws, model.pred.hs)])
+  assert elapsedHours >= 0, "cannot go back in time"
+  logPrecall = max(log2w - elapsedHours / h for log2w, h in zip(model.pred.log2ws, model.pred.hs))
   return logPrecall if logDomain else np.exp2(logPrecall)
 
 
 def hoursToRecallDecay(model: Model, percentile=0.5):
+  "How many hours for this model's recall probability to decay to `percentile`?"
   assert (0 < percentile <= 1), "percentile must be in (0, 1]"
   lp = log2(percentile)
   return max((lw - lp) * h for lw, h in zip(model.pred.log2ws, model.pred.hs))
-  # max above will ALWAYS get at least one result given p ∈ (0, 1]
+  # max above will ALWAYS get at least one result given percentile ∈ (0, 1]
+
+
+def halflifeToWmax(h: float, hmax: float = 1e5, n: int = 10):
+  res = minimize_scalar(lambda w: abs(h - hoursToRecallDecay(initModel(w, hmax=hmax, n=n))), [0, 1],
+                        [0, 1])
+  assert res.success, "wmax found s.t. h is a halflife"
+  return res.x

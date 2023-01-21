@@ -26,15 +26,13 @@ Consider a student memorizing a set of facts.
 - Which facts need reviewing?
 - How does the student’s performance on a review change the fact’s future review schedule?
 
-Ebisu is a public-domain library that answers these two questions. It is intended to be used by software developers writing quiz apps, and provides a simple API to deal with these two aspects of scheduling quizzes, centered on two functions:
+Ebisu is an open-source public-domain library that answers these two questions. It is intended to be used by software developers writing quiz apps, and provides a simple API to deal with these two aspects of scheduling quizzes, centered on two functions:
 - `predictRecall` gives the current recall probability for a given fact.
 - `updateRecall` adjusts the belief about future recall probability given a quiz result.
 
-Behind this simple API, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and exponential forgetting.
+Behind this simple API, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and sum-of-exponentials (power law) forgetting.
 
-With this system, quiz applications can move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today; an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed.
-
-Ebisu also enables apps to provide an infinite stream of quizzes for students who are cramming. Thus, Ebisu intelligently handles over-reviewing as well as under-reviewing.
+With Ebisu, quiz applications can move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today, so an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed. And since every flashcard always has a recall probability at any given time, Ebisu also enables apps to provide an infinite stream of quizzes for students who are cramming. Thus, Ebisu intelligently handles over-reviewing as well as under-reviewing.
 
 This document contains both a detailed mathematical description of the underlying algorithm as well as the software API it exports. Separate implementations in other languages are detailed below.
 
@@ -44,14 +42,11 @@ Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other sch
 
 Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like Gamma-distributed random variables, importance sampling, and maximum likelihood, this is for you.
 
-> Nerdy details in a nutshell: Ebisu begins by you positing [Gamma](https://en.wikipedia.org/wiki/Gamma_distribution) priors on (1) the memory halflife of a newly-learned fact, as well as (2) a boost factor that governs how quickly that memory strengthens after each successful review. This allows you to easily find the facts that are most in danger of forgetting, via simple arithmetic. Next, a future *quiz* is modeled as a [binomial](https://en.wikipedia.org/wiki/Binomial_distribution) or noisy Bernoulli trial whose underlying probability is an exponential function of the halflife and the time elapsed since the fact was last reviewed. Ebisu then does a Bayesian update of the halflife, either using the boost as a static factor or jointly updating both halflife and boost. The static update is quite fast, involving an evaluation of the [Gamma function](https://en.wikipedia.org/wiki/Gamma_function) and the [Bessel function of the second kind](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.kve.html). The joint update more expensive and involves fitting the bivariate posterior to a bivariate Gamma distribution followed by importance sampling.
+> Nerdy details in a nutshell: Ebisu largely follows Mozer et al.’s multiscale context model (MCM) of \(n\) leaky integrators, published at [NIPS 2009](https://home.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/MozerPashlerCepedaLindseyVul2009.pdf) ([local copy](./MozerPashlerCepedaLindseyVul2009.pdf)), but with a Bayesian twist. The probability of recall for a given fact is assumed to be governed by an ensemble of decaying exponentials with *fixed* time constants (these increase from an hour to ten years) but *uncertain* mixture weights. The weights themselves decay according to an exponential to a single uncertain value governed by a single Beta random variable. Therefore, the recall probability at any given time is a straightforward arithmetic expression of elapsed time, time constants, and weights. And after a quiz, the new best estimate of the weights is computed via a simple MAP (maximum a posteriori) estimator implemented as a simple hill-climbing algorithm.
  
-Finally, in the [Source Code](#source-code) section, we describe the software testing done to validate the math, including comparing Ebisu’s updates to
-1. vanilla Monte Carlo,
-2. numerical integration, and
-3. MCMC (Markov-chain Monte Carlo) via [Stan](https://mc-stan.org).
+Finally, in the [Source Code](#source-code) section, we describe the software testing done to validate the math, including tests comparing Ebisu’s output to Monte Carlo sampling.
 
-A quick note on history—more information is in the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md). This document discusses Ebisu v3. Versions 2 and before used a very different model that was simpler but failed to handle the strenghening of memory that accompanied quizzes. If you used Ebisu <=2 and are confused, see the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md) for a migration guide.
+A quick note on history—more information is in the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md). This document discusses Ebisu v3. Versions 2 and before used a very different model that was both more complex and that failed to handle the *strenghening* of memory that accompanied quizzes. If you are interested, see the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md) for details and a migration guide.
 
 ## Install
 ```sh
@@ -63,22 +58,38 @@ python -m pip install ebisu
 ### Data model
 ```py
 def initModel(
-    initHlMean: float,
-    boostMean: float,
-    initHlStd: Optional[float] = None,
-    boostStd: Optional[float] = None,
+    wmaxMean: float,
+    hmax: float = 1e5,
+    n: int = 10,
     now: Optional[float] = None,
 ) -> Model
 ```
-For each fact in your quiz app, create an Ebisu `Model` via `ebisu.initModel`. You give this function (a) the mean and (b) optionally the standard deviation of
-1. this fact’s initial halflife in hours. This is your guess for how many hours it will take for the student’s recall probability to weaken to 50%. Anki starts out with 24 hours, Memrise with 4 hours; sometimes I use 0.25 (fifteen minutes). And
-2. the boost factor that applies to each successful quiz. A good default might be 2. For facts that the student has created a good mnemonic for or has a strong mental model for, a good number might be 3 or 4. For facts where you expect weaker memory strenghening, maybe 1.5.
+For each fact in your quiz app, create an Ebisu `Model` via `ebisu.initModel`. The three optional keyword arguments, `wmaxMean`, `hmax`, and `n`, govern the collection of leaky integrators (weighted exponentials) that are at the heart of the Ebisu framework. Let’s talk about how they work.
+
+1. There are `n` leaky integrators (decaying exponentials), each with a halflife that’s strictly logarithmically increasing, starting at 1 hour and ending at `hmax` hours.
+2. Each of the `n` leaky integrators also has a weight, indicating the max recall probability at time 0. The weights are strictly exponentially decreasing: the first leaky integrator gets a weight of 1 and the `n`th gets `wmaxMean`. A single leaky integrator predicts a recall probability \\(p_i(t) ∝ w_i ⋅ 2^{-t / h_i}\\) (here \\(t\\) indicates hours since last review).
+
+Putting these together, you get the Ebisu formula for probability of recall, just take the *max* of each leaky integrator: \\(p(t) = \max_i(w_i ⋅ 2^{-t / h_i})\\).
+
+For example, with `n=5` leaky integrators going from 1 hour to `hmax=1e4` hours (10⁴ hours is 13.7-ish months), and with `wmaxMean=0.1` (10% probability) yields this profile of weights:
+
+![Weights per halflife for each leaky integrator](leaky-integrators-weights.png)
+
+The next plot shows each of the five leaky integrators’ contribution to the recall probability as well as the max among them—
+
+![Recall probability for each leaky integrator, with max](leaky-integrators-precall.png)
+
+Switching the above plot’s x and y scales to log-log gives and zooming out to see more time gives us this:
+
+![Recall probability, as above, on log-log plot](leaky-integrators-precall-loglog.png)
+
+By taking the *max* of each the output of each leaky integrator, we get this *sequence* of bumps which roughly follow the ubiquitous memory *power law*, for times between 6 minutes and 1+ year. As `n` and `hmax` increase, this can be expected to converge to a power law (proof by plotting 🙃).
+
+In this example, after more than a year since review, the probability of recall gets crushed by exponential decay—the last leaky integrator. This can be avoided by using higher `hmax`, and this is why the default `hmax=1e5`, i.e., 11.4-ish years.
+
+Having said *all* this, the most import input to `initModel` is the one without a default: `maxMean`, a number between 0 and 1 that represents the weight of the final `n`th leaky integrator and therefore all other weights.
 
 `now` is milliseconds since the Unix epoch (midnight UTC, Jan 1, 1970). Provide this to customize when the student learned this fact, otherwise Ebisu will use the current time.
-
-Tip: Ebisu is pretty smart about boosting 😇 if you pass a quiz right after you study it, it’s obviously not going to boost the halflife by 4. You can take “boost” to mean “max boost” that Ebisu will apply to successful quizzes. More details in the math section below.
-
-Tip: feel free to be generous with standard deviations if you don't have strong feelings about these values. See the math section below for details but you’re free to set the standard deviation up to `0.7 * mean` (technically `sqrt(0.5) * mean`). For the sake of providing a default, we’ll set the standard deviation to *half* the mean if you omit this.
 
 You can serialize this `Model` with the `to_json` method provided by [Dataclasses-JSON](https://github.com/lidatong/dataclasses-json), which also provides its complement, `from_json`. Therefore, this will work:
 ```py

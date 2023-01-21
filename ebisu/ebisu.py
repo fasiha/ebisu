@@ -10,12 +10,13 @@ from ebisu.models import BinomialResult, Model, NoisyBinaryResult, WeightsFormat
 
 def initModel(
     wmaxMean: Optional[float] = None,
-    initHlMean: Optional[float] = None,
+    hmin: float = 1,
     hmax: float = 1e5,  # 1e5 hours = 11+ years
     n: int = 10,
+    initHlMean: Optional[float] = None,
+    now: Optional[float] = None,
     format: WeightsFormat = "exp",
     m: Optional[float] = None,
-    now: Optional[float] = None,
 ) -> Model:
   """
   Create brand new Ebisu model
@@ -24,7 +25,7 @@ def initModel(
   """
   if wmaxMean is None:
     assert initHlMean, "must provide wmaxMean or initHlMean"
-    initWmaxPrior = halflifeToWmaxPrior(initHlMean, hmax, n)
+    initWmaxPrior = halflifeToWmaxPrior(initHlMean, hmin=hmin, hmax=hmax, n=n)
     wmaxMean = _betaToMean(*initWmaxPrior)
   else:
     initWmaxPrior = None
@@ -33,7 +34,7 @@ def initModel(
   wmaxMean = wmaxMean or np.spacing(1)
   now = now if now is not None else timeMs()
 
-  hs = np.logspace(0, np.log10(hmax), n)
+  hs = np.logspace(np.log10(hmin), np.log10(hmax), n)
   ws = _makeWs(n, wmaxMean, format, m)
   return Model(
       version=1,
@@ -89,6 +90,7 @@ def updateRecall(
 
   hs = np.array(ret.pred.hs)
   res = minimize_scalar(lambda wmax: -(posterior(ret, wmax, wmaxPrior, hs)[0]), [0, 1], [0, 1])
+  assert res.success
   wmaxMap = res.x
 
   ret.pred.lastEncounterMs = now
@@ -141,26 +143,28 @@ def hoursForRecallDecay(model: Model, percentile=0.5):
   # max above will ALWAYS get at least one result given percentile ∈ (0, 1]
 
 
-def halflifeToWmax(h: float, hmax: float = 1e5, n: int = 10):
-  res = minimize_scalar(lambda w: abs(h - hoursForRecallDecay(initModel(w, hmax=hmax, n=n))),
-                        [0, 1], [0, 1])
+def halflifeToWmax(h: float, hmin: float = 1.0, hmax: float = 1e5, n: int = 10):
+  res = minimize_scalar(
+      lambda w: abs(h - hoursForRecallDecay(initModel(w, hmin=hmin, hmax=hmax, n=n))), [0, 1],
+      [0, 1])
   assert res.success, "wmax found s.t. h is a halflife"
   return res.x
 
 
-def halflifeToWmaxPrior(h: float, hmax: float = 1e5, n: int = 10):
-  wmaxMean = halflifeToWmax(h, hmax, n)
+def halflifeToWmaxPrior(h: float, hmin: float = 1.0, hmax: float = 1e5, n: int = 10):
+  wmaxMean = halflifeToWmax(h, hmin=hmin, hmax=hmax, n=n)
   # find (α, β) such that Beta(α, β) is lowest variance AND α>=2, β>=2
 
   # following are solutions for μ = a/(a+b) such that a=2 and b=2, which will
   # be the maximum-var solution (proof by handwaving)
   b = -2 + 2 / wmaxMean  # beta = 2
   if b >= 2:
-    return (2.0, b)
+    return (2.0, min(b, 10 + np.log10(b)))
+    # I mean sure β might be 300 (for e.g., `h=1` hour) but let's cap this for sanity
 
   a = -2 * wmaxMean / (wmaxMean - 1)  # alpha = 2
   if a >= 2:
-    return (a, 2.0)
+    return (min(a, 10 + np.log10(a)), 2.0)
   raise Exception('unable to find prior')
 
 

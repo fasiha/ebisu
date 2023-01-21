@@ -58,26 +58,31 @@ python -m pip install ebisu
 ### Data model
 ```py
 def initModel(
-    wmaxMean: float,
+    wmaxMean: Optional[float] = None,
     hmax: float = 1e5,
     n: int = 10,
+    initHlMean: Optional[float] = None,
     now: Optional[float] = None,
 ) -> Model
 ```
 For each fact in your quiz app, create an Ebisu `Model` via `ebisu.initModel`. The three optional keyword arguments, `wmaxMean`, `hmax`, and `n`, govern the collection of leaky integrators (weighted exponentials) that are at the heart of the Ebisu framework. Let’s talk about how they work.
 
 1. There are `n` leaky integrators (decaying exponentials), each with a halflife that’s strictly logarithmically increasing, starting at 1 hour and ending at `hmax` hours.
-2. Each of the `n` leaky integrators also has a weight, indicating the max recall probability at time 0. The weights are strictly exponentially decreasing: the first leaky integrator gets a weight of 1 and the `n`th gets `wmaxMean`. A single leaky integrator predicts a recall probability \\(p_i(t) ∝ w_i ⋅ 2^{-t / h_i}\\) (here \\(t\\) indicates hours since last review).
+2. Each of the `n` leaky integrators also has a weight, indicating its maximum recall probability at time 0. The weights are strictly exponentially decreasing: the first leaky integrator gets a weight of 1 and the `n`th gets `wmaxMean`. A single leaky integrator predicts a recall probability \\(p_i(t) ∝ w_i ⋅ 2^{-t / h_i}\\) (here \\(t\\) indicates hours since last review).
 
 Putting these together, you get the Ebisu formula for probability of recall, just take the *max* of each leaky integrator: \\(p(t) = \max_i(w_i ⋅ 2^{-t / h_i})\\).
 
-For example, with `n=5` leaky integrators going from 1 hour to `hmax=1e4` hours (10⁴ hours is 13.7-ish months), and with `wmaxMean=0.1` (10% probability) yields this profile of weights:
+For example, with `n=5` leaky integrators going from 1 hour to `hmax=1e4` hours (10⁴ hours is 13.7-ish months), and with `wmaxMean=0.1` (the longest-duration exponential starts off with 10% probability) yields this profile of weights:
 
 ![Weights per halflife for each leaky integrator](leaky-integrators-weights.png)
 
-The next plot shows each of the five leaky integrators’ contribution to the recall probability as well as the max among them—
+Note how the exponential is not in terms of the actual values of the halflives themselves but rather their index (0, 1, 2...), in keeping with Mozer et al.’s MCM forumation (and just for simplicity).
+
+The next plot shows each of the five leaky integrators’ contribution to the recall probability as well as the max among them, indicating the predicted probability of recall—
 
 ![Recall probability for each leaky integrator, with max](leaky-integrators-precall.png)
+
+At the left-most part of the plot), the first leaky integrator dominates, but very quickly fades away due to the crush of its exponential. As it decays however, the subsequent integrator, with a strictly lower starting value, steps up to keep the recall probability from entirely collapsing.
 
 Switching the above plot’s x and y scales to log-log gives and zooming out to see more time gives us this:
 
@@ -87,7 +92,9 @@ By taking the *max* of each the output of each leaky integrator, we get this *se
 
 In this example, after more than a year since review, the probability of recall gets crushed by exponential decay—the last leaky integrator. This can be avoided by using higher `hmax`, and this is why the default `hmax=1e5`, i.e., 11.4-ish years.
 
-Having said *all* this, the most import input to `initModel` is the one without a default: `maxMean`, a number between 0 and 1 that represents the weight of the final `n`th leaky integrator and therefore all other weights.
+Having said *all* this, the most import input to `initModel` is `maxMean`, a number between 0 and 1 that represents the weight of the final `n`th leaky integrator and therefore all other weights. Given how likely it is that you have *no* interest in specifying such a strange quantity, whereas you probably have a good sense of the overall halflife of this fact, `initModel` also lets you specify `initHlMean`, your best guess as to this fact’s initial memory halflife, in hours.
+
+> Math note: we expand on this below but in a nutshell, we find the `wmaxMean` that yields this halflife.
 
 `now` is milliseconds since the Unix epoch (midnight UTC, Jan 1, 1970). Provide this to customize when the student learned this fact, otherwise Ebisu will use the current time.
 

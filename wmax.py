@@ -72,6 +72,7 @@ if __name__ == '__main__':
 
     wmaxMean, initHlMean = 0.5, None
     wmaxMean, initHlMean = None, 12.0
+    intermediate = False
 
     models = [
         ebisu.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now),
@@ -104,9 +105,10 @@ if __name__ == '__main__':
       success = s * 2 > t
       ll = tuple(np.log(p) if success else np.log(1 - p) for p in pRecallForModels)
       logliks.append(ll)
-      print(
-          f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[round(l,3) for l in ll]}'
-      )
+      if intermediate:
+        print(
+            f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[round(l,3) for l in ll]}'
+        )
 
       models = [update(model, s, t, now) for model, update in zip(models, updators)]
 

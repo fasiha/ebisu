@@ -117,7 +117,7 @@ This functions answers one of the core questions any flashcard app asks: what fa
 
 If you pass in `logDomain=False`, this function will call `exp2` to convert log-probability (-∞ to 0) to actual probability (0 to 1). (This is not done by default because `exp2`, floating-point power, is actually expensive compared to arithmetic. No, I don’t have an explicit reference. Yes, profiling is important.)
 
-**Nota bene** if you’re storing Ebisu models as JSON in SQL, you most likely do not need this function! The following snippet selects all columns and a new column, called `logPredictRecall`, assuming a SQLite table called `mytable` with Ebisu models in a column called `model_json`:
+**Nota bene** if you’re storing Ebisu models as JSON in SQL, you might not need this function! The following snippet selects all columns and a new column, called `logPredictRecall`, assuming a SQLite table called `mytable` with Ebisu models in a column called `model_json`:
 ```sql
 SELECT
   t.id,

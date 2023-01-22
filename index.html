@@ -281,7 +281,7 @@
 ) -&gt; float</code></pre>
 <p>This functions answers one of the core questions any flashcard app asks: what fact is most in danger of being forgotten? You can run this function against all Ebisu models, with an optional <code>now</code> (milliseconds in the Unix epoch), to get a log-probability of recall. A higher number implies more likely to recall; the lower the number, the more risk of of forgetting.</p>
 <p>If you pass in <code>logDomain=False</code>, this function will call <code>exp2</code> to convert log-probability (-∞ to 0) to actual probability (0 to 1). (This is not done by default because <code>exp2</code>, floating-point power, is actually expensive compared to arithmetic. No, I don’t have an explicit reference. Yes, profiling is important.)</p>
-<p><strong>Nota bene</strong> if you’re storing Ebisu models as JSON in SQL, you most likely do not need this function! The following snippet selects all columns and a new column, called <code>logPredictRecall</code>, assuming a SQLite table called <code>mytable</code> with Ebisu models in a column called <code>model_json</code>:</p>
+<p><strong>Nota bene</strong> if you’re storing Ebisu models as JSON in SQL, you might not need this function! The following snippet selects all columns and a new column, called <code>logPredictRecall</code>, assuming a SQLite table called <code>mytable</code> with Ebisu models in a column called <code>model_json</code>:</p>
 <pre class="sql"><code>SELECT
   t.id,
   t.model_json,

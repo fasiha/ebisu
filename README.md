@@ -65,7 +65,7 @@ def initModel(
     now: Optional[float] = None,
 ) -> Model
 ```
-For each fact in your quiz app, create an Ebisu `Model` via `ebisu.initModel`. The optional keyword arguments, `wmaxMean`, `hmin`, `hmax`, and `n`, govern the collection of leaky integrators (weighted exponentials) that are at the heart of the Ebisu framework. Let’s talk about how they work.
+For each fact in your quiz app, create an Ebisu `Model` via `initModel`. The optional keyword arguments, `wmaxMean`, `hmin`, `hmax`, and `n`, govern the collection of leaky integrators (weighted exponentials) that are at the heart of the Ebisu framework. Let’s talk about how they work.
 
 1. There are `n` leaky integrators (decaying exponentials), each with a halflife that’s strictly logarithmically increasing, starting at `hmin` hours (default 1) and ending at `hmax` hours (default `1e5` or roughly 11 years).
 2. Each of the `n` leaky integrators also has a weight, indicating its maximum recall probability at time 0. The weights are strictly exponentially decreasing: the first leaky integrator gets a weight of 1 and the `n`th gets `wmaxMean`. A single leaky integrator predicts a recall probability \\(p_i(t) ∝ w_i ⋅ 2^{-t / h_i}\\) (here \\(t\\) indicates hours since last review, and \\(w_i\\) and \\(h_i\\) are this leaky integrator’s weight and halflife; the index \\(i\\) runs from 1 to `n`).
@@ -86,7 +86,7 @@ Switching the above plot’s x and y scales to log-log gives and zooming out to 
 
 ![Recall probability, as above, on log-log plot](leaky-integrators-precall-loglog.png)
 
-By taking the *max* of each the output of each leaky integrator, we get this *sequence* of bumps which roughly follow the ubiquitous memory *power law*, for times between 6 minutes and 1+ year. A true power law would, in a log-log plot such as this, be a straight line, and as `n` and `hmax` increase, the bumpy line representing the probability of recall above can be expected to converge to a power law (proof by visualization 🙃).
+By taking the *max* of each the output of each leaky integrator, we get this *sequence* of bumps which roughly follow the ubiquitous memory *power law*, for times between 6 minutes and 1+ year. A true power law would, in a log-log plot such as this, be a straight line, and as `n` and `hmax` increase, the bumpy line representing the probability of recall above can be expected to converge to a power law (proof by visualization 🙃). See Mozer et al. cited above ([DOI](https://dl.acm.org/doi/10.5555/2984093.2984242), [academic copy](https://home.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/MozerPashlerCepedaLindseyVul2009.pdf), [local copy](./MozerPashlerCepedaLindseyVul2009.pdf)) for discussion and references suggesting the power-law decay of memory.
 
 In this example, after more than a year (10⁴ hours) since review, the probability of recall gets crushed by the exponential decay of the last leaky integrator. This can be avoided by using higher `hmax`, and this is why the default `hmax=1e5`, i.e., 11.4-ish years.
 
@@ -100,7 +100,7 @@ Having said *all* this, the most import input to `initModel` is `wmaxMean`, a nu
 
 You can serialize this `Model` with the `to_json` method provided by [Dataclasses-JSON](https://github.com/lidatong/dataclasses-json), which also provides its complement, `from_json`. Therefore, this will work:
 ```py
-ebisu.Model.from_json(ebisu.initModel(24, 6, 2, 1).to_json())
+ebisu.Model.from_json(ebisu.initModel(0.1).to_json())
 ```
 
 It's expected that apps using Ebisu will save the serialized JSON to a database. The model contains all historic quiz information and numbers describing the probabilistic configuration.

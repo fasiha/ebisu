@@ -6,9 +6,7 @@
   - [API Quickstart](#api-quickstart)
     - [Data model](#data-model)
     - [Predict recall probability](#predict-recall-probability)
-    - [Quick-update halflife after a quiz](#quick-update-halflife-after-a-quiz)
-    - [Fully-update halflife and boost](#fully-update-halflife-and-boost)
-    - [Reset a model to a new halflife](#reset-a-model-to-a-new-halflife)
+    - [Update after a quiz](#update-after-a-quiz)
   - [How it works](#how-it-works)
   - [Math](#math)
   - [Acknowledgments](#acknowledgments)
@@ -69,7 +67,7 @@ def initModel(
 For each fact in your quiz app, create an Ebisu `Model` via `ebisu.initModel`. The optional keyword arguments, `wmaxMean`, `hmin`, `hmax`, and `n`, govern the collection of leaky integrators (weighted exponentials) that are at the heart of the Ebisu framework. Let’s talk about how they work.
 
 1. There are `n` leaky integrators (decaying exponentials), each with a halflife that’s strictly logarithmically increasing, starting at `hmin` hours (default 1) and ending at `hmax` hours (default `1e5` or roughly 11 years).
-2. Each of the `n` leaky integrators also has a weight, indicating its maximum recall probability at time 0. The weights are strictly exponentially decreasing: the first leaky integrator gets a weight of 1 and the `n`th gets `wmaxMean`. A single leaky integrator predicts a recall probability \\(p_i(t) ∝ w_i ⋅ 2^{-t / h_i}\\) (here \\(t\\) indicates hours since last review, and \\(w_i\\) and \\(h_i\\) are this leaky integrator’s weight and halflife).
+2. Each of the `n` leaky integrators also has a weight, indicating its maximum recall probability at time 0. The weights are strictly exponentially decreasing: the first leaky integrator gets a weight of 1 and the `n`th gets `wmaxMean`. A single leaky integrator predicts a recall probability \\(p_i(t) ∝ w_i ⋅ 2^{-t / h_i}\\) (here \\(t\\) indicates hours since last review, and \\(w_i\\) and \\(h_i\\) are this leaky integrator’s weight and halflife; the index \\(i\\) runs from 1 to `n`).
 
 Putting these together, you get the Ebisu formula for probability of recall, just take the *max* of each leaky integrator: \\(p(t) = \max_i(w_i ⋅ 2^{-t / h_i})\\).
 
@@ -104,9 +102,7 @@ You can serialize this `Model` with the `to_json` method provided by [Dataclasse
 ebisu.Model.from_json(ebisu.initModel(24, 6, 2, 1).to_json())
 ```
 
-It's expected that apps using Ebisu will save the serialized JSON to a database. The model contains all historic quiz information and numbers describing the probabilistic state. `Model.pred` has a two useful keys that will be useful for quiz apps directly:
-- `Model.pred.lastEncounterMs`: a timestamp (milliseconds in Unix epoch) of when the student last encountered this quiz;
-- `Model.pred.currentHalflifeHours`: the current estimate of this fact’s halflife.
+It's expected that apps using Ebisu will save the serialized JSON to a database. The model contains all historic quiz information and numbers describing the probabilistic configuration.
 
 ### Predict recall probability
 ```py
@@ -118,94 +114,59 @@ def predictRecall(
 ```
 This functions answers one of the core questions any flashcard app asks: what fact is most in danger of being forgotten? You can run this function against all Ebisu models, with an optional `now` (milliseconds in the Unix epoch), to get a log-probability of recall. A higher number implies more likely to recall; the lower the number, the more risk of of forgetting.
 
-If you pass in `logDomain=False`, this function will call `exp` to convert log-probability (-∞ to 0) to actual probability (0 to 1). (This is not done by default because `exp`, a transcendental function, is actually expensive compared to arithmetic. No, I don’t have an explicit reference. Yes, profiling is important.)
+If you pass in `logDomain=False`, this function will call `exp2` to convert log-probability (-∞ to 0) to actual probability (0 to 1). (This is not done by default because `exp2`, floating-point power, is actually expensive compared to arithmetic. No, I don’t have an explicit reference. Yes, profiling is important.)
 
-**Nota bene** if you’re storing Ebisu models as JSON in SQL, you most likely do not need this function! The following snippet selects all columns and a new column, `scaledLogPredictRecall`, assuming a SQLite table called `mytable` with Ebisu models in a column called `model_json`:
+**Nota bene** if you’re storing Ebisu models as JSON in SQL, you most likely do not need this function! The following snippet selects all columns and a new column, called `logPredictRecall`, assuming a SQLite table called `mytable` with Ebisu models in a column called `model_json`:
 ```sql
-SELECT *, 
-       (JSON_EXTRACT(model_json, '$.pred.lastEncounterMs') - 
-        strftime('%s','now') * 1000) /
-       JSON_EXTRACT(model_json, '$.pred.currentHalflifeHours') AS scaledLogPredictRecall
-FROM mytable
+SELECT
+  t.id,
+  t.model_json,
+  MAX(
+    (
+      JSON_EXTRACT(value, '$[0]') - (
+        (?) - JSON_EXTRACT(model_json, '$.pred.lastEncounterMs')
+      ) / JSON_EXTRACT(value, '$[1]')
+    )
+  ) AS logPredictRecall
+FROM
+  mytable t,
+  JSON_EACH(JSON_EXTRACT(t.model_json, '$.pred.forSql'))
+GROUP BY t.id
 ```
-For reference, `scaledLogPredictRecall * math.log(2) / 3600e3` matches the ouput of `predictRecall`: `log(2)` to convert `exp` to `exp2`, and `3600e3` is milliseconds per hour.
+The placeholder `(?)` is for you to pass in the current timestamp (milliseconds since Unix epoch; in SQLite you can get this via `strftime('%s','now') * 1000`).
 
-### Quick-update halflife after a quiz
+### Update after a quiz
 ```py
 def updateRecall(
     model: Model,
     successes: Union[float, int],
     total: int = 1,
     q0: Optional[float] = None,
-    left=0.3,
-    right=1.0,
+    wmaxPrior: Optional[tuple[float, float]] = None,
     now: Optional[float] = None,
 ) -> Model
 ```
-The other really important question flashcard apps ask is: “I've done a quiz, now what?” Ebisu has a two-step process to handle quiz results:
-1. After each quiz, call `updateRecall` to get a new model, and save that to the database. This does a quick Bayesian update on just the halflife using just this quiz, assuming the boost to be fixed.
-2. Once in a while, call the next function described below, `updateRecallHistory`, to perform a joint Bayesian update on both halflife *and* boost, incorporating *all* quizzes.
+The other really important question flashcard apps ask is: “I've done a quiz, now what?” This `updateRecall` function is for this crucial step.
 
 Via `updateRecall`, Ebisu supports **two** distinct kinds of quizzes:
-- with `total=1` you get *noisy-binary* (or *soft-binary*) quizzes where `0 <= successes <= 1` can be a float.
+- with `total=1` you get *noisy-binary* (or *soft-binary*) quizzes where `0 <= successes <= 1` can be a float. This supports the most basic flashcard reviews (binary quizzes) but also some pretty complex workflows!
 - With `total>1` you get *binomial* quizzes, meaning out of a `total` number of points the student could get, she got `successes` (must be integer).
 
-Example 1. For the bog-standard flashcard review, where you show the student a flashcard and they get it right (or wrong), you can pass in `successes=1` (or `successes=0`), and use the default `total=1`.
+Example 1. For the bog-standard flashcard review, where you show the student a flashcard and they get it right (or wrong), you can pass in `successes=1` (or `successes=0`), and use the default `total=1`. You get binary quizzes.
 
-Example 2. For a Duolingo-style review, where you review the same fact multiple times in a single short quiz session, you provide the number of `successes` and `total>1` (the number of points received versus the maximum number of points, both integers).
+Example 2. For a Duolingo-style review, where you review the same fact multiple times in a single short quiz session, you provide the number of `successes` and `total>1` (the number of points received versus the maximum number of points, both integers). Ebisu treats this as a binomial quiz. (Math note: a binary quiz is just a special case of the binomial with `total=1`.)
 
-Example 3. For more complex apps, where you have deep probabilistic insight into the student’s performance, you can use the noisy-binary by passing in `total=1` and `0 <= successes <= 1`. In the noisy-binary model, we assume the existence of a “real” binary quiz result which was scrambled by going through a noisy channel such that flips the “real” quiz result with some probability.
+Example 3. For more complex apps, where you have deep probabilistic insight into the student’s performance, you can specify noisy-binary quizzes by passing in `total=1` and `0 < successes < 1`, a float between 0 and 1. In this situation, we assume the existence of a “real” binary quiz result, which we *don’t* observe, and which was scrambled by going through a noisy channel that flipped the “real” quiz result with some probability.
 - `max(successes, 1 - successes)` is `Probability(observed pass | real quiz pass)` and
 - `q0` is `Probability(observed pass | real quiz failed)`, defaults to the complement of the above (`1 - max(successes, 1 - successes)`).
 
-A good example of a use for this quiz type: your app is a foreign language reader app and you know the student read a word and they did *not* ask for its definition. You don’t know that the student would have gotten it right if you’d *actually* prompted them for the definition of the word, so you don’t want to treat this as a normal “successful” quiz. So you can say
-- `Probability(did not ask for definition | they know the word) = successes = 1.0`, i.e., if they know the word, they would never ask for the definition, but
+More concretely, imagine you have a foreign language reader app where users can read text and click on a word to look it up in the dictionary if they’ve forgotten it. Now imagine you know the student read a word and they did *not* ask for its definition. You can’t say for sure that the student would have gotten it right if you’d *actually* prompted them for the definition of the word, so you don’t want to treat this as a normal “successful” quiz. Here you can say
+- `Probability(did not ask for definition | they know the word) = successes = 1.0`, i.e., if they know the word, they would never ask for the definition (or maybe they would? Fine, make this 0.98), but
 - `Probability(did not ask for definition | they forgot the word) = q0 = 0.1`: if they actually had forgotten the word, there’s a low but non-zero chance of observing the same behavior (didn’t ask for the definition).
 
-The two keyword arguments `left` and `right` let you customize a key feature of Ebisu's boosting mechanism. This is discussed more in the math section below.
+This update function is what performs the full Bayesian analysis to estimate a new “`wmax`”, the final leaky integrator’s weight. An important part of Bayesian analysis is your prior belief on what this value should be, before you’ve looked at the data (the actual quiz results). You can provide `wmaxPrior`, a 2-tuple \\((α, β)\\) representing the Beta distribution (we follow [Wikipedia](https://en.wikipedia.org/wiki/Beta_distribution)’s definition) representing your prior for this weight. This is optional—if you don’t provide `wmaxPrior`, we will find the highest-variance Beta distribution that implies a halflife equal to the student’s *maximum* inter-quiz interval. In practice, this works well, and follows [Lindsey, et al.](https://journals.sagepub.com/doi/pdf/10.1177/0956797613504302) ([local copy](./LindseyShroyerPashlerMozer2014Published.pdf)) in applying “a bias that additional study in a given time window helps, but has logarithmically diminishing returns”.
 
-As with other functions, `updateRecall` also accepts `now`, milliseconds since the Unix epoch.
-
-### Fully-update halflife and boost
-```py
-def updateRecallHistory(
-    model: Model,
-    left=0.3,
-    right=1.0,
-    size=10_000,
-    likelihoodFitWeight=0.9,
-    likelihoodFitPower=2,
-    likelihoodFitSize=600,
-) -> Model
-```
-As mentioned above, flashcard apps are expected to call `updateRecall` after each quiz to quickly evolve the probability distribution around the memory halflife while holding the boost as fixed (by collapsing the boost’s probability distribution to its mean), using just a single quiz.
-
-In contrast, this function `updateRecallHistory` will use all quizzes for this fact to jointly update an Ebisu model’s probability distributions for halflife *and* boost. The specifics are detailed in the math section below, but this is a computationally-intensive operation (matrix least-squares and importance sampling), taking between 100 milliseconds for five quizzes to ~700 milliseconds for twenty quizzes, on an old Mac laptop.
-
-You could of course run `updateRecallHistory` after every quiz (call `updateRecall` and immediately call `updateRecallHistory`, and save its output to your app’s database).
-
-Or you could run `updateRecallHistory` only once a day (after a quiz has been added to a model).
-
-Or you could run `updateRecallHistory` every five quizzes.
-
-Or some combination thereof, because after several quizzes, the initial priors you placed on the boost and halflife in `initModel` will become solidified, and `updateRecallHistory` will change these probability distributions less and less.
-
-### Reset a model to a new halflife
-```py
-def resetHalflife(
-    model: Model,
-    initHlMean: float,
-    initHlStd: Optional[float] = None,
-    now: Optional[float] = None,
-) -> Model
-```
-As mentioned above, once you have ten or twenty quizzes, each additional quiz result doesn’t make much of a difference in the probabilistic beliefs Ebisu has about that fact’s halflife and boost. Usually, this is a good thing! But it can also mean that when a fact becomes meaningfully easier (the student has internalized it) or harder (the student has learned a confuser fact, that interferes with the first), the Bayesian framework makes it hard to throw away the mass of old data and adapt to new information.
-
-This function is a backdoor around that. It keeps all the old quiz data but reinitializes the halflife with a new mean and standard deviation (akin to `initModel`, though note how this function `resetHalflife` doesn’t change its belief about boost). Each new quiz can have a big impact on the probabilistic belief about the halflife. 
-
-> You might not need this function. If it turns out you just initialized the model with a bad mean/standard deviation for halfife and boost (perhaps they were too narrow and the new quiz data cannot overcome the prior?), you can just reset `Model.prob.initHlPrior` and `Model.prob.boostPrior` and rerun `updateModelHistory` to see if thath elps.
-
-That's it. Five functions in the API.
+As with other functions above, `updateRecall` also accepts `now`, milliseconds since the Unix epoch.
 
 ## How it works
 

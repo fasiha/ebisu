@@ -36,19 +36,19 @@ FROM mytable f, json_each(json_extract(f.json_column, '$.pred.forSql'))
     """
 queryGOOD = """
 SELECT
-  f.id,
-  f.json_column,
+  t.id,
+  t.json_column,
   MAX(
     (
       json_extract(value, '$[0]') - (
         (?) - JSON_EXTRACT(json_column, '$.pred.lastEncounterMs')
       ) / json_extract(value, '$[1]')
     )
-  )
+  ) AS logPredictRecall
 FROM
-  mytable f,
-  json_each(json_extract(f.json_column, '$.pred.forSql'))
-group by f.id
+  mytable t,
+  json_each(json_extract(t.json_column, '$.pred.forSql'))
+group by t.id
     """
 query = queryGOOD
 

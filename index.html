@@ -94,6 +94,7 @@
 <li><a href="#data-model">Data model</a></li>
 <li><a href="#predict-recall-probability">Predict recall probability</a></li>
 <li><a href="#update-after-a-quiz">Update after a quiz</a></li>
+<li><a href="#how-long-till-a-model-reaches-some-probability">How long till a model reaches some probability?</a></li>
 </ul></li>
 <li><a href="#how-it-works">How it works</a></li>
 <li><a href="#math">Math</a></li>
@@ -323,6 +324,7 @@ GROUP BY t.id</code></pre>
 <li><code>Probability(did not ask for definition | they know the word) = successes = 1.0</code>, i.e., if they know the word, they would never ask for the definition (or maybe they would? Fine, make this 0.98), but</li>
 <li><code>Probability(did not ask for definition | they forgot the word) = q0 = 0.1</code>: if they actually had forgotten the word, there’s a low but non-zero chance of observing the same behavior (didn’t ask for the definition).</li>
 </ul>
+<p>With <code>successes</code>, <code>total</code>, and <code>q0</code>, Ebisu can handle a rich range of quiz results robustly and quantitatively.</p>
 <p>This update function is what performs the full Bayesian analysis to estimate a new “<code>wmax</code>”, the final leaky integrator’s weight. An important part of Bayesian analysis is your prior belief on what this value should be, before you’ve looked at the data (the actual quiz results). You can provide <code>wmaxPrior</code>, a 2-tuple <span class="mjpage"><svg xmlns:xlink="http://www.w3.org/1999/xlink" width="5.647ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 2431.2 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-9-Title">
 <title id="MathJax-SVG-9-Title">(α, β)</title>
 <g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
@@ -334,6 +336,10 @@ GROUP BY t.id</code></pre>
 </g>
 </svg></span> representing the Beta distribution (we follow <a href="https://en.wikipedia.org/wiki/Beta_distribution">Wikipedia</a>’s definition) representing your prior for this weight. This is optional—if you don’t provide <code>wmaxPrior</code>, we will find the highest-variance Beta distribution that implies a halflife equal to the student’s <em>maximum</em> inter-quiz interval. In practice, this works well, and follows <a href="https://journals.sagepub.com/doi/pdf/10.1177/0956797613504302">Lindsey, et al.</a> (<a href="./LindseyShroyerPashlerMozer2014Published.pdf">local copy</a>) in applying “a bias that additional study in a given time window helps, but has logarithmically diminishing returns”.</p>
 <p>As with other functions above, <code>updateRecall</code> also accepts <code>now</code>, milliseconds since the Unix epoch.</p>
+<h3 id="how-long-till-a-model-reaches-some-probability">How long till a model reaches some probability?</h3>
+<pre><code>def hoursForRecallDecay(model: Model, percentile=0.5) -&gt; float</code></pre>
+<p>This is sometimes useful for quizzes that seek to schedule a review in the future when a fact’s memory is expected to have decayed to some probability. This <code>hoursForRecallDecay</code>, in converting probability to time (hours), is sort of the inverse of <code>predictRecall</code> which converts time (hours) to probability. By default the probability is 0.5, so this function returns the halflife of a <code>Model</code>.</p>
+<p>That’s it. Four functions in the API.</p>
 <h2 id="how-it-works">How it works</h2>
 <p>There are many scheduling schemes, e.g.,</p>
 <ul>

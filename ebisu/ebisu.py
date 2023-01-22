@@ -145,7 +145,7 @@ def predictRecall(
   return logPrecall if logDomain else np.exp2(logPrecall)
 
 
-def hoursForRecallDecay(model: Model, percentile=0.5):
+def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
   "How many hours for this model's recall probability to decay to `percentile`?"
   assert (0 < percentile <= 1), "percentile must be in (0, 1]"
   lp = log2(percentile)

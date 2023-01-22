@@ -7,6 +7,7 @@
     - [Data model](#data-model)
     - [Predict recall probability](#predict-recall-probability)
     - [Update after a quiz](#update-after-a-quiz)
+    - [How long till a model reaches some probability?](#how-long-till-a-model-reaches-some-probability)
   - [How it works](#how-it-works)
   - [Math](#math)
   - [Acknowledgments](#acknowledgments)
@@ -164,9 +165,19 @@ More concretely, imagine you have a foreign language reader app where users can 
 - `Probability(did not ask for definition | they know the word) = successes = 1.0`, i.e., if they know the word, they would never ask for the definition (or maybe they would? Fine, make this 0.98), but
 - `Probability(did not ask for definition | they forgot the word) = q0 = 0.1`: if they actually had forgotten the word, there’s a low but non-zero chance of observing the same behavior (didn’t ask for the definition).
 
+With `successes`, `total`, and `q0`, Ebisu can handle a rich range of quiz results robustly and quantitatively.
+
 This update function is what performs the full Bayesian analysis to estimate a new “`wmax`”, the final leaky integrator’s weight. An important part of Bayesian analysis is your prior belief on what this value should be, before you’ve looked at the data (the actual quiz results). You can provide `wmaxPrior`, a 2-tuple \\((α, β)\\) representing the Beta distribution (we follow [Wikipedia](https://en.wikipedia.org/wiki/Beta_distribution)’s definition) representing your prior for this weight. This is optional—if you don’t provide `wmaxPrior`, we will find the highest-variance Beta distribution that implies a halflife equal to the student’s *maximum* inter-quiz interval. In practice, this works well, and follows [Lindsey, et al.](https://journals.sagepub.com/doi/pdf/10.1177/0956797613504302) ([local copy](./LindseyShroyerPashlerMozer2014Published.pdf)) in applying “a bias that additional study in a given time window helps, but has logarithmically diminishing returns”.
 
 As with other functions above, `updateRecall` also accepts `now`, milliseconds since the Unix epoch.
+
+### How long till a model reaches some probability?
+```
+def hoursForRecallDecay(model: Model, percentile=0.5) -> float
+```
+This is sometimes useful for quizzes that seek to schedule a review in the future when a fact’s memory is expected to have decayed to some probability. This `hoursForRecallDecay`, in converting probability to time (hours), is sort of the inverse of `predictRecall` which converts time (hours) to probability. By default the probability is 0.5, so this function returns the halflife of a `Model`.
+
+That’s it. Four functions in the API.
 
 ## How it works
 

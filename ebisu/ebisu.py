@@ -25,10 +25,7 @@ def initModel(
   """
   if wmaxMean is None:
     assert initHlMean, "must provide wmaxMean or initHlMean"
-    initWmaxPrior = halflifeToWmaxPrior(initHlMean, hmin=hmin, hmax=hmax, n=n)
-    wmaxMean = _betaToMean(*initWmaxPrior)
-  else:
-    initWmaxPrior = None
+    wmaxMean = _halflifeToWmax(initHlMean, hmin=hmin, hmax=hmax, n=n)
 
   assert 0 <= wmaxMean <= 1, 'wmaxMean should be between 0 and 1'
   wmaxMean = wmaxMean or np.spacing(1)
@@ -49,7 +46,6 @@ def initModel(
           # custom
           format=format,
           m=m,
-          initWmaxPrior=initWmaxPrior,
           initHlMean=initHlMean,
       ),
   )
@@ -73,7 +69,7 @@ def updateRecall(
     # AFTER that, use past quizzes' times and initHlMean if provided
     maxh = max([q.hoursElapsed for q in model.quiz.results[0]] +
                [t if nq == 0 else 0, model.pred.initHlMean or 0])
-    wmaxPrior = halflifeToWmaxPrior(maxh)
+    wmaxPrior = _halflifeToWmaxPrior(maxh)
     # Note I don't use this or any past results, just past times. Given
     # http://www.stat.columbia.edu/~gelman/research/published/entropy-19-00555-v2.pdf
     # ("The Prior Can Often Only Be Understood in the Context of the Likelihood"
@@ -151,7 +147,7 @@ def hoursForRecallDecay(model: Model, percentile=0.5):
   # max above will ALWAYS get at least one result given percentile ∈ (0, 1]
 
 
-def halflifeToWmax(h: float, hmin: float = 1.0, hmax: float = 1e5, n: int = 10):
+def _halflifeToWmax(h: float, hmin: float = 1.0, hmax: float = 1e5, n: int = 10):
   res = minimize_scalar(
       lambda w: abs(h - hoursForRecallDecay(initModel(w, hmin=hmin, hmax=hmax, n=n))), [0, 1],
       [0, 1])
@@ -159,11 +155,11 @@ def halflifeToWmax(h: float, hmin: float = 1.0, hmax: float = 1e5, n: int = 10):
   return res.x
 
 
-def halflifeToWmaxPrior(h: float,
+def _halflifeToWmaxPrior(h: float,
                         hmin: float = 1.0,
                         hmax: float = 1e5,
                         n: int = 10) -> tuple[float, float]:
-  wmaxMean = halflifeToWmax(h, hmin=hmin, hmax=hmax, n=n)
+  wmaxMean = _halflifeToWmax(h, hmin=hmin, hmax=hmax, n=n)
   # find (α, β) such that Beta(α, β) is lowest variance AND α>=2, β>=2
 
   # following are solutions for μ = a/(a+b) such that a=2 and b=2, which will
@@ -178,6 +174,3 @@ def halflifeToWmaxPrior(h: float,
     return (min(a, 10 + np.log10(a)), 2.0)
   raise Exception('unable to find prior')
 
-
-def _betaToMean(a: float, b: float) -> float:
-  return a / (a + b)

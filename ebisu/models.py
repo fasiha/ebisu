@@ -48,13 +48,13 @@ class Predict(DataClassJsonMixin):
   version: int
   lastEncounterMs: float  # milliseconds since unix epoch
   wmaxMean: float  # weight for max halflife (it's actually the smallest weight), between 0 and 1
-  hmax: float  # max halflife, in hours
   log2ws: list[float]
   hs: list[float]  # same length as log2ws
 
   format: WeightsFormat
   m: Optional[float]
   initHlMean: Optional[float]
+  forSql: list[tuple[float, float]]  # `(log2w, hsInMilliseconds)`
   # recall probability is proportional to:
   # `MAX(log2ws - ((NOW_MS - lastEncounterMs) * HOURS_PER_MILLISECONDS / hs)`
   # where NOW_MS is milliseconds since Unix epoch.

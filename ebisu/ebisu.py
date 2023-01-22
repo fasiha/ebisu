@@ -27,12 +27,13 @@ def initModel(
     assert initHlMean, "must provide wmaxMean or initHlMean"
     wmaxMean = _halflifeToWmax(initHlMean, hmin=hmin, hmax=hmax, n=n)
 
-  assert 0 <= wmaxMean <= 1, 'wmaxMean should be between 0 and 1'
+  assert wmaxMean and 0 <= wmaxMean <= 1, 'wmaxMean should be between 0 and 1'
   wmaxMean = wmaxMean or np.spacing(1)
   now = now if now is not None else timeMs()
 
-  hs = np.logspace(np.log10(hmin), np.log10(hmax), n)
+  hs = np.logspace(np.log10(hmin), np.log10(hmax), n).tolist()
   ws = _makeWs(n, wmaxMean, format, m)
+  log2ws = np.log2(ws).tolist()
   return Model(
       version=1,
       quiz=Quiz(version=1, results=[[]], startTimestampMs=[now]),
@@ -40,15 +41,19 @@ def initModel(
           version=1,
           lastEncounterMs=now,
           wmaxMean=wmaxMean,
-          hmax=hs[-1],
-          log2ws=np.log2(ws).tolist(),
-          hs=hs.tolist(),
+          log2ws=log2ws,
+          hs=hs,
+          forSql=_genForSql(log2ws, hs),
           # custom
           format=format,
           m=m,
           initHlMean=initHlMean,
       ),
   )
+
+
+def _genForSql(log2ws, hs) -> list[tuple[float, float]]:
+  return [(lw, h * 3600e3) for lw, h in zip(log2ws, hs)]
 
 
 def updateRecall(
@@ -103,6 +108,7 @@ def updateRecall(
 
   ws = _makeWs(len(hs), wmaxMap, model.pred.format, model.pred.m)
   ret.pred.log2ws = np.log2(ws).tolist()
+  ret.pred.forSql = _genForSql(ret.pred.log2ws, ret.pred.hs)
 
   return ret
 
@@ -156,9 +162,9 @@ def _halflifeToWmax(h: float, hmin: float = 1.0, hmax: float = 1e5, n: int = 10)
 
 
 def _halflifeToWmaxPrior(h: float,
-                        hmin: float = 1.0,
-                        hmax: float = 1e5,
-                        n: int = 10) -> tuple[float, float]:
+                         hmin: float = 1.0,
+                         hmax: float = 1e5,
+                         n: int = 10) -> tuple[float, float]:
   wmaxMean = _halflifeToWmax(h, hmin=hmin, hmax=hmax, n=n)
   # find (α, β) such that Beta(α, β) is lowest variance AND α>=2, β>=2
 
@@ -173,4 +179,3 @@ def _halflifeToWmaxPrior(h: float,
   if a >= 2:
     return (min(a, 10 + np.log10(a)), 2.0)
   raise Exception('unable to find prior')
-

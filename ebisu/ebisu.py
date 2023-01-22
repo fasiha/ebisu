@@ -49,7 +49,9 @@ def initModel(
           # custom
           format=format,
           m=m,
-          initWmaxPrior=initWmaxPrior),
+          initWmaxPrior=initWmaxPrior,
+          initHlMean=initHlMean,
+      ),
   )
 
 
@@ -63,6 +65,20 @@ def updateRecall(
 ) -> Model:
   now = now or timeMs()
   t = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
+
+  if wmaxPrior is None:
+    # don't even look at the result, this is supposed to be a prior
+    nq = len(model.quiz.results[0])
+    # Before the first quiz, just use this quiz time and the initHlMean if provided
+    # AFTER that, use past quizzes' times and initHlMean if provided
+    maxh = max([q.hoursElapsed for q in model.quiz.results[0]] +
+               [t if nq == 0 else 0, model.pred.initHlMean or 0])
+    wmaxPrior = halflifeToWmaxPrior(maxh)
+    # Note I don't use this or any past results, just past times. Given
+    # http://www.stat.columbia.edu/~gelman/research/published/entropy-19-00555-v2.pdf
+    # ("The Prior Can Often Only Be Understood in the Context of the Likelihood"
+    # by Gelman, Simpson, Betancourt, 2017) I think this is ok
+
   resultObj: Union[NoisyBinaryResult, BinomialResult]
 
   if total == 1:
@@ -79,14 +95,6 @@ def updateRecall(
 
   ret = deepcopy(model)  # clone
   _appendQuizImpure(ret, resultObj)
-
-  if wmaxPrior is None:
-    numQs = len(ret.quiz.results[-1])
-    if ret.pred.initWmaxPrior:
-      amin, bmin = ret.pred.initWmaxPrior
-    else:
-      amin, bmin = 0, 7
-    wmaxPrior = (max(2.0, amin + numQs), max(2.0, bmin - numQs))
 
   hs = np.array(ret.pred.hs)
   res = minimize_scalar(lambda wmax: -(posterior(ret, wmax, wmaxPrior, hs)[0]), [0, 1], [0, 1])
@@ -151,7 +159,10 @@ def halflifeToWmax(h: float, hmin: float = 1.0, hmax: float = 1e5, n: int = 10):
   return res.x
 
 
-def halflifeToWmaxPrior(h: float, hmin: float = 1.0, hmax: float = 1e5, n: int = 10):
+def halflifeToWmaxPrior(h: float,
+                        hmin: float = 1.0,
+                        hmax: float = 1e5,
+                        n: int = 10) -> tuple[float, float]:
   wmaxMean = halflifeToWmax(h, hmin=hmin, hmax=hmax, n=n)
   # find (α, β) such that Beta(α, β) is lowest variance AND α>=2, β>=2
 

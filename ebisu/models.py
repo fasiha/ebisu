@@ -55,6 +55,7 @@ class Predict(DataClassJsonMixin):
   format: WeightsFormat
   m: Optional[float]
   initWmaxPrior: Optional[tuple[float, float]]
+  initHlMean:Optional[float]
   # recall probability is proportional to:
   # `MAX(log2ws - ((NOW_MS - lastEncounterMs) * HOURS_PER_MILLISECONDS / hs)`
   # where NOW_MS is milliseconds since Unix epoch.

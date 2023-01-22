@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
   fracs = [0.8]
   # fracs = [1.0]
-  fracs = [0.8, 0.85, 0.9, 0.95, 1.]
+  fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
   for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
     # for card in train:
     hlMeanStd = (24., 24 * .7)
@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
     wmaxMean, initHlMean = 0.5, None
     wmaxMean, initHlMean = None, 12.0
-    intermediate = False
+    intermediate = not False
 
     models = [
         ebisu.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now),

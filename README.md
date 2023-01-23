@@ -10,6 +10,7 @@
     - [How long till a model reaches some probability?](#how-long-till-a-model-reaches-some-probability)
   - [How it works](#how-it-works)
   - [Math](#math)
+  - [Bibliography](#bibliography)
   - [Acknowledgments](#acknowledgments)
 
 
@@ -41,7 +42,7 @@ Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other sch
 
 Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like Gamma-distributed random variables, importance sampling, and maximum likelihood, this is for you.
 
-> Nerdy details in a nutshell: Ebisu largely follows Mozer et al.’s multiscale context model (MCM) of `n` leaky integrators, published at NIPS 2009 ([DOI](https://dl.acm.org/doi/10.5555/2984093.2984242), [academic copy](https://home.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/MozerPashlerCepedaLindseyVul2009.pdf), [local copy](./MozerPashlerCepedaLindseyVul2009.pdf)), but with a Bayesian twist. The probability of recall for a given fact is assumed to be governed by an ensemble of decaying exponentials with *fixed* time constants (these increase from an hour to ten years) but *uncertain* mixture weights. The weights themselves decay according to an exponential to a single uncertain value governed by a Beta random variable. Therefore, the recall probability at any given time is a straightforward arithmetic expression of elapsed time, time constants, and weights. And after a quiz, the new best estimate of the weights is computed via a simple MAP (maximum a posteriori) estimator that uses a standard Scipy hill-climbing algorithm.
+> Nerdy details in a nutshell: Ebisu largely follows Mozer et al.’s multiscale context model (MCM) of `n` leaky integrators, published at NIPS 2009 (see [bibliography](#bibliography)), but with a Bayesian twist. The probability of recall for a given fact is assumed to be governed by an ensemble of decaying exponentials with *fixed* time constants (these increase from an hour to ten years) but *uncertain* mixture weights. The weights themselves decay according to an exponential to a single uncertain value governed by a Beta random variable. Therefore, the recall probability at any given time is a straightforward arithmetic expression of elapsed time, time constants, and weights. And after a quiz, the new best estimate of the weights is computed via a simple MAP (maximum a posteriori) estimator that uses a standard Scipy hill-climbing algorithm.
  
 Finally, in the [Source Code](#source-code) section, we describe the software testing done to validate the math, including tests comparing Ebisu’s output to Monte Carlo sampling.
 
@@ -86,7 +87,7 @@ Switching the above plot’s x and y scales to log-log gives and zooming out to 
 
 ![Recall probability, as above, on log-log plot](leaky-integrators-precall-loglog.png)
 
-By taking the *max* of each the output of each leaky integrator, we get this *sequence* of bumps which roughly follow the ubiquitous memory *power law*, for times between 6 minutes and 1+ year. A true power law would, in a log-log plot such as this, be a straight line, and as `n` and `hmax` increase, the bumpy line representing the probability of recall above can be expected to converge to a power law (proof by visualization 🙃). See Mozer et al. cited above ([DOI](https://dl.acm.org/doi/10.5555/2984093.2984242), [academic copy](https://home.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/MozerPashlerCepedaLindseyVul2009.pdf), [local copy](./MozerPashlerCepedaLindseyVul2009.pdf)) for discussion and references suggesting the power-law decay of memory.
+By taking the *max* of each the output of each leaky integrator, we get this *sequence* of bumps which roughly follow the ubiquitous memory *power law*, for times between 6 minutes and 1+ year. A true power law would, in a log-log plot such as this, be a straight line, and as `n` and `hmax` increase, the bumpy line representing the probability of recall above can be expected to converge to a power law (proof by visualization 🙃). See Mozer et al. (cited above, and [bibliography](#bibliography)) for discussion and references suggesting the power-law decay of memory.
 
 In this example, after more than a year (10⁴ hours) since review, the probability of recall gets crushed by the exponential decay of the last leaky integrator. This can be avoided by using higher `hmax`, and this is why the default `hmax=1e5`, i.e., 11.4-ish years.
 
@@ -167,7 +168,7 @@ More concretely, imagine you have a foreign language reader app where users can 
 
 With `successes`, `total`, and `q0`, Ebisu can handle a rich range of quiz results robustly and quantitatively.
 
-This update function is what performs the full Bayesian analysis to estimate a new “`wmax`”, the final leaky integrator’s weight. An important part of Bayesian analysis is your prior belief on what this value should be, before you’ve looked at the data (the actual quiz results). You can provide `wmaxPrior`, a 2-tuple \\((α, β)\\) representing the Beta distribution (we follow [Wikipedia](https://en.wikipedia.org/wiki/Beta_distribution)’s definition) representing your prior for this weight. This is optional—if you don’t provide `wmaxPrior`, we will find the highest-variance Beta distribution that implies a halflife equal to the student’s *maximum* inter-quiz interval. In practice, this works well, and follows Lindsey, et al. ([DOI](https://journals.sagepub.com/doi/pdf/10.1177/0956797613504302), [academic copy](https://home.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/LindseyShroyerPashlerMozer2014Published.pdf), [local copy](./LindseyShroyerPashlerMozer2014Published.pdf)) in applying “a bias that additional study in a given time window helps, but has logarithmically diminishing returns” (2014). (Lindsey, et al., is the same team those MCM (multiscale context model) NIPS 2009 paper I cite above as the core inspiration for Ebisu.)
+This update function is what performs the full Bayesian analysis to estimate a new “`wmax`”, the final leaky integrator’s weight. An important part of Bayesian analysis is your prior belief on what this value should be, before you’ve looked at the data (the actual quiz results). You can provide `wmaxPrior`, a 2-tuple \\((α, β)\\) representing the Beta distribution (we follow [Wikipedia](https://en.wikipedia.org/wiki/Beta_distribution)’s definition) representing your prior for this weight. This is optional—if you don’t provide `wmaxPrior`, we will find the highest-variance Beta distribution that implies a halflife equal to the student’s *maximum* inter-quiz interval. In practice, this works well, and follows Lindsey, et al. (see [bibliography](#bibliography)) in applying “a bias that additional study in a given time window helps, but has logarithmically diminishing returns” (2014). (Lindsey, et al., is the same team those MCM (multiscale context model) NIPS 2009 paper I cite above as the core inspiration for Ebisu.)
 
 As with other functions above, `updateRecall` also accepts `now`, milliseconds since the Unix epoch.
 
@@ -181,31 +182,50 @@ That’s it. Four functions in the API.
 
 ## How it works
 
-There are many scheduling schemes, e.g.,
+There are many flashcard scheduling schemes, e.g.,
 
 - [Anki](https://apps.ankiweb.net/), an open-source Python flashcard app (and a closed-source mobile app),
-- the [SuperMemo](https://www.supermemo.com/help/smalg.htm) family of algorithms ([Anki’s](https://apps.ankiweb.net/docs/manual.html#what-algorithm) is a derivative of SM-2),
+- the [SuperMemo](https://www.supermemo.com/help/smalg.htm) family of algorithms ([Anki’s](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html) is a derivative of SM-2),
 - [Memrise.com](https://www.memrise.com), a closed-source webapp,
 - [Duolingo](https://www.duolingo.com/) has published a [blog entry](http://making.duolingo.com/how-we-learn-how-you-learn) and a [conference paper/code repo](https://github.com/duolingo/halflife-regression) on their half-life regression technique,
 - the Leitner and Pimsleur spacing schemes (also discussed in some length in Duolingo’s paper).
-- Also worth noting is Michael Mozer’s team’s Bayesian multiscale models, e.g., [Mozer, Pashler, Cepeda, Lindsey, and Vul](http://www.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/MozerPashlerCepedaLindseyVul2009.pdf)’s 2009 <cite>NIPS</cite> paper and subsequent work.
+- Also worth noting is Michael Mozer’s team’s Bayesian multiscale models, specifically Mozer et al. (2009) and, by the same team, Lindsey et al. (2014) (see [bibliography](#bibliography)).
 
-Many of these are inspired by Hermann Ebbinghaus’ discovery of the [exponential forgetting curve](https://en.wikipedia.org/w/index.php?title=Forgetting_curve&oldid=766120598#History), published in 1885, when he was thirty-five. He [memorized random](https://en.wikipedia.org/w/index.php?title=Hermann_Ebbinghaus&oldid=773908952#Research_on_memory) consonant–vowel–consonant trigrams (‘PED’, e.g.) and found, among other things, that his recall decayed exponentially with some time-constant.
+Memory research began with Hermann Ebbinghaus’ discovery of the [forgetting curve](https://en.wikipedia.org/w/index.php?title=Forgetting_curve&oldid=766120598#History), published in 1885, when he was thirty-five. He [memorized random](https://en.wikipedia.org/w/index.php?title=Hermann_Ebbinghaus&oldid=773908952#Research_on_memory) consonant–vowel–consonant trigrams (‘PED’, e.g.) and found, among other things, that his recall decayed logarithmically. More recent research has shown, apparently conclusively, that *forgetting* follows a power law decay.
 
-Anki and SuperMemo use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little [field guide](https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174) to Anki’s, with links to the source code—since they are optimized to minimize daily review time while maximizing retention. However, because each fact has simply a date of next review, these algorithms do not gracefully accommodate over- or under-reviewing. Even when used as prescribed, they can schedule many facts for review on one day but few on others. (I must note that all three of these issues—over-reviewing (cramming), under-reviewing, and lumpy reviews—have well-supported solutions in Anki by tweaking the rules and third-party plugins.)
+Anki and SuperMemo are extremely popular. They use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little [field guide](https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174) to Anki’s, with links to the source code—since they are optimized to minimize daily review time while maximizing retention. However, because each fact has simply a date of next review, these algorithms do not gracefully accommodate over- or under-reviewing. Even when used as prescribed, they can schedule many facts for review on one day but few on others. (I must note that all three of these issues—over-reviewing (cramming), under-reviewing, and lumpy reviews—have well-supported solutions in Anki by tweaking the rules and third-party plugins.)
 
-Duolingo’s half-life regression explicitly models the probability of you recalling a fact as \\(2^{-Δ/h}\\), where Δ is the time since your last review and \\(h\\) is a *half-life*. In this model, your chances of passing a quiz after \\(h\\) days is 50%, which drops to 25% after \\(2 h\\) days. They estimate this half-life by combining your past performance and fact metadata in a large-scale machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.
+Duolingo’s half-life regression explicitly models the probability of you recalling a fact as an exponential, \\(2^{-Δ/h}\\) where Δ is the time since your last review and \\(h\\) is a *half-life*. In this model, your chances of passing a quiz after \\(h\\) days is 50%, which drops to 25% after \\(2 h\\) days, and so on. They estimate this half-life by combining your past performance and fact metadata in a large-scale machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.
 
-The Mozer group’s algorithms also fit a hierarchical Bayesian model that links quiz performance to memory, taking into account inter-fact and inter-student variability, but the training step is again computationally-intensive.
+The Mozer group’s algorithms (MCM (their 2009 paper) and DASH (their 2014 paper; see [bibliography](#bibliography))) also curve-fit a large quantity of quiz data to high-dimensional models, including, in DASH’s case, a hierarchical Bayesian model that takes into account inter-fact and inter-student variability.
 
-Like Duolingo and Mozer’s approaches, Ebisu explicitly tracks the exponential forgetting curve to provide a list of facts sorted by most to least likely to be forgotten. However, Ebisu formulates the problem very differently—while memory is understood to decay exponentially, Ebisu posits a *probability distribution* on the half-life and uses quiz results to update its beliefs in a fully Bayesian way. These updates, while definitely more computationally-burdensome than Anki’s scheduler, are much lighter-weight than Duolingo’s industrial-strength approach.
+Ebisu is like Duolingo and Mozer’s algorithms, in that it explicitly tracks the recall probability as it decays. Ebisu further adapts the mathematical form of the memory decay after Mozer et al.’s MCM (multiscale context model): a cascade of weighted exponentials.
 
-This gives small quiz apps the same intelligent scheduling as Duolingo’s approach—real-time recall probabilities for any fact—but with quick incorporation of quiz results, even on mobile apps.
+However, Ebisu adds a few Bayesian twists to these approaches:
+1. Ebisu posits an explicit probability distribution on the parameters of the memory decay. This allows you to treat your subjective belief about each flashcard’s difficulty as a Bayesian prior that governs its memory decay over time as well as its memory strengthening via reviews.
+2. We also support a rich variety of quizzes fully analytically: 
+    - binary quizzes—pass/fail,
+    - binomial quizzes—e.g., three points out of four,
+    - even exotic noisy-binary quizzes that let you fully specify the odds of the student “passing” the quiz when they actually don’t know the answer (handy for deweighting multiple-choice vs. active recall, as well as for reader apps described above).
+3. Both predicting memory *and* incorporating quizzes are done computationally-efficiently on a quiz-by-quiz basis. Once ported to JavaScript or Kotlin or Swift, the algorithm can readily run on your phone, no need for large sets of historic quiz data and expensive training. The most you need in terms of computational mathematics is a one-dimensional function minimization (e.g., golden section search) and the Gamma function.
 
-This allows Ebisu to seamlessly handle the over-reviewing and under-reviewing case (cramming and lazing, respectively), while also moving away from 
+Note that Ebisu treats each flashcard’s memory as independent of the others. It can’t handle flashcard correlation or interference, alas, so you have to handle this in your application.
+
+The hope is that Ebisu can be used by flashcard apps that continue to unleash the true potential of personalized learning and spaced reptition practice. 
+
+With the [API docs](#api-quickstart) above and this explanation, let’s jump into a more formal description of the mathematics.
 
 ## Math
 (Forthcoming.)
+
+## Bibliography
+
+While most citations are given inline above, this section contains academic papers, to whose PDFs I want to provide multiple links.
+
+Lindsey, R. V., Shroyer, J. D., Pashler, H., & Mozer, M. C. (2014). Improving Students’ Long-Term Knowledge Retention Through Personalized Review. <cite>Psychological Science</cite>, 25(3), 639–647. [DOI](https://doi.org/10.1177/0956797613504302), [academic copy](https://home.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/LindseyShroyerPashlerMozer2014Published.pdf), [local copy](./LindseyShroyerPashlerMozer2014Published.pdf). The authors also share some very interesting mathematical details as “Additional Methods” under [Supplemental Material](https://journals.sagepub.com/doi/10.1177/0956797613504302#supplementary-materials) on SagePub.
+
+Michael C. Mozer, Harold Pashler, Nicholas Cepeda, Robert Lindsey, and Ed Vul. 2009. Predicting the optimal spacing of study: a multiscale context model of memory. In <cite>Proceedings of the 22nd International Conference on Neural Information Processing Systems (NIPS'09)</cite>. Curran Associates Inc., Red Hook, NY, USA, 1321–1329. [DOI](https://dl.acm.org/doi/10.5555/2984093.2984242), [academic copy](https://home.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/MozerPashlerCepedaLindseyVul2009.pdf), [local copy](./MozerPashlerCepedaLindseyVul2009.pdf).
+
 
 ## Acknowledgments
 

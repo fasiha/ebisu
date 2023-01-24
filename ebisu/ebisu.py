@@ -5,15 +5,16 @@ from typing import Union, Optional
 from scipy.optimize import minimize_scalar  # type: ignore
 
 from ebisu.ebisuHelpers import posterior, timeMs
+from ebisu.expectionMaxScaledPowBeta import expectationMaxScaledPowBeta
 from ebisu.models import BinomialResult, Model, NoisyBinaryResult, WeightsFormat, success, Predict, Quiz, Result
 
 
 def initModel(
     wmaxMean: Optional[float] = None,
+    initHlMean: Optional[float] = None,
     hmin: float = 1,
     hmax: float = 1e5,  # 1e5 hours = 11+ years
     n: int = 10,
-    initHlMean: Optional[float] = None,
     now: Optional[float] = None,
     format: WeightsFormat = "exp",
     m: Optional[float] = None,
@@ -115,8 +116,7 @@ def updateRecall(
 
 def _makeWs(n: int, wmax: float, format: WeightsFormat, m: Optional[float] = None) -> np.ndarray:
   if format == "exp":
-    tau = -(n - 1) / (np.log(wmax) or np.spacing(1))
-    return np.exp(-np.arange(n) / tau)
+    return wmax**(np.arange(n) / (n - 1))
   elif format == "rational":
     assert m and (m > 0), "m must be positive"
     return 1 + (wmax - 1) * (np.arange(n) / (n - 1))**m
@@ -179,3 +179,28 @@ def _halflifeToWmaxPrior(h: float,
   if a >= 2:
     return (min(a, 10 + np.log10(a)), 2.0)
   raise Exception('unable to find prior')
+
+
+def predictRecallBayesian(
+    model: Model,
+    wmaxVar: float,
+    now: Optional[float] = None,
+):
+  now = now if now is not None else timeMs()
+  elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
+  assert elapsedHours >= 0, "cannot go back in time"
+
+  alpha, beta = _meanVarToBeta(model.pred.wmaxMean, wmaxVar)
+  n = len(model.pred.hs)
+  return expectationMaxScaledPowBeta(
+      np.exp2(-elapsedHours / np.array(model.pred.hs)),
+      np.arange(n) / (n - 1), alpha, beta)
+
+
+def _meanVarToBeta(mean, var):
+  """Fit a Beta distribution to a mean and variance."""
+  # [betaFit] https://en.wikipedia.org/w/index.php?title=Beta_distribution&oldid=774237683#Two_unknown_parameters
+  tmp = mean * (1 - mean) / var - 1
+  alpha = mean * tmp
+  beta = (1 - mean) * tmp
+  return alpha, beta

@@ -5,16 +5,18 @@ from functools import cache
 
 
 # see https://stats.stackexchange.com/q/602835 and my answer there
-def expectationMaxScaledPowBeta(avec: list[float] | np.ndarray, bvec: list[float] | np.ndarray,
-                                alpha: float, beta: float) -> float:
-  crossings = [0.0] + [
-      (a2 / a1)**(1 / (b1 - b2)) for ((a1, b1), (a2, b2)) in pairwise(zip(avec, bvec))
-  ] + [1.0]
+def expectationMaxScaledPowBeta(avec: list[float] | np.ndarray,
+                                bvec: list[float] | np.ndarray,
+                                alpha: float,
+                                beta: float,
+                                avecLog=False) -> float:
+  crossings = [0.0] + [(a2 / a1)**(1 / (b1 - b2)) if avecLog == False else np.exp(
+      (a2 - a1) / (b1 - b2)) for ((a1, b1), (a2, b2)) in pairwise(zip(avec, bvec))] + [1.0]
 
   betaincLoHi = lambda a, b, c1, c2: (cachedBetainc(a, b, c2) - cachedBetainc(a, b, c1)
                                      ) * cachedBeta(a, b)
   bab = cachedBeta(alpha, beta)
-  correct = sum(a * betaincLoHi(alpha + b, beta, lo, hi)
+  correct = sum((np.exp(a) if avecLog else a) * betaincLoHi(alpha + b, beta, lo, hi)
                 for (a, b, (lo, hi)) in zip(avec, bvec, pairwise(crossings))) / bab
   return correct
 

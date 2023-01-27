@@ -1,11 +1,11 @@
 from scipy.special import gammaln  #type: ignore
 from functools import cache
 from math import fsum, exp, log, expm1
-from typing import Union
+from typing import Optional, Union
 import numpy as np
 from time import time_ns
 
-from .models import BinomialResult, Model, NoisyBinaryResult
+from .models import BinomialResult, Model, NoisyBinaryResult, WeightsFormat
 
 
 def timeMs() -> float:
@@ -48,6 +48,15 @@ def _logBinomPmfLogp(n: int, k: int, logp: float) -> float:
   return logcomb + k * logp
 
 
+def _makeWs(n: int, wmax: float, format: WeightsFormat, m: Optional[float] = None) -> np.ndarray:
+  if format == "exp":
+    return wmax**(np.arange(n) / (n - 1))
+  elif format == "rational":
+    assert m and (m > 0), "m must be positive"
+    return 1 + (wmax - 1) * (np.arange(n) / (n - 1))**m
+  raise Exception('unknown format')
+
+
 def posterior(
     ret: Model,
     wmax: float,
@@ -58,8 +67,7 @@ def posterior(
   logprior = betarv.logpdf(wmax, *wmaxBetaPriors)
 
   n = hs.size
-  tau = -(n - 1) / np.log(wmax + 1e-12)  # exp
-  ws = np.exp(-np.arange(n) / tau)
+  ws = _makeWs(n, wmax, 'exp')
 
   loglik = []
   for res in ret.quiz.results[-1] if len(ret.quiz.results) else []:

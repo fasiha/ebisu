@@ -4,9 +4,9 @@ from copy import deepcopy
 from typing import Union, Optional
 from scipy.optimize import minimize_scalar  # type: ignore
 
-from ebisu.ebisuHelpers import posterior, timeMs
+from ebisu.ebisuHelpers import _makeWs, posterior, timeMs
 from ebisu.expectionMaxScaledPowBeta import expectationMaxScaledPowBeta
-from ebisu.models import BinomialResult, Model, NoisyBinaryResult, WeightsFormat, success, Predict, Quiz, Result
+from ebisu.models import BinomialResult, Model, NoisyBinaryResult, WeightsFormat, Predict, Quiz, Result
 
 
 def initModel(
@@ -76,6 +76,7 @@ def updateRecall(
     maxh = max([q.hoursElapsed for q in model.quiz.results[0]] +
                [t if nq == 0 else 0, model.pred.initHlMean or 0])
     wmaxPrior = _halflifeToWmaxPrior(maxh)
+    print(f'{maxh=}, {wmaxPrior=}')
     # Note I don't use this or any past results, just past times. Given
     # http://www.stat.columbia.edu/~gelman/research/published/entropy-19-00555-v2.pdf
     # ("The Prior Can Often Only Be Understood in the Context of the Likelihood"
@@ -112,15 +113,6 @@ def updateRecall(
   ret.pred.forSql = _genForSql(ret.pred.log2ws, ret.pred.hs)
 
   return ret
-
-
-def _makeWs(n: int, wmax: float, format: WeightsFormat, m: Optional[float] = None) -> np.ndarray:
-  if format == "exp":
-    return wmax**(np.arange(n) / (n - 1))
-  elif format == "rational":
-    assert m and (m > 0), "m must be positive"
-    return 1 + (wmax - 1) * (np.arange(n) / (n - 1))**m
-  raise Exception('unknown format')
 
 
 def _appendQuizImpure(model: Model, result: Result) -> None:

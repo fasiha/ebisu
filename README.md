@@ -3,13 +3,13 @@
 - [Ebisu: intelligent quiz scheduling](#ebisu-intelligent-quiz-scheduling)
   - [Introduction](#introduction)
   - [Install](#install)
-  - [API Quickstart](#api-quickstart)
+  - [API quickstart](#api-quickstart)
+  - [How it works](#how-it-works)
+  - [API and math](#api-and-math)
     - [Data model](#data-model)
     - [Predict recall probability](#predict-recall-probability)
     - [Update after a quiz](#update-after-a-quiz)
     - [How long till a model reaches some probability?](#how-long-till-a-model-reaches-some-probability)
-  - [How it works](#how-it-works)
-  - [Math](#math)
   - [Bibliography](#bibliography)
   - [Acknowledgments](#acknowledgments)
 
@@ -30,20 +30,25 @@ Ebisu is an open-source public-domain library that answers these two questions. 
 - `predictRecall` gives the current recall probability for a given fact.
 - `updateRecall` adjusts the belief about future recall probability given a quiz result.
 
-Behind this simple API, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and sum-of-exponentials (power law) forgetting.
+Behind this simple API, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and sum-of-exponentials (power law) forgetting. Thanks to these probabilistic foundations, Ebisu is able to handle quite a rich variety of quiz types:
+- of course you have your binary quizzes, i.e., pass/fail;
+- you also have Duolingo-style quizzes where the student got X points out of a maximum of Y points (binomial quizzes);
+- you can even customize the probability that the student “passed” the quiz even if they forgot the fact—this is handy for deweighting multiple-choice quizzes, and also for reader apps where the readers can click on words they don’t know (“the dog that didn’t bark”).
 
-With Ebisu, quiz applications can move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today, so an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed. And since every flashcard always has a recall probability at any given time, Ebisu also enables apps to provide an infinite stream of quizzes for students who are cramming. Thus, Ebisu intelligently handles over-reviewing as well as under-reviewing.
+So with Ebisu, quiz applications can move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today, so an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed. And since every flashcard always has a recall probability at any given time, Ebisu also enables apps to provide an infinite stream of quizzes for students who are cramming. Thus, Ebisu intelligently handles over-reviewing as well as under-reviewing.
 
-This document contains both a detailed mathematical description of the underlying algorithm as well as the software API it exports. Separate implementations in other languages are detailed below.
+Ebisu also has been able to support creative quiz apps that move beyond simple pass/fail flashcards.
+
+So. This document contains both a detailed mathematical description of the underlying algorithm as well as the software API it exports. Separate implementations in other languages are detailed below.
 
 The next sections are installation and an [API Quickstart](#qpi-quickstart). See these if you know you want to use Ebisu in your app.
 
 Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other scheduling algorithms and describe, non-technically, why you should use it.
 
-Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like Gamma-distributed random variables, importance sampling, and maximum likelihood, this is for you.
+Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like nonlinear-transformed Beta-distributed random variables, maximum a posteriori estimation, and incomplete Beta functions, this is for you.
 
-> Nerdy details in a nutshell: Ebisu largely follows Mozer et al.’s multiscale context model (MCM) of `n` leaky integrators, published at NIPS 2009 (see [bibliography](#bibliography)), but with a Bayesian twist. The probability of recall for a given fact is assumed to be governed by an ensemble of decaying exponentials with *fixed* time constants (these increase from an hour to ten years) but *uncertain* mixture weights. The weights themselves decay according to an exponential to a single uncertain value governed by a Beta random variable. Therefore, the recall probability at any given time is a straightforward arithmetic expression of elapsed time, time constants, and weights. And after a quiz, the new best estimate of the weights is computed via a simple MAP (maximum a posteriori) estimator that uses a standard Scipy hill-climbing algorithm.
- 
+> Nerdy details in a nutshell: Ebisu largely follows Mozer et al.’s multiscale context model (MCM) of `n` leaky integrators, published at NIPS 2009 (see [bibliography](#bibliography)), but with a Bayesian twist. The probability of recall for a given fact is assumed to be governed by an ensemble of decaying exponentials with *fixed* time constants (ranging from an hour to ten years) but *uncertain* mixture weights. These weights decay according to an exponential to a single uncertain value governed by a Beta random variable. Therefore, the recall probability at any given time is a straightforward arithmetic expression of elapsed time, time constants, and weights. After a quiz, the new best estimate of the weights is computed via a simple MAP (maximum a posteriori) estimator that uses a standard Scipy hill-climbing algorithm.
+
 Finally, in the [Source Code](#source-code) section, we describe the software testing done to validate the math, including tests comparing Ebisu’s output to Monte Carlo sampling.
 
 A quick note on history—more information is in the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md). This document discusses Ebisu v3. Versions 2 and before used a very different model that was both more complex and that failed to handle the *strenghening* of memory that accompanied quizzes. If you are interested, see the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md) for details and a migration guide.
@@ -53,60 +58,29 @@ A quick note on history—more information is in the [Changelog](https://github.
 python -m pip install ebisu
 ```
 
-## API Quickstart
+## API quickstart
+> This is intended to be a quick refresher for those already familiar with the Ebisu API. If it doesn't make sense, jump to the full [API](#api-and-math) section!
 
-### Data model
+**Step 0.** `import ebisu`
+
+**Step 1.** Create an Ebisu `Model` for each flashcard when a student learns it:
 ```py
 def initModel(
     wmaxMean: Optional[float] = None,
+    initHlMean: Optional[float] = None,
     hmin: float = 1,
     hmax: float = 1e5,
     n: int = 10,
-    initHlMean: Optional[float] = None,
     now: Optional[float] = None,
 ) -> Model
 ```
-For each fact in your quiz app, create an Ebisu `Model` via `initModel`. The optional keyword arguments, `wmaxMean`, `hmin`, `hmax`, and `n`, govern the collection of leaky integrators (weighted exponentials) that are at the heart of the Ebisu framework. Let’s talk about how they work.
+Here, `0 < wmaxMean < 1` (unitless) or `initHlMean > 0` (hours) specify your belief about the durability of the memory: higher `wmaxMean` implies higher initial halflife `initHlMean` and vice versa.
 
-1. There are `n` leaky integrators (decaying exponentials), each with a halflife that’s strictly logarithmically increasing, starting at `hmin` hours (default 1) and ending at `hmax` hours (default `1e5` or roughly 11 years).
-2. Each of the `n` leaky integrators also has a weight, indicating its maximum recall probability at time 0. The weights are strictly exponentially decreasing: the first leaky integrator gets a weight of 1 and the `n`th gets `wmaxMean`. A single leaky integrator predicts a recall probability \\(p_i(t) ∝ w_i ⋅ 2^{-t / h_i}\\) (here \\(t\\) indicates hours since last review, and \\(w_i\\) and \\(h_i\\) are this leaky integrator’s weight and halflife; the index \\(i\\) runs from 1 to `n`).
+`hmin` and `hmax` (both in units of hours) specify the time constant of `n` exponentials (Mozer et al. call these “leaky integrators” so I will too), each logarithmically-spaced. The default covers one hour to more than a decade.
 
-Putting these together, you get the Ebisu formula for probability of recall, just take the *max* of each leaky integrator: \\(p(t) = \max_i(w_i ⋅ 2^{-t / h_i})\\).
+`now` is when this fact was learned (milliseconds in the Unix epoch, midnight UTC on 1 January, 1970).
 
-For example, with `n=5` leaky integrators going from `hmin=1` hour to `hmax=1e4` hours (13.7-ish months), and with the last longest-duration exponential getting a weight of `wmaxMean=0.1`, we have this profile of weights:
-
-![Weights per halflife for each leaky integrator](leaky-integrators-weights.png)
-
-The next plot shows each of the five leaky integrators’ contribution to the recall probability as well as the max among them at any given time, indicating the expected probability of recall—
-
-![Recall probability for each leaky integrator, with max](leaky-integrators-precall.png)
-
-At the left-most part of the plot, the first leaky integrator dominates, but very quickly fades away due to the crush of its fast exponential. As it decays however, the subsequent leaky integrator, with a strictly lower starting value, steps up to keep the recall probability from entirely collapsing. And so on till the last leaky integrator.
-
-Switching the above plot’s x and y scales to log-log gives and zooming out to see more time gives us this:
-
-![Recall probability, as above, on log-log plot](leaky-integrators-precall-loglog.png)
-
-By taking the *max* of each the output of each leaky integrator, we get this *sequence* of bumps which roughly follow the ubiquitous memory *power law*, for times between 6 minutes and 1+ year. A true power law would, in a log-log plot such as this, be a straight line, and as `n` and `hmax` increase, the bumpy line representing the probability of recall above can be expected to converge to a power law (proof by visualization 🙃). See Mozer et al. (cited above, and [bibliography](#bibliography)) for discussion and references suggesting the power-law decay of memory.
-
-In this example, after more than a year (10⁴ hours) since review, the probability of recall gets crushed by the exponential decay of the last leaky integrator. This can be avoided by using higher `hmax`, and this is why the default `hmax=1e5`, i.e., 11.4-ish years.
-
-Having said *all* this, the most import input to `initModel` is `wmaxMean`, a number between 0 and 1 that represents the weight of the final `n`th leaky integrator and therefore governs all other weights. However, I think it’s safe to assume that you have *no* interest thinking about this strange random variable, and rather you have a *lot* of thoughts on this fact’s *halflife*. Therefore, `initModel` also lets you specify `initHlMean`, your best guess as to this fact’s initial memory halflife, in hours.
-
-> Math note: we don’t ask for a full prior on “`wmax`”, just its mean. This is because Ebisu deals naively pretends that \\(E[f(W)] ≈ f(E[W])\\) (where \\(W\\) is the random variable representing the final leaky integrator’s weight) in order to efficiently and conveniently compute the recall probabilities (see `predictRecall` below!).
-> 
-> Math note 2: if you just provide `initHlMean`, we convert this to `wmaxMean` through a quick function minimization (see `hoursForModelDecay` below for how we convert an Ebisu `Model` to the halflife).
-
-`now` is milliseconds since the Unix epoch (midnight UTC, Jan 1, 1970). Provide this to customize when the student learned this fact, otherwise Ebisu will use the current time.
-
-You can serialize this `Model` with the `to_json` method provided by [Dataclasses-JSON](https://github.com/lidatong/dataclasses-json), which also provides its complement, `from_json`. Therefore, this will work:
-```py
-ebisu.Model.from_json(ebisu.initModel(0.1).to_json())
-```
-
-It's expected that apps using Ebisu will save the serialized JSON to a database. The model contains all historic quiz information and numbers describing the probabilistic configuration.
-
-### Predict recall probability
+**Step 2.** Find the `Model` with the lowest recall probability. You can do this in SQL (see below!) or use:
 ```py
 def predictRecall(
     model: Model,
@@ -114,30 +88,9 @@ def predictRecall(
     logDomain=True,
 ) -> float
 ```
-This functions answers one of the core questions any flashcard app asks: what fact is most in danger of being forgotten? You can run this function against all Ebisu models, with an optional `now` (milliseconds in the Unix epoch), to get a log-probability of recall. A higher number implies more likely to recall; the lower the number, the more risk of of forgetting.
+`now` is again milliseconds since the Unix epoch started.
 
-If you pass in `logDomain=False`, this function will call `exp2` to convert log-probability (-∞ to 0) to actual probability (0 to 1). (This is not done by default because `exp2`, floating-point power, is actually expensive compared to arithmetic. No, I don’t have an explicit reference. Yes, profiling is important.)
-
-**Nota bene** if you’re storing Ebisu models as JSON in SQL, you might not need this function! The following snippet selects all columns and a new column, called `logPredictRecall`, assuming a SQLite table called `mytable` with Ebisu models in a column called `model_json`:
-```sql
-SELECT
-  t.id,
-  t.model_json,
-  MAX(
-    (
-      JSON_EXTRACT(value, '$[0]') - (
-        (?) - JSON_EXTRACT(model_json, '$.pred.lastEncounterMs')
-      ) / JSON_EXTRACT(value, '$[1]')
-    )
-  ) AS logPredictRecall
-FROM
-  mytable t,
-  JSON_EACH(JSON_EXTRACT(t.model_json, '$.pred.forSql'))
-GROUP BY t.id
-```
-The placeholder `(?)` is for you to pass in the current timestamp (milliseconds since Unix epoch; in SQLite you can get this via `strftime('%s','now') * 1000`).
-
-### Update after a quiz
+**Step 3.** After you show the student a flashcard and grade their answer, update the `Model`:
 ```py
 def updateRecall(
     model: Model,
@@ -148,37 +101,17 @@ def updateRecall(
     now: Optional[float] = None,
 ) -> Model
 ```
-The other really important question flashcard apps ask is: “I've done a quiz, now what?” This `updateRecall` function is for this crucial step.
+This is a pure function: the input `Model` is left untouched, so you can replace it with the returned `Model`. A binary/binomial quiz is denoted by integer `successes` (points received) out of `total` points possible. A noisy-binary quiz uses `0 < successes < 1`, a float and optionally `q0` to specify its parameters.
 
-Via `updateRecall`, Ebisu supports **two** distinct kinds of quizzes:
-- with `total=1` you get *noisy-binary* (or *soft-binary*) quizzes where `0 <= successes <= 1` can be a float. This supports the most basic flashcard reviews (binary quizzes) but also some pretty complex workflows!
-- With `total>1` you get *binomial* quizzes, meaning out of a `total` number of points the student could get, she got `successes` (must be integer).
+`wmaxPrior` is a 2-tuple `(α, β)` of a Beta distribution that captures your belief about the weights of each of the `n` leaky integrators (decaying exponentials, `n` per `initModel` above), via the weight of the last one. If you don’t provide this, Ebisu will pick one based on the maximum interval between quizzes.
 
-Example 1. For the bog-standard flashcard review, where you show the student a flashcard and they get it right (or wrong), you can pass in `successes=1` (or `successes=0`), and use the default `total=1`. You get binary quizzes.
+`now` is as before milliseconds in the Unix epoch.
 
-Example 2. For a Duolingo-style review, where you review the same fact multiple times in a single short quiz session, you provide the number of `successes` and `total>1` (the number of points received versus the maximum number of points, both integers). Ebisu treats this as a binomial quiz. (Math note: a binary quiz is just a special case of the binomial with `total=1`.)
-
-Example 3. For more complex apps, where you have deep probabilistic insight into the student’s performance, you can specify noisy-binary quizzes by passing in `total=1` and `0 < successes < 1`, a float between 0 and 1. In this situation, we assume the existence of a “real” binary quiz result, which we *don’t* observe, and which was scrambled by going through a noisy channel that flipped the “real” quiz result with some probability.
-- `max(successes, 1 - successes)` is `Probability(observed pass | real quiz pass)` and
-- `q0` is `Probability(observed pass | real quiz failed)`, defaults to the complement of the above (`1 - max(successes, 1 - successes)`).
-
-More concretely, imagine you have a foreign language reader app where users can read text and click on a word to look it up in the dictionary if they’ve forgotten it. Now imagine you know the student read a word and they did *not* ask for its definition. You can’t say for sure that the student would have gotten it right if you’d *actually* prompted them for the definition of the word, so you don’t want to treat this as a normal “successful” quiz. Here you can say
-- `Probability(did not ask for definition | they know the word) = successes = 1.0`, i.e., if they know the word, they would never ask for the definition (or maybe they would? Fine, make this 0.98), but
-- `Probability(did not ask for definition | they forgot the word) = q0 = 0.1`: if they actually had forgotten the word, there’s a low but non-zero chance of observing the same behavior (didn’t ask for the definition).
-
-With `successes`, `total`, and `q0`, Ebisu can handle a rich range of quiz results robustly and quantitatively.
-
-This update function is what performs the full Bayesian analysis to estimate a new “`wmax`”, the final leaky integrator’s weight. An important part of Bayesian analysis is your prior belief on what this value should be, before you’ve looked at the data (the actual quiz results). You can provide `wmaxPrior`, a 2-tuple \\((α, β)\\) representing the Beta distribution (we follow [Wikipedia](https://en.wikipedia.org/wiki/Beta_distribution)’s definition) representing your prior for this weight. This is optional—if you don’t provide `wmaxPrior`, we will find the highest-variance Beta distribution that implies a halflife equal to the student’s *maximum* inter-quiz interval. In practice, this works well, and follows Lindsey, et al. (see [bibliography](#bibliography)) in applying “a bias that additional study in a given time window helps, but has logarithmically diminishing returns” (2014). (Lindsey, et al., is the same team those MCM (multiscale context model) NIPS 2009 paper I cite above as the core inspiration for Ebisu.)
-
-As with other functions above, `updateRecall` also accepts `now`, milliseconds since the Unix epoch.
-
-### How long till a model reaches some probability?
-```
+**Bonus** It can be useful to know when a `Model`’s memory will decay to some probability:
+```py
 def hoursForRecallDecay(model: Model, percentile=0.5) -> float
 ```
-This is sometimes useful for quizzes that seek to schedule a review in the future when a fact’s memory is expected to have decayed to some probability. This `hoursForRecallDecay`, in converting probability to time (hours), is sort of the inverse of `predictRecall` which converts time (hours) to probability. By default the probability is 0.5, so this function returns the halflife of a `Model`.
-
-That’s it. Four functions in the API.
+With the default `percentile=0.5`, the returned value corresponds to the halflife (in hours).
 
 ## How it works
 
@@ -213,10 +146,184 @@ Note that Ebisu treats each flashcard’s memory as independent of the others. I
 
 The hope is that Ebisu can be used by flashcard apps that continue to unleash the true potential of personalized learning and spaced reptition practice. 
 
-With the [API docs](#api-quickstart) above and this explanation, let’s jump into a more formal description of the mathematics.
+Now let’s jump into a more formal description of the mathematics and the resultant Ebisu Python API.
 
-## Math
-(Forthcoming.)
+## API and math
+### Data model
+```py
+def initModel(
+    wmaxMean: Optional[float] = None,
+    hmin: float = 1,
+    hmax: float = 1e5,
+    n: int = 10,
+    initHlMean: Optional[float] = None,
+    now: Optional[float] = None,
+) -> Model
+```
+For each fact in your quiz app, create an Ebisu `Model` via `initModel`. The optional keyword arguments, `wmaxMean`, `hmin`, `hmax`, and `n`, govern the collection of leaky integrators (weighted exponentials) that are at the heart of the Ebisu framework. Let’s describe these in prose before looking at some clarifying plots.
+
+1. There are `n` leaky integrators (decaying exponentials), each with a halflife that’s strictly logarithmically increasing, starting at `hmin` hours (default 1) and ending at `hmax` hours (default `1e5` or roughly 11 years).
+2. Each of the `n` leaky integrators also has a weight, indicating its maximum recall probability at time 0. The weights are strictly exponentially decreasing: the first leaky integrator gets a weight of 1 and the `n`th gets `wmaxMean`.
+
+> A bit more formally, let the vector of halflives be `h = np.logspace(np.log10(hmin), np.log10(hmax), n)` where [`np.logspace`](https://numpy.org/doc/stable/reference/generated/numpy.logspace.html) is provided by Numpy. And let each weight be \\(w_i = \left(w_{max}\right)^{\frac{i-1}{n-1}}\\), for the index \\(i\\) running from 1 to `n`. (For reasons that will become clear in a second, the weights are *not* normalized to sum to 1: the `n` leaky integrators do *not* constitute a mixture.)
+
+A single leaky integrator predicts a recall probability \\(p_i(t) = w_i ⋅ 2^{-t / h_i}\\) (here \\(t\\) indicates hours since last review).
+
+Ebisu considers the *max* of each leaky integrator to be this flashcard’s probability of recall:
+
+\\[p(t) = \max_i(w_i ⋅ 2^{-t / h_i}).\\]
+
+For example, with `n=5` leaky integrators going from `hmin=1` hour to `hmax=1e4` hours (13.7-ish months), and with the last longest-duration exponential getting a weight of `wmaxMean=0.1`, we have this profile of weights:
+
+![Weights per halflife for each leaky integrator](leaky-integrators-weights.png)
+
+Note how first weight above is 1.0 and the last is 0.1 (`wmaxMean`).
+
+The next plot shows each of the five leaky integrators individually as well as the max among them—the thick gray dotted line—which indicates the overall probability of recall:
+
+![Recall probability for each leaky integrator, with max](leaky-integrators-precall.png)
+
+Note how each of the five leaky integrators start at elapsed time \\(t=0\\) at exactly their weights (logarithmically spaced from 1 to `wmaxMean`, here 0.1), and decay from there.
+
+At the left-most part of the plot, the first leaky integrator with the shortest time constant dominates, but very quickly fades away due to the crush of its fast exponential. As it decays however, the second leaky integrator, with a strictly lower starting value (weight), steps up to keep the recall probability from collapsing. And so on till the last leaky integrator.
+
+Switching the above plot’s x and y scales to log-log gives and zooming out to see more time gives us this:
+
+![Recall probability, as above, on log-log plot](leaky-integrators-precall-loglog.png)
+
+By taking the *max* of the output of each leaky integrator, we get this *sequence* of bumps which roughly follow the ubiquitous memory *power law*, for times between 6 minutes and 1+ year. A true power law would, in a log-log plot such as this, be a straight line, and as `n` and `hmax` increase, the bumpy thick black dotted line (representing the probability of recall) can be expected to converge to a power law (proof by visualization 🙃).
+
+After the last leaky integrator (i.e., when the time since review exceeds `hmax`), the probability of recall collapses quickly to zero due to the weight of exponential decay (“the most powerful force in the world”). This can be staved off by using higher `hmax`, and this is why the default `hmax=1e5`, i.e., 11.4-ish years.
+
+Sharp-eyed readers will have noticed that when I described the weights as \\(w_i = \left(w_{max}\right)^{\frac{i-1}{n-1}}\\) for \\\(i\\) running from 1 to `n`, I glossed over what \\(w_max\\) really was. Let’s formally nail that down: \\(w_{max}\\) is a Beta-distributed random variable which governs the entire set of weights.
+
+The powers of \\(w_{max}\\) ensure that \\(w_1=1\\) (a constant) and \\(w_n=w_{max}\\) (the Beta-distributed random variable).
+
+You can you can give `initModel` the mean of the finalweight , \\(E[w_{max}]\\), via the `wmaxMean` keyword argument. But given the high odds that you have *no* interest thinking about this strange random variable, but rather you have a *lot* of thoughts on this fact’s *halflife*. Therefore, `initModel` also lets you specify `initHlMean`, your best guess as to this fact’s initial memory halflife, in hours.
+
+> Math note: upfront we just let you specify the *mean* of the final weight \\(E[w_{max}]\\), i.e., `wmaxMean`, and not a full Beta distribution. We will eventually ask you for a full prior on the weights later, when we get quizzes, but don’t use that for just predicting recall. We will discuss this in the next section, on `predictRecall`.
+> 
+> Math note 2: if you just provide `initHlMean`, we convert this to `wmaxMean` through a quick function minimization (see `hoursForModelDecay` below for how we convert an Ebisu `Model` to the halflife).
+
+`now` is milliseconds since the Unix epoch (midnight UTC, Jan 1, 1970). Provide this to customize when the student learned this fact, otherwise Ebisu will use the current time.
+
+You can serialize this `Model` with the `to_json` method provided by [Dataclasses-JSON](https://github.com/lidatong/dataclasses-json), which also provides its complement, `from_json`. Therefore, this will work:
+```py
+ebisu.Model.from_json(ebisu.initModel(0.1).to_json())
+```
+
+It's expected that apps using Ebisu will save the serialized JSON to a database. The model contains all historic quiz information and numbers describing the probabilistic configuration.
+
+### Predict recall probability
+```py
+def predictRecall(
+    model: Model,
+    now: Optional[float] = None,
+    logDomain=True,
+) -> float
+```
+This functions answers one of the core questions any flashcard app asks: what fact is most in danger of being forgotten? You give function an Ebisu `Model`, with an optional `now` (milliseconds in the Unix epoch), to get a log-base-2-probability of recall. A higher number implies more likely to recall, and so the lower the number, the more risk of of forgetting.
+
+If you pass in `logDomain=False`, this function will call `exp2` to convert log-base-2-probability (-∞ to 0) to actual probability (0 to 1). (This is not done by default because `exp2`, floating-point power, is actually expensive compared to arithmetic. No, I don’t have an explicit reference. Yes, profiling is important.)
+
+**Nota bene** if you’re storing Ebisu models as JSON in SQL, you might not need this function! The following snippet selects all columns and a new column, called `logPredictRecall`, assuming a SQLite table called `mytable` with Ebisu models in a column called `model_json`:
+```sql
+SELECT
+  t.id,
+  t.model_json,
+  MAX(
+    (
+      JSON_EXTRACT(value, '$[0]') - (
+        (?) - JSON_EXTRACT(model_json, '$.pred.lastEncounterMs')
+      ) / JSON_EXTRACT(value, '$[1]')
+    )
+  ) AS logPredictRecall
+FROM
+  mytable t,
+  JSON_EACH(JSON_EXTRACT(t.model_json, '$.pred.forSql'))
+GROUP BY t.id
+```
+The placeholder `(?)` is for you to pass in the current timestamp (milliseconds since Unix epoch; in SQLite you can get this via `strftime('%s','now') * 1000`).
+
+As mentioned above in the discussion of `initModel`, we just ask you to specify the mean of \\(w_{max}\\), `wmaxMean` (and just pretend we know the “true values” of the weights even though they’re really random variables) so that the above SQL works—so that the equivalent `predictRecall` function is fast and straightforward to implement.
+
+> More formally, for purposes of predicting recall, Ebisu naively pretends that the expected probability of recall after \\(t\\) hours, \\(E[p(t)] = E\left[\max_i \left\lbrace w_i ⋅ 2^{-t / h_i} \right\rbrace\right]\\), is:
+> \\[E[p(t)] = E\left[\max_i \left\lbrace(w_{max})^{\frac{i-1}{n-1}} ⋅ 2^{-t / h_i} \right\rbrace\right] ≈ \max_i \left\lbrace E[w_i] ⋅ 2^{-t / h_i} \right\rbrace,\\]
+> that is, even though \\(w_i\\) are actually random variables (because \\(w_{max}\\) is Beta-distributed), Ebisu simplifies and approximates the expectation by moving it inside the `max` and power, for computational efficiency and convenience.
+> 
+> In general, via [Jensen’s inequality](https://en.wikipedia.org/wiki/Jensen's_inequality), \\(E[f(w_n)] ≠ f(E[w_n])\\) when \\(f\\) is nonlinear: you can’t just move the expectation inside a nonlinear function. (An easy way to see this: what’s \\(E[N^2]\\) where \\(N\\) follows a standard Normal (Gaussian) distribution? It’s certainly not \\(E[N]^2\\) which is \\(0^2\\)!) However, the approximation is pretty accurate, and we will revisit this in an appendix.
+>
+> Strictly as a bonus, and not part of the official Ebisu API, this Python module provides `predictRecallBayesian` that accepts a full Bayesian prior in the form of a Beta distribution around \\(w_{max}\\): you can pass in the variance and mean, though both are optional. If you omit the mean, we use the `wmaxMean` you specified in `initModel` (or that Ebisu estimates in `updateRecall` below). If you don’t provide a variance, Ebisu will compute the highest-variance “reasonable” Beta distribution that meets that mean, where “reasonable” means unimodal (α and β both greater than 2):
+> ```py
+> def predictRecallBayesian(
+>     model: Model,
+>     wmaxVar: float,
+>     now: Optional[float] = None,
+> ) -> float
+> ```
+> As mentioned, in an appendix we’ll evaluate this decision to collapse the variability around the weights to just the mean weights and see that the cost of flouting Jensen’s inequality is not bad.
+
+### Update after a quiz
+```py
+def updateRecall(
+    model: Model,
+    successes: Union[float, int],
+    total: int = 1,
+    q0: Optional[float] = None,
+    wmaxPrior: Optional[tuple[float, float]] = None,
+    now: Optional[float] = None,
+) -> Model
+```
+The other really important question flashcard apps ask is: “I've done a quiz, now what?” This `updateRecall` function handles this crucial step.
+
+As alluded to in the introduction, Ebisu supports **two** distinct kinds of quizzes.
+- With `total>1` you get *binomial* quizzes, meaning out of a `total` number of points the student could have gotten, she got `successes` (both integers). 
+- With `total=1` you get *noisy-binary* (or *soft-binary*) quizzes where `0 <= successes <= 1` can be a float. This supports some pretty complex workflows!
+
+§ Example 1. For the bog-standard flashcard review, where you show the student a flashcard and they get it right (or wrong), you can pass in `successes=1` (or `successes=0`), and use the default `total=1`. You get binary quizzes.
+
+§ Example 2. For a Duolingo-style review, where you review the same fact multiple times in a single short quiz session, you provide the number of `successes` and `total>1` (the number of points received versus the maximum number of points, both integers). Ebisu treats this as a binomial quiz. 
+
+> Math note: a binary experiment, formally called a Bernoulli experiment, is just a special case of the binomial experiment. Though the math is different, the numbers come out the same for binary quizzes, whether we use the binomial or the noisy-binary route (see next paragraph). Both also have comparable runtime, but technically Ebisu stores plain binary quizzes as the noisy-binary.
+
+§ Example 3. For more complex apps, where you have deep probabilistic insight into the student’s performance, you can specify noisy-binary quizzes by passing in `total=1` with a float `0 < successes < 1`, and optionally a float `0 <= q0 <= 1`.
+
+In the noisy-binary model, we can separate the actual quiz result (a pass/fail) with whether the student *actually* remembers the fact by specifying two independent numbers:
+- `Probability(passed quiz | actually remembers)`, or \\(q_1\\) in the derivation below, is the probability that, assuming the student *actually* remembers the fact, they got the quiz right? This should be 1.0 (100%), especially if your app is nice and lets students change their grade (typos, etc.), but might be less if your app doesn’t allow this. Second, you can specify
+- `Probability(passed quiz | actually forgot)`, or \\(q_0\\) that is, given the student actually forgot the fact, what’s the probability they passed the quiz? This might be greater than zero if, for example, you provided multiple-choice quizzes and the student only remembered the answer because they recognized it in the list of choices. Or consider a foreign language reader app where users can read texts and click on words they don’t remember: imagine they read a sentence without clicking on any words—you’d like to be able to model the situation where, if you actually quizzed them on one of the words, they would fail the quiz, but all you know is they didn’t click on a word to see its definition.
+
+In Ebisu, you identify these two values via:
+- \\(q_1\\) or `Probability(passed quiz | actually remembers)` is: `max(successes, 1 - successes)`. I.e., if `successes=0.9`, then this conditional probability \\(q_1\\) is 0.9 and you are indicating that the student passed the quiz. If `successes=0.1`, \\(q_1=0.9\\) still and you’re indicating the student failed this review.
+- \\(q_0\\) or `Probability(observed pass | real quiz failed)` can be passed in as the `q0` keyword argument. It defaults to the complement of \\(q_1\\), i.e, by default \\(q_0=1-q_1\\). In code, `q0=1 - max(successes, 1 - successes)`.
+
+Let’s revisit that foreign language reader quiz app. The student read a word in a sentence and did *not* click on it to see the definition.
+- What should \\(q_1\\) or `Probability(did not ask for definition | they know the word) = successes` be? I would guess 1.0—that is, if they know the word, they would never ask for the definition, so `successes=1.0`. But maybe your quiz is really cool and your student is very conscientious, and they tell you that they weren’t 100% sure, in which case you assign \\(q_1=0.9\\), i.e., `successes=0.9`.
+- What should \\(q_0\\), or `Probability(did not ask for definition | they forgot the word)` be? If they actually had forgotten the word, there’s a low but non-zero chance of observing the same behavior (didn’t ask for the definition), so I might pass in `q0=0.1` (10% chance of this).
+
+With `successes`, `total`, and `q0`, Ebisu can handle a rich range of quiz results robustly and quantitatively.
+
+This update function is performs a full Bayesian analysis to estimate a new \\(w_{max}\\), the final leaky integrator’s weight, which therefore governs the weights of all `n` leaky integrators and thus the effective halflife of the memory.
+
+An important part of Bayesian analysis is your prior belief on what values \\(w_{max}\\) takes on, before you’ve looked at any data, before you look at the actual quiz results. You can provide `wmaxPrior`, a 2-tuple \\((α, β)\\) representing the parameters of the Beta distribution representing your prior for this weight (we follow [Wikipedia](https://en.wikipedia.org/wiki/Beta_distribution)’s definition).
+
+This is optional—if you don’t provide `wmaxPrior`, we will find the highest-variance “reasonable” Beta distribution that implies a halflife equal to the student’s *maximum inter-quiz interval*. “Reasonable” here means a unimodal Beta prior (both \\(α, β ≥ 2\\)).
+
+In other words, if you don’t provide a prior (and we imagine very few of you will actually have enough of an opinion on the weights, as abstract and distant a concept that they are), we will pick a prior for you by cheating a tiny bit: we will look at the data but only to find the longest the student has gone between quizzes and assume that’s the mean halflife of the quiz.
+
+In practice, this works well, and follows Lindsey, et al. (see [bibliography](#bibliography)) by applying “a bias that additional study in a given time window helps, but has logarithmically diminishing returns” (2014). (Lindsey, et al., is the same team whose leaky integrator NIPS 2009 paper is the core inspiration for Ebisu.)
+
+If you repeatedly review the same flashcard on a weekly basis, and you call `updateRecall` with `wmaxPrior=None` (the default), Ebisu *will* estimate a posterior \\(w_{max}\\) that implies a *slowly* strenghening memory. You can only convince Ebisu that you *durably* know this fact by showing us you remember it at increasing intervals.
+
+As with other functions above, `updateRecall` also accepts `now`, milliseconds since the Unix epoch.
+
+### How long till a model reaches some probability?
+```py
+def hoursForRecallDecay(model: Model, percentile=0.5) -> float
+```
+This is sometimes useful for quizzes that seek to schedule a review in the future when a fact’s memory is expected to have decayed to some probability. This `hoursForRecallDecay`, in converting probability to time (hours), is sort of the inverse of `predictRecall` which converts time (hours) to probability. By default the probability is 0.5, so this function returns the halflife of a `Model`.
+
+That’s it. Four functions in the API.
+
 
 ## Bibliography
 

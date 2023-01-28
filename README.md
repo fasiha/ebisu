@@ -128,7 +128,7 @@ Memory research began with Hermann Ebbinghaus’ discovery of the [forgetting cu
 
 Anki and SuperMemo are extremely popular. They use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little [field guide](https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174) to Anki’s, with links to the source code—since they are optimized to minimize daily review time while maximizing retention. However, because each fact has simply a date of next review, these algorithms do not gracefully accommodate over- or under-reviewing. Even when used as prescribed, they can schedule many facts for review on one day but few on others. (I must note that all three of these issues—over-reviewing (cramming), under-reviewing, and lumpy reviews—have well-supported solutions in Anki by tweaking the rules and third-party plugins.)
 
-Duolingo’s half-life regression explicitly models the probability of you recalling a fact as an exponential, \\(2^{-Δ/h}\\) where Δ is the time since your last review and \\(h\\) is a *half-life*. In this model, your chances of passing a quiz after \\(h\\) days is 50%, which drops to 25% after \\(2 h\\) days, and so on. They estimate this half-life by combining your past performance and fact metadata in a large-scale machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.
+Duolingo’s half-life regression explicitly models the probability of you recalling a fact as an exponential, $2^{-Δ/h}$ where Δ is the time since your last review and $h$ is a *half-life*. In this model, your chances of passing a quiz after $h$ days is 50%, which drops to 25% after $2 h$ days, and so on. They estimate this half-life by combining your past performance and fact metadata in a large-scale machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.
 
 The Mozer group’s algorithms (MCM (their 2009 paper) and DASH (their 2014 paper; see [bibliography](#bibliography))) also curve-fit a large quantity of quiz data to high-dimensional models, including, in DASH’s case, a hierarchical Bayesian model that takes into account inter-fact and inter-student variability.
 
@@ -165,13 +165,13 @@ For each fact in your quiz app, create an Ebisu `Model` via `initModel`. The opt
 1. There are `n` leaky integrators (decaying exponentials), each with a halflife that’s strictly logarithmically increasing, starting at `hmin` hours (default 1) and ending at `hmax` hours (default `1e5` or roughly 11 years).
 2. Each of the `n` leaky integrators also has a weight, indicating its maximum recall probability at time 0. The weights are strictly exponentially decreasing: the first leaky integrator gets a weight of 1 and the `n`th gets `wmaxMean`.
 
-> A bit more formally, let the vector of halflives be `h = np.logspace(np.log10(hmin), np.log10(hmax), n)` where [`np.logspace`](https://numpy.org/doc/stable/reference/generated/numpy.logspace.html) is provided by Numpy. And let each weight be \\(w_i = \left(w_{max}\right)^{\frac{i-1}{n-1}}\\), for the index \\(i\\) running from 1 to `n`. (For reasons that will become clear in a second, the weights are *not* normalized to sum to 1: the `n` leaky integrators do *not* constitute a mixture.)
+> A bit more formally, let the vector of halflives be `h = np.logspace(np.log10(hmin), np.log10(hmax), n)` where [`np.logspace`](https://numpy.org/doc/stable/reference/generated/numpy.logspace.html) is provided by Numpy. And let each weight be $w_i = \left(w_{max}\right)^{\frac{i-1}{n-1}}$, for the index $i$ running from 1 to `n`. (For reasons that will become clear in a second, the weights are *not* normalized to sum to 1: the `n` leaky integrators do *not* constitute a mixture.)
 
-A single leaky integrator predicts a recall probability \\(p_i(t) = w_i ⋅ 2^{-t / h_i}\\) (here \\(t\\) indicates hours since last review).
+A single leaky integrator predicts a recall probability $p_i(t) = w_i ⋅ 2^{-t / h_i}$ (here $t$ indicates hours since last review).
 
 Ebisu considers the *max* of each leaky integrator to be this flashcard’s probability of recall:
 
-\\[p(t) = \max_i(w_i ⋅ 2^{-t / h_i}).\\]
+$p(t) = \max_i(w_i ⋅ 2^{-t / h_i}).$
 
 For example, with `n=5` leaky integrators going from `hmin=1` hour to `hmax=1e4` hours (13.7-ish months), and with the last longest-duration exponential getting a weight of `wmaxMean=0.1`, we have this profile of weights:
 
@@ -183,7 +183,7 @@ The next plot shows each of the five leaky integrators individually as well as t
 
 ![Recall probability for each leaky integrator, with max](leaky-integrators-precall.png)
 
-Note how each of the five leaky integrators start at elapsed time \\(t=0\\) at exactly their weights (logarithmically spaced from 1 to `wmaxMean`, here 0.1), and decay from there.
+Note how each of the five leaky integrators start at elapsed time $t=0$ at exactly their weights (logarithmically spaced from 1 to `wmaxMean`, here 0.1), and decay from there.
 
 At the left-most part of the plot, the first leaky integrator with the shortest time constant dominates, but very quickly fades away due to the crush of its fast exponential. As it decays however, the second leaky integrator, with a strictly lower starting value (weight), steps up to keep the recall probability from collapsing. And so on till the last leaky integrator.
 
@@ -195,13 +195,13 @@ By taking the *max* of the output of each leaky integrator, we get this *sequenc
 
 After the last leaky integrator (i.e., when the time since review exceeds `hmax`), the probability of recall collapses quickly to zero due to the weight of exponential decay (“the most powerful force in the world”). This can be staved off by using higher `hmax`, and this is why the default `hmax=1e5`, i.e., 11.4-ish years.
 
-Sharp-eyed readers will have noticed that when I described the weights as \\(w_i = \left(w_{max}\right)^{\frac{i-1}{n-1}}\\) for \\\(i\\) running from 1 to `n`, I glossed over what \\(w_max\\) really was. Let’s formally nail that down: \\(w_{max}\\) is a Beta-distributed random variable which governs the entire set of weights.
+Sharp-eyed readers will have noticed that when I described the weights as $w_i = \left(w_{max}\right)^{\frac{i-1}{n-1}}$ for \$i$ running from 1 to `n`, I glossed over what $w_max$ really was. Let’s formally nail that down: $w_{max}$ is a Beta-distributed random variable which governs the entire set of weights.
 
-The powers of \\(w_{max}\\) ensure that \\(w_1=1\\) (a constant) and \\(w_n=w_{max}\\) (the Beta-distributed random variable).
+The powers of $w_{max}$ ensure that $w_1=1$ (a constant) and $w_n=w_{max}$ (the Beta-distributed random variable).
 
-You can you can give `initModel` the mean of the finalweight , \\(E[w_{max}]\\), via the `wmaxMean` keyword argument. But given the high odds that you have *no* interest thinking about this strange random variable, but rather you have a *lot* of thoughts on this fact’s *halflife*. Therefore, `initModel` also lets you specify `initHlMean`, your best guess as to this fact’s initial memory halflife, in hours.
+You can you can give `initModel` the mean of the finalweight , $E[w_{max}]$, via the `wmaxMean` keyword argument. But given the high odds that you have *no* interest thinking about this strange random variable, but rather you have a *lot* of thoughts on this fact’s *halflife*. Therefore, `initModel` also lets you specify `initHlMean`, your best guess as to this fact’s initial memory halflife, in hours.
 
-> Math note: upfront we just let you specify the *mean* of the final weight \\(E[w_{max}]\\), i.e., `wmaxMean`, and not a full Beta distribution. We will eventually ask you for a full prior on the weights later, when we get quizzes, but don’t use that for just predicting recall. We will discuss this in the next section, on `predictRecall`.
+> Math note: upfront we just let you specify the *mean* of the final weight $E[w_{max}]$, i.e., `wmaxMean`, and not a full Beta distribution. We will eventually ask you for a full prior on the weights later, when we get quizzes, but don’t use that for just predicting recall. We will discuss this in the next section, on `predictRecall`.
 > 
 > Math note 2: if you just provide `initHlMean`, we convert this to `wmaxMean` through a quick function minimization (see `hoursForModelDecay` below for how we convert an Ebisu `Model` to the halflife).
 
@@ -245,15 +245,15 @@ GROUP BY t.id
 ```
 The placeholder `(?)` is for you to pass in the current timestamp (milliseconds since Unix epoch; in SQLite you can get this via `strftime('%s','now') * 1000`).
 
-As mentioned above in the discussion of `initModel`, we just ask you to specify the mean of \\(w_{max}\\), `wmaxMean` (and just pretend we know the “true values” of the weights even though they’re really random variables) so that the above SQL works—so that the equivalent `predictRecall` function is fast and straightforward to implement.
+As mentioned above in the discussion of `initModel`, we just ask you to specify the mean of $w_{max}$, `wmaxMean` (and just pretend we know the “true values” of the weights even though they’re really random variables) so that the above SQL works—so that the equivalent `predictRecall` function is fast and straightforward to implement.
 
-> More formally, for purposes of predicting recall, Ebisu naively pretends that the expected probability of recall after \\(t\\) hours, \\(E[p(t)] = E\left[\max_i \left\lbrace w_i ⋅ 2^{-t / h_i} \right\rbrace\right]\\), is:
-> \\[E[p(t)] = E\left[\max_i \left\lbrace(w_{max})^{\frac{i-1}{n-1}} ⋅ 2^{-t / h_i} \right\rbrace\right] ≈ \max_i \left\lbrace E[w_i] ⋅ 2^{-t / h_i} \right\rbrace,\\]
-> that is, even though \\(w_i\\) are actually random variables (because \\(w_{max}\\) is Beta-distributed), Ebisu simplifies and approximates the expectation by moving it inside the `max` and power, for computational efficiency and convenience.
+> More formally, for purposes of predicting recall, Ebisu naively pretends that the expected probability of recall after $t$ hours, $E[p(t)] = E\left[\max_i \left\lbrace w_i ⋅ 2^{-t / h_i} \right\rbrace\right]$, is:
+> $E[p(t)] = E\left[\max_i \left\lbrace(w_{max})^{\frac{i-1}{n-1}} ⋅ 2^{-t / h_i} \right\rbrace\right] ≈ \max_i \left\lbrace E[w_i] ⋅ 2^{-t / h_i} \right\rbrace,$
+> that is, even though $w_i$ are actually random variables (because $w_{max}$ is Beta-distributed), Ebisu simplifies and approximates the expectation by moving it inside the `max` and power, for computational efficiency and convenience.
 > 
-> In general, via [Jensen’s inequality](https://en.wikipedia.org/wiki/Jensen's_inequality), \\(E[f(w_n)] ≠ f(E[w_n])\\) when \\(f\\) is nonlinear: you can’t just move the expectation inside a nonlinear function. (An easy way to see this: what’s \\(E[N^2]\\) where \\(N\\) follows a standard Normal (Gaussian) distribution? It’s certainly not \\(E[N]^2\\) which is \\(0^2\\)!) However, the approximation is pretty accurate, and we will revisit this in an appendix.
+> In general, via [Jensen’s inequality](https://en.wikipedia.org/wiki/Jensen's_inequality), $E[f(w_n)] ≠ f(E[w_n])$ when $f$ is nonlinear: you can’t just move the expectation inside a nonlinear function. (An easy way to see this: what’s $E[N^2]$ where $N$ follows a standard Normal (Gaussian) distribution? It’s certainly not $E[N]^2$ which is $0^2$!) However, the approximation is pretty accurate, and we will revisit this in an appendix.
 >
-> Strictly as a bonus, and not part of the official Ebisu API, this Python module provides `predictRecallBayesian` that accepts a full Bayesian prior in the form of a Beta distribution around \\(w_{max}\\): you can pass in the variance and mean, though both are optional. If you omit the mean, we use the `wmaxMean` you specified in `initModel` (or that Ebisu estimates in `updateRecall` below). If you don’t provide a variance, Ebisu will compute the highest-variance “reasonable” Beta distribution that meets that mean, where “reasonable” means unimodal (α and β both greater than 2):
+> Strictly as a bonus, and not part of the official Ebisu API, this Python module provides `predictRecallBayesian` that accepts a full Bayesian prior in the form of a Beta distribution around $w_{max}$: you can pass in the variance and mean, though both are optional. If you omit the mean, we use the `wmaxMean` you specified in `initModel` (or that Ebisu estimates in `updateRecall` below). If you don’t provide a variance, Ebisu will compute the highest-variance “reasonable” Beta distribution that meets that mean, where “reasonable” means unimodal (α and β both greater than 2):
 > ```py
 > def predictRecallBayesian(
 >     model: Model,
@@ -289,30 +289,30 @@ As alluded to in the introduction, Ebisu supports **two** distinct kinds of quiz
 § Example 3. For more complex apps, where you have deep probabilistic insight into the student’s performance, you can specify noisy-binary quizzes by passing in `total=1` with a float `0 < successes < 1`, and optionally a float `0 <= q0 <= 1`.
 
 In the noisy-binary model, we can separate the actual quiz result (a pass/fail) with whether the student *actually* remembers the fact by specifying two independent numbers:
-- `Probability(passed quiz | actually remembers)`, or \\(q_1\\) in the derivation below, is the probability that, assuming the student *actually* remembers the fact, they got the quiz right? This should be 1.0 (100%), especially if your app is nice and lets students change their grade (typos, etc.), but might be less if your app doesn’t allow this. Second, you can specify
-- `Probability(passed quiz | actually forgot)`, or \\(q_0\\) that is, given the student actually forgot the fact, what’s the probability they passed the quiz? This might be greater than zero if, for example, you provided multiple-choice quizzes and the student only remembered the answer because they recognized it in the list of choices. Or consider a foreign language reader app where users can read texts and click on words they don’t remember: imagine they read a sentence without clicking on any words—you’d like to be able to model the situation where, if you actually quizzed them on one of the words, they would fail the quiz, but all you know is they didn’t click on a word to see its definition.
+- `Probability(passed quiz | actually remembers)`, or $q_1$ in the derivation below, is the probability that, assuming the student *actually* remembers the fact, they got the quiz right? This should be 1.0 (100%), especially if your app is nice and lets students change their grade (typos, etc.), but might be less if your app doesn’t allow this. Second, you can specify
+- `Probability(passed quiz | actually forgot)`, or $q_0$ that is, given the student actually forgot the fact, what’s the probability they passed the quiz? This might be greater than zero if, for example, you provided multiple-choice quizzes and the student only remembered the answer because they recognized it in the list of choices. Or consider a foreign language reader app where users can read texts and click on words they don’t remember: imagine they read a sentence without clicking on any words—you’d like to be able to model the situation where, if you actually quizzed them on one of the words, they would fail the quiz, but all you know is they didn’t click on a word to see its definition.
 
 In Ebisu, you identify these two values via:
-- \\(q_1\\) or `Probability(passed quiz | actually remembers)` is: `max(successes, 1 - successes)`. I.e., if `successes=0.9`, then this conditional probability \\(q_1\\) is 0.9 and you are indicating that the student passed the quiz. If `successes=0.1`, \\(q_1=0.9\\) still and you’re indicating the student failed this review.
-- \\(q_0\\) or `Probability(observed pass | real quiz failed)` can be passed in as the `q0` keyword argument. It defaults to the complement of \\(q_1\\), i.e, by default \\(q_0=1-q_1\\). In code, `q0=1 - max(successes, 1 - successes)`.
+- $q_1$ or `Probability(passed quiz | actually remembers)` is: `max(successes, 1 - successes)`. I.e., if `successes=0.9`, then this conditional probability $q_1$ is 0.9 and you are indicating that the student passed the quiz. If `successes=0.1`, $q_1=0.9$ still and you’re indicating the student failed this review.
+- $q_0$ or `Probability(observed pass | real quiz failed)` can be passed in as the `q0` keyword argument. It defaults to the complement of $q_1$, i.e, by default $q_0=1-q_1$. In code, `q0=1 - max(successes, 1 - successes)`.
 
 Let’s revisit that foreign language reader quiz app. The student read a word in a sentence and did *not* click on it to see the definition.
-- What should \\(q_1\\) or `Probability(did not ask for definition | they know the word) = successes` be? I would guess 1.0—that is, if they know the word, they would never ask for the definition, so `successes=1.0`. But maybe your quiz is really cool and your student is very conscientious, and they tell you that they weren’t 100% sure, in which case you assign \\(q_1=0.9\\), i.e., `successes=0.9`.
-- What should \\(q_0\\), or `Probability(did not ask for definition | they forgot the word)` be? If they actually had forgotten the word, there’s a low but non-zero chance of observing the same behavior (didn’t ask for the definition), so I might pass in `q0=0.1` (10% chance of this).
+- What should $q_1$ or `Probability(did not ask for definition | they know the word) = successes` be? I would guess 1.0—that is, if they know the word, they would never ask for the definition, so `successes=1.0`. But maybe your quiz is really cool and your student is very conscientious, and they tell you that they weren’t 100% sure, in which case you assign $q_1=0.9$, i.e., `successes=0.9`.
+- What should $q_0$, or `Probability(did not ask for definition | they forgot the word)` be? If they actually had forgotten the word, there’s a low but non-zero chance of observing the same behavior (didn’t ask for the definition), so I might pass in `q0=0.1` (10% chance of this).
 
 With `successes`, `total`, and `q0`, Ebisu can handle a rich range of quiz results robustly and quantitatively.
 
-This update function is performs a full Bayesian analysis to estimate a new \\(w_{max}\\), the final leaky integrator’s weight, which therefore governs the weights of all `n` leaky integrators and thus the effective halflife of the memory.
+This update function is performs a full Bayesian analysis to estimate a new $w_{max}$, the final leaky integrator’s weight, which therefore governs the weights of all `n` leaky integrators and thus the effective halflife of the memory.
 
-An important part of Bayesian analysis is your prior belief on what values \\(w_{max}\\) takes on, before you’ve looked at any data, before you look at the actual quiz results. You can provide `wmaxPrior`, a 2-tuple \\((α, β)\\) representing the parameters of the Beta distribution representing your prior for this weight (we follow [Wikipedia](https://en.wikipedia.org/wiki/Beta_distribution)’s definition).
+An important part of Bayesian analysis is your prior belief on what values $w_{max}$ takes on, before you’ve looked at any data, before you look at the actual quiz results. You can provide `wmaxPrior`, a 2-tuple $(α, β)$ representing the parameters of the Beta distribution representing your prior for this weight (we follow [Wikipedia](https://en.wikipedia.org/wiki/Beta_distribution)’s definition).
 
-This is optional—if you don’t provide `wmaxPrior`, we will find the highest-variance “reasonable” Beta distribution that implies a halflife equal to the student’s *maximum inter-quiz interval*. “Reasonable” here means a unimodal Beta prior (both \\(α, β ≥ 2\\)).
+This is optional—if you don’t provide `wmaxPrior`, we will find the highest-variance “reasonable” Beta distribution that implies a halflife equal to the student’s *maximum inter-quiz interval*. “Reasonable” here means a unimodal Beta prior (both $α, β ≥ 2$).
 
 In other words, if you don’t provide a prior (and we imagine very few of you will actually have enough of an opinion on the weights, as abstract and distant a concept that they are), we will pick a prior for you by cheating a tiny bit: we will look at the data but only to find the longest the student has gone between quizzes and assume that’s the mean halflife of the quiz.
 
 In practice, this works well, and follows Lindsey, et al. (see [bibliography](#bibliography)) by applying “a bias that additional study in a given time window helps, but has logarithmically diminishing returns” (2014). (Lindsey, et al., is the same team whose leaky integrator NIPS 2009 paper is the core inspiration for Ebisu.)
 
-If you repeatedly review the same flashcard on a weekly basis, and you call `updateRecall` with `wmaxPrior=None` (the default), Ebisu *will* estimate a posterior \\(w_{max}\\) that implies a *slowly* strenghening memory. You can only convince Ebisu that you *durably* know this fact by showing us you remember it at increasing intervals.
+If you repeatedly review the same flashcard on a weekly basis, and you call `updateRecall` with `wmaxPrior=None` (the default), Ebisu *will* estimate a posterior $w_{max}$ that implies a *slowly* strenghening memory. You can only convince Ebisu that you *durably* know this fact by showing us you remember it at increasing intervals.
 
 As with other functions above, `updateRecall` also accepts `now`, milliseconds since the Unix epoch.
 

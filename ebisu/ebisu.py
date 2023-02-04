@@ -6,7 +6,9 @@ from scipy.optimize import minimize_scalar  # type: ignore
 
 from ebisu.ebisuHelpers import _makeWs, posterior, timeMs
 from ebisu.expectionMaxScaledPowBeta import expectationMaxScaledPowBeta
-from ebisu.models import BinomialResult, Model, NoisyBinaryResult, WeightsFormat, Predict, Quiz, Result
+from ebisu.models import BinomialResult, Ebisu2Model, Model, NoisyBinaryResult, WeightsFormat, Predict, Quiz, Result
+
+import ebisu2beta
 
 
 def initModel(
@@ -15,6 +17,7 @@ def initModel(
     hmin: float = 1,
     hmax: float = 1e5,  # 1e5 hours = 11+ years
     n: int = 10,
+    initAlphaBeta=2.0,
     now: Optional[float] = None,
     format: WeightsFormat = "exp",
     m: Optional[float] = None,
@@ -49,12 +52,81 @@ def initModel(
           format=format,
           m=m,
           initHlMean=initHlMean,
+          # whee
+          betaWeights=ws.tolist(),
+          betaModels=[(initAlphaBeta, initAlphaBeta, t) for t in hs],
+          betaWeightsReached=[x == 0 for x in range(n)],
       ),
   )
 
 
 def _genForSql(log2ws, hs) -> list[tuple[float, float]]:
   return [(lw, h * 3600e3) for lw, h in zip(log2ws, hs)]
+
+
+def updateRecallBetas(
+    model: Model,
+    successes: Union[float, int],
+    total: int = 1,
+    q0: Optional[float] = None,
+    now: Optional[float] = None,
+) -> Model:
+  now = now or timeMs()
+  t = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
+  updatedModels = [
+      ebisu2beta.updateRecall(
+          prior, successes=successes, total=total, tnow=t, rebalance=False, tback=prior[2])
+      for prior in model.pred.betaModels
+  ]
+  updatedHls = [ebisu2beta.modelToPercentileDecay(m) for m in updatedModels]
+  hls = [ebisu2beta.modelToPercentileDecay(m) for m in model.pred.betaModels]
+  hlScales = [n / o for n, o in zip(updatedHls, hls)]
+  SCALE_THRESH = 0.95
+  newModels: list[Ebisu2Model] = []
+  newWeights: list[float] = []
+  newReached: list[bool] = []
+  for m, updated, scal, weight, reached in zip(model.pred.betaModels, updatedModels, hlScales,
+                                               model.pred.betaWeights,
+                                               model.pred.betaWeightsReached):
+    if reached:
+      newModels.append(updated)
+      newWeights.append(min(weight * scal if scal > 1 else weight, 1))
+      newReached.append(True)
+    else:
+      if (scal < 1 and scal < SCALE_THRESH) or (scal > 1 and scal < 1.01):
+        # early failure or success
+        newModels.append(m)
+        newWeights.append(weight)
+        newReached.append(False)
+      else:
+        newModels.append(updated)
+        newWeights.append(min(powerMean([weight, scal], 2), 1))
+        newReached.append(True)
+
+  resultObj: Union[NoisyBinaryResult, BinomialResult]
+
+  if total == 1:
+    assert (0 <= successes <= 1), "`total=1` implies successes in [0, 1]"
+    q1 = max(successes, 1 - successes)  # between 0.5 and 1
+    q0 = 1 - q1 if q0 is None else q0  # either the input argument OR between 0 and 0.5
+    resultObj = NoisyBinaryResult(result=successes, q1=q1, q0=q0, hoursElapsed=t)
+
+  else:
+    assert successes == np.floor(successes), "float `successes` must have `total=1`"
+    assert successes >= 0, "negative `successes` meaningless"
+    assert total > 0, "positive binomial trials"
+    resultObj = BinomialResult(successes=int(successes), total=total, hoursElapsed=t)
+
+  ret = deepcopy(model)  # clone
+  _appendQuizImpure(ret, resultObj)
+
+  ret.pred.lastEncounterMs = now
+
+  ret.pred.betaModels = newModels
+  ret.pred.betaWeights = newWeights
+  ret.pred.betaWeightsReached = newReached
+
+  return ret
 
 
 def updateRecall(
@@ -76,7 +148,6 @@ def updateRecall(
     maxh = max([q.hoursElapsed for q in model.quiz.results[0]] +
                [t if nq == 0 else 0, model.pred.initHlMean or 0])
     wmaxPrior = _halflifeToWmaxPrior(maxh)
-    print(f'{maxh=}, {wmaxPrior=}')
     # Note I don't use this or any past results, just past times. Given
     # http://www.stat.columbia.edu/~gelman/research/published/entropy-19-00555-v2.pdf
     # ("The Prior Can Often Only Be Understood in the Context of the Likelihood"
@@ -100,7 +171,8 @@ def updateRecall(
   _appendQuizImpure(ret, resultObj)
 
   hs = np.array(ret.pred.hs)
-  res = minimize_scalar(lambda wmax: -(posterior(ret, wmax, wmaxPrior, hs)[0]), [0, 1], [0, 1])
+  res = minimize_scalar(
+      lambda wmax: -(posterior(ret, wmax, wmaxPrior, hs)[0]), bracket=[0, 1], bounds=[0, 1])
   assert res.success
   wmaxMap = res.x
 
@@ -135,6 +207,33 @@ def predictRecall(
   assert elapsedHours >= 0, "cannot go back in time"
   logPrecall = max(log2w - elapsedHours / h for log2w, h in zip(model.pred.log2ws, model.pred.hs))
   return logPrecall if logDomain else np.exp2(logPrecall)
+
+
+def predictRecallBetas(
+    model: Model,
+    now: Optional[float] = None,
+    logDomain=True,
+) -> float:
+  now = now if now is not None else timeMs()
+  elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
+  assert elapsedHours >= 0, "cannot go back in time"
+  if logDomain:
+    logPrecall = max(
+        np.log(w) + ebisu2beta.predictRecall(prior, elapsedHours, exact=not logDomain)
+        for prior, w in zip(model.pred.betaModels, model.pred.betaWeights))
+    return logPrecall
+  else:
+    return max(w * ebisu2beta.predictRecall(prior, elapsedHours, exact=not logDomain)
+               for prior, w in zip(model.pred.betaModels, model.pred.betaWeights))
+
+
+def hoursForRecallDecayBetas(model: Model, percentile=0.5) -> float:
+  logp = np.log(percentile)
+  res = minimize_scalar(
+      lambda h: abs(logp - predictRecallBetas(model, model.pred.lastEncounterMs + 3600e3 * h)),
+      [0, 1e7], [0, 1e7])
+  assert res.success
+  return res.x
 
 
 def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
@@ -239,3 +338,8 @@ def _meanVarToBeta(mean: float, var: float) -> tuple[float, float]:
   alpha = mean * tmp
   beta = (1 - mean) * tmp
   return alpha, beta
+
+
+def powerMean(v: list[float] | np.ndarray, p: int | float) -> float:
+  assert p > 0
+  return np.mean(np.array(v)**p)**(1 / p)

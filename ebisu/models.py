@@ -42,6 +42,8 @@ class Quiz(DataClassJsonMixin):
 
 WeightsFormat = Literal['exp', 'rational']
 
+Ebisu2Model = tuple[float, float, float]
+
 
 @dataclass
 class Predict(DataClassJsonMixin):
@@ -58,6 +60,10 @@ class Predict(DataClassJsonMixin):
   # recall probability is proportional to:
   # `MAX(log2ws - ((NOW_MS - lastEncounterMs) * HOURS_PER_MILLISECONDS / hs)`
   # where NOW_MS is milliseconds since Unix epoch.
+
+  betaWeights: list[float]
+  betaModels: list[Ebisu2Model]
+  betaWeightsReached: list[bool]
 
 
 @dataclass

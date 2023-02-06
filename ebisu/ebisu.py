@@ -9,6 +9,8 @@ from ebisu.expectionMaxScaledPowBeta import expectationMaxScaledPowBeta
 from ebisu.models import BinomialResult, Ebisu2Model, Model, NoisyBinaryResult, WeightsFormat, Predict, Quiz, Result
 
 import ebisu2beta
+from ebisu3gammas.ebisuHelpers import gammaUpdateBinomial, gammaUpdateNoisy
+from ebisu3gammas.gammaDistribution import meanVarToGamma
 
 
 def initModel(
@@ -52,16 +54,81 @@ def initModel(
           format=format,
           m=m,
           initHlMean=initHlMean,
-          # whee
+          # beta-on-recall models
           betaWeights=ws.tolist(),
           betaModels=[(initAlphaBeta, initAlphaBeta, t) for t in hs],
           betaWeightsReached=[x == 0 for x in range(n)],
+          # gamma-on-hl models
+          gammaWeights=ws.tolist(),
+          gammaParams=[meanVarToGamma(t, (t * .5)**2) for t in hs],
+          gammaWeightsReached=[x == 0 for x in range(n)],
       ),
   )
 
 
 def _genForSql(log2ws, hs) -> list[tuple[float, float]]:
   return [(lw, h * 3600e3) for lw, h in zip(log2ws, hs)]
+
+
+def updateRecallGammas(
+    model: Model,
+    successes: Union[float, int],
+    total: int = 1,
+    q0: Optional[float] = None,
+    now: Optional[float] = None,
+) -> Model:
+  now = now or timeMs()
+  t = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
+  resultObj: Union[NoisyBinaryResult, BinomialResult]
+
+  if total == 1:
+    assert (0 <= successes <= 1), "`total=1` implies successes in [0, 1]"
+    q1 = max(successes, 1 - successes)  # between 0.5 and 1
+    q0 = 1 - q1 if q0 is None else q0  # either the input argument OR between 0 and 0.5
+    z = successes >= 0.5
+    updateds = [gammaUpdateNoisy(a, b, t, q1, q0, z) for a, b in model.pred.gammaParams]
+    resultObj = NoisyBinaryResult(result=successes, q1=q1, q0=q0, hoursElapsed=t)
+  else:
+    assert successes == np.floor(successes), "float `successes` must have `total=1`"
+    assert successes >= 0, "negative `successes` meaningless"
+    assert total > 0, "positive binomial trials"
+    k = int(successes)
+    n = total
+    updateds = [gammaUpdateBinomial(a, b, t, k, n) for a, b in model.pred.gammaParams]
+    resultObj = BinomialResult(successes=int(successes), total=total, hoursElapsed=t)
+
+  ret = deepcopy(model)  # clone
+  _appendQuizImpure(ret, resultObj)
+
+  SCALE_THRESH = 0.95
+  newModels: list[tuple[float, float]] = []
+  newWeights: list[float] = []
+  newReached: list[bool] = []
+  for m, updated, weight, reached in zip(model.pred.gammaParams, updateds, model.pred.gammaWeights,
+                                         model.pred.gammaWeightsReached):
+    scal = (updated.a / updated.b) / (m[0] / m[1])
+    if reached:
+      newModels.append((updated.a, updated.b))
+      newWeights.append(min(weight * scal if scal > 1 else weight, 1))
+      newReached.append(True)
+    else:
+      if (scal < 1 and scal < SCALE_THRESH) or (scal > 1 and scal < 1.01):
+        # early failure or success
+        newModels.append(m)
+        newWeights.append(weight)
+        newReached.append(False)
+      else:
+        newModels.append((updated.a, updated.b))
+        newWeights.append(min(powerMean([weight, scal], 2), 1))
+        newReached.append(True)
+
+  ret.pred.lastEncounterMs = now
+
+  ret.pred.gammaParams = newModels
+  ret.pred.gammaWeights = newWeights
+  ret.pred.gammaWeightsReached = newReached
+
+  return ret
 
 
 def updateRecallBetas(
@@ -74,8 +141,7 @@ def updateRecallBetas(
   now = now or timeMs()
   t = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   updatedModels = [
-      ebisu2beta.updateRecall(
-          prior, successes=successes, total=total, tnow=t, rebalance=False, tback=prior[2])
+      ebisu2beta.updateRecall(prior, successes=successes, total=total, tnow=t, q0=q0)
       for prior in model.pred.betaModels
   ]
   updatedHls = [ebisu2beta.modelToPercentileDecay(m) for m in updatedModels]
@@ -195,6 +261,7 @@ def _appendQuizImpure(model: Model, result: Result) -> None:
 
 
 HOURS_PER_MILLISECONDS = 1 / 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec
+LN2 = np.log(2)
 
 
 def predictRecall(
@@ -209,22 +276,64 @@ def predictRecall(
   return logPrecall if logDomain else np.exp2(logPrecall)
 
 
-def predictRecallBetas(
+def predictRecallGammas(
     model: Model,
     now: Optional[float] = None,
     logDomain=True,
+    extra: Optional[dict] = None,
 ) -> float:
+  # To be more exact, you'd need to use https://github.com/spedygiorgio/mbbefd/blob/e8b1ef11a6289dbf23701860afebd54dc70c7b99/R/distr-GB1.R#L23-L35 and https://math.stackexchange.com/questions/3679707/expected-maximum-of-beta-random-variables
   now = now if now is not None else timeMs()
   elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   assert elapsedHours >= 0, "cannot go back in time"
   if logDomain:
-    logPrecall = max(
-        np.log(w) + ebisu2beta.predictRecall(prior, elapsedHours, exact=not logDomain)
-        for prior, w in zip(model.pred.betaModels, model.pred.betaWeights))
+    l = [
+        np.log(w) + -elapsedHours / (alpha / beta) * LN2
+        for (alpha, beta), w in zip(model.pred.gammaParams, model.pred.gammaWeights)
+    ]
+    if extra is not None:
+      extra['indiv'] = l
+    logPrecall = max(l)
     return logPrecall
   else:
-    return max(w * ebisu2beta.predictRecall(prior, elapsedHours, exact=not logDomain)
-               for prior, w in zip(model.pred.betaModels, model.pred.betaWeights))
+    l = [
+        w * np.exp(-elapsedHours / (alpha / beta) * LN2)
+        for (alpha, beta), w in zip(model.pred.gammaParams, model.pred.gammaWeights)
+    ]
+    if extra is not None:
+      extra['indiv'] = l
+
+    return max(l)
+
+
+def predictRecallBetas(
+    model: Model,
+    now: Optional[float] = None,
+    logDomain=True,
+    extra: Optional[dict] = None,
+) -> float:
+  # To be more exact, you'd need to use https://github.com/spedygiorgio/mbbefd/blob/e8b1ef11a6289dbf23701860afebd54dc70c7b99/R/distr-GB1.R#L23-L35 and https://math.stackexchange.com/questions/3679707/expected-maximum-of-beta-random-variables
+  now = now if now is not None else timeMs()
+  elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
+  assert elapsedHours >= 0, "cannot go back in time"
+  if logDomain:
+    l = [
+        np.log(w) + ebisu2beta.predictRecall(prior, elapsedHours, exact=not logDomain)
+        for prior, w in zip(model.pred.betaModels, model.pred.betaWeights)
+    ]
+    if extra is not None:
+      extra['indiv'] = l
+    logPrecall = max(l)
+    return logPrecall
+  else:
+    l = [
+        w * ebisu2beta.predictRecall(prior, elapsedHours, exact=not logDomain)
+        for prior, w in zip(model.pred.betaModels, model.pred.betaWeights)
+    ]
+    if extra is not None:
+      extra['indiv'] = l
+
+    return max(l)
 
 
 def hoursForRecallDecayBetas(model: Model, percentile=0.5) -> float:

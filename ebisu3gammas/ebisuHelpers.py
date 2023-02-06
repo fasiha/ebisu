@@ -183,16 +183,24 @@ def gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: bool
   """
   qz = (q0, q1) if z else (1 - q0, 1 - q1)
 
-  def moment(n):
+  def logmoment(n):
     an = a + n
-    return _intGammaPdfExp(an, b, t, logDomain=False) * (qz[1] - qz[0]) + qz[0] * gamma(an) / b**an
+    # return _intGammaPdfExp(an, b, t, logDomain=False) * (qz[1] - qz[0]) + qz[0] * gamma(an) / b**an
+    res, sgn = logsumexp([
+        _intGammaPdfExp(an, b, t, logDomain=True),
+        np.log(qz[0] or np.spacing(1)) + gammaln(an) - an * np.log(b)
+    ],
+                         b=[qz[1] - qz[0], 1],
+                         return_sign=True)
+    assert sgn > 0
+    return res
 
-  m0 = moment(0)
-  mean = moment(1) / m0
-  m2 = moment(2) / m0
-  var = m2 - mean**2
-  newAlpha, newBeta = meanVarToGamma(mean, var)
-  return GammaUpdate(a=newAlpha, b=newBeta, mean=mean)
+  logm0 = logmoment(0)
+  logmean = logmoment(1) - logm0
+  logm2 = logmoment(2) - logm0
+  logvar = logsumexp([logm2, 2 * logmean], b=[1, -1])
+  newAlpha, newBeta = logmeanlogVarToGamma(logmean, logvar)
+  return GammaUpdate(a=newAlpha, b=newBeta, mean=np.exp(logmean))
 
 
 def _enrichDebug(fullDebug):

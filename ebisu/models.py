@@ -61,9 +61,15 @@ class Predict(DataClassJsonMixin):
   # `MAX(log2ws - ((NOW_MS - lastEncounterMs) * HOURS_PER_MILLISECONDS / hs)`
   # where NOW_MS is milliseconds since Unix epoch.
 
+  # multiple Ebisu2 beta-on-recall models
   betaWeights: list[float]
   betaModels: list[Ebisu2Model]
   betaWeightsReached: list[bool]
+
+  # multiple gamma-on-halflife models
+  gammaWeights: list[float]
+  gammaParams: list[tuple[float, float]]
+  gammaWeightsReached: list[bool]
 
 
 @dataclass

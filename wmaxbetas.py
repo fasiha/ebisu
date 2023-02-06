@@ -66,6 +66,13 @@ if __name__ == '__main__':
   betasUpdator = lambda model, s, t, now: ebisu.updateRecallBetas(
       model, successes=s, total=t, now=now)
 
+  gammaPredictor = lambda model, elapsedTime: ebisu.predictRecallGammas(
+      model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
+  gammaUpdator = lambda model, s, t, now: ebisu.updateRecallGammas(
+      model, successes=s, total=t, now=now)
+  np.seterr(all='raise')
+  np.seterr(under='warn')
+
   fracs = [0.8]
   # fracs = [1.0]
   fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
@@ -90,12 +97,13 @@ if __name__ == '__main__':
             boostStd=boostMeanStd[1],
             now=now),
         ebisu.initModel(wmaxMean=.02, now=now),
+        ebisu.initModel(wmaxMean=.02, now=now),
     ]
     modelsInit = models
     modelsPerIter = [modelsInit]
 
-    predictors = [ePredictor, v3Predictor, betasPredictor]
-    updators = [eUpdator, v3Updator, betasUpdator]
+    predictors = [ePredictor, v3Predictor, betasPredictor, gammaPredictor]
+    updators = [eUpdator, v3Updator, betasUpdator, gammaUpdator]
 
     logliks = []
     for ankiResult, elapsedTime in zip(card.results, card.dts_hours):
@@ -118,10 +126,10 @@ if __name__ == '__main__':
     loglikFinal = np.sum(np.array(logliks), axis=0).tolist()
     print(f'loglikFinal={[round(p,3) for p in loglikFinal]}, {card.key=}')
     np.set_printoptions(precision=2, suppress=True)
-    print(
-        np.array([[t + (w,)
-                   for t, w in zip(v[-1].pred.betaModels, v[-1].pred.betaWeights)]
-                  for v in modelsPerIter]))
+    # print(
+    #     np.array([[t + (w,)
+    #                for t, w in zip(v[-1].pred.betaModels, v[-1].pred.betaWeights)]
+    #               for v in modelsPerIter]))
 """
 [[[     2.        2.        1.        1.  ]
   [     2.        2.        3.59      0.77]

@@ -5,7 +5,7 @@ import pylab as plt  # type:ignore
 import typing
 
 import ebisu
-import ebisu3gammas
+import ebisu3boost
 import utils
 
 plt.ion()
@@ -61,13 +61,13 @@ if __name__ == '__main__':
     ePredictor, v3Predictor = [
         lambda model, elapsedTime: ebisu.predictRecall(
             model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False),
-        lambda model, elapsedTime: ebisu3gammas.predictRecall(
+        lambda model, elapsedTime: ebisu3boost.predictRecall(
             model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False),
     ]
     eUpdator, v3Updator = [
         lambda model, s, t, now: ebisu.updateRecall(model, successes=s, total=t, now=now),
-        lambda model, s, t, now: ebisu3gammas.updateRecallHistory(
-            ebisu3gammas.updateRecall(model, successes=s, total=t, now=now), size=1000),
+        lambda model, s, t, now: ebisu3boost.updateRecallHistory(
+            ebisu3boost.updateRecall(model, successes=s, total=t, now=now), size=1000),
     ]
 
     wmaxMean, initHlMean = 0.5, None
@@ -83,7 +83,7 @@ if __name__ == '__main__':
         ebisu.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now, format="rational", m=1),
         ebisu.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now, format="rational", m=2),
         ebisu.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now, format="rational", m=4),
-        ebisu3gammas.initModel(
+        ebisu3boost.initModel(
             initHlMean=hlMeanStd[0],
             boostMean=boostMeanStd[0],
             initHlStd=hlMeanStd[1],

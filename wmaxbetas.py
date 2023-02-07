@@ -5,7 +5,8 @@ import pylab as plt  # type:ignore
 import typing
 
 import ebisu
-import ebisu3gammas
+import ebisu3wmax
+import ebisu3boost
 import utils
 
 plt.ion()
@@ -50,25 +51,25 @@ if __name__ == '__main__':
   modelsPerIter = None
 
   ePredictor, v3Predictor = [
-      lambda model, elapsedTime: ebisu.predictRecall(
+      lambda model, elapsedTime: ebisu3wmax.predictRecall(
           model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False),
-      lambda model, elapsedTime: ebisu3gammas.predictRecall(
+      lambda model, elapsedTime: ebisu3boost.predictRecall(
           model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False),
   ]
   eUpdator, v3Updator = [
-      lambda model, s, t, now: ebisu.updateRecall(model, successes=s, total=t, now=now),
-      lambda model, s, t, now: ebisu3gammas.updateRecallHistory(
-          ebisu3gammas.updateRecall(model, successes=s, total=t, now=now), size=1000),
+      lambda model, s, t, now: ebisu3wmax.updateRecall(model, successes=s, total=t, now=now),
+      lambda model, s, t, now: ebisu3boost.updateRecallHistory(
+          ebisu3boost.updateRecall(model, successes=s, total=t, now=now), size=1000),
   ]
 
-  betasPredictor = lambda model, elapsedTime: ebisu.predictRecallBetas(
+  betasPredictor = lambda model, elapsedTime: ebisu3wmax.predictRecallBetas(
       model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
-  betasUpdator = lambda model, s, t, now: ebisu.updateRecallBetas(
+  betasUpdator = lambda model, s, t, now: ebisu3wmax.updateRecallBetas(
       model, successes=s, total=t, now=now)
 
-  gammaPredictor = lambda model, elapsedTime: ebisu.predictRecallGammas(
+  gammaPredictor = lambda model, elapsedTime: ebisu3wmax.predictRecallGammas(
       model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
-  gammaUpdator = lambda model, s, t, now: ebisu.updateRecallGammas(
+  gammaUpdator = lambda model, s, t, now: ebisu3wmax.updateRecallGammas(
       model, successes=s, total=t, now=now)
   np.seterr(all='raise')
   np.seterr(under='warn')
@@ -89,15 +90,15 @@ if __name__ == '__main__':
     intermediate = not False
 
     models = [
-        ebisu.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now),
-        ebisu3gammas.initModel(
+        ebisu3wmax.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now),
+        ebisu3boost.initModel(
             initHlMean=hlMeanStd[0],
             boostMean=boostMeanStd[0],
             initHlStd=hlMeanStd[1],
             boostStd=boostMeanStd[1],
             now=now),
-        ebisu.initModel(wmaxMean=.02, now=now),
-        ebisu.initModel(wmaxMean=.02, now=now),
+        ebisu3wmax.initModel(wmaxMean=.02, now=now),
+        ebisu3wmax.initModel(wmaxMean=.02, now=now),
     ]
     modelsInit = models
     modelsPerIter = [modelsInit]
@@ -126,10 +127,10 @@ if __name__ == '__main__':
     loglikFinal = np.sum(np.array(logliks), axis=0).tolist()
     print(f'loglikFinal={[round(p,3) for p in loglikFinal]}, {card.key=}')
     np.set_printoptions(precision=2, suppress=True)
-    # print(
-    #     np.array([[t + (w,)
-    #                for t, w in zip(v[-1].pred.betaModels, v[-1].pred.betaWeights)]
-    #               for v in modelsPerIter]))
+    print(
+        np.array([[t + (w,)
+                   for t, w in zip(v[-1].pred.gammaParams, v[-1].pred.gammaWeights)]
+                  for v in modelsPerIter]))
 """
 [[[     2.        2.        1.        1.  ]
   [     2.        2.        3.59      0.77]

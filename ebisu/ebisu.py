@@ -9,6 +9,7 @@ from .ebisuHelpers import gammaUpdateBinomial, gammaUpdateNoisy
 
 
 def initModel(
+    halflife: Optional[float] = None,
     finalWeight: Optional[float] = None,
     firstHalflife=1.0,
     finalHalflife=1e5,
@@ -30,8 +31,12 @@ def initModel(
     halflives = [_gammaToMean(alpha, beta) for alpha, beta in halflifeGammas]
 
   if weights is None:
-    assert finalWeight is not None, "weights or finalWeight must be provided"
-    weights = _makeWs(n, finalWeight)
+    if finalWeight is not None:
+      weights = _makeWs(n, finalWeight)
+    elif halflife is not None:
+      weights = _makeWs(n, _halflifeToFinalWeight(halflife, halflives))
+    else:
+      raise Exception('need weights, finalWeight, or halflife')
   log2weights = np.log2(weights).tolist()
 
   return Model(
@@ -144,6 +149,19 @@ def predictRecall(
   logPrecall = max(l)
   assert np.isfinite(logPrecall) and logPrecall <= 0
   return logPrecall if logDomain else np.exp2(logPrecall)
+
+
+def _halflifeToFinalWeight(halflife: float, hs: list[float] | np.ndarray):
+  """
+  Complement to `hoursForRecallDecay`, which is $halflife(percentile, wmaxMean)$.
+
+  This is $wmaxMean(halflife, percentile=0.5)$.
+  """
+  n = len(hs)
+  i = np.arange(0, n)
+  hs = np.array(hs)
+  # Avoid divide-by-0 below by skipping first `i` and `hs`
+  return 2**(min((halflife / hs[1:] + log2(0.5)) * (n - 1) / i[1:]))
 
 
 def hoursForRecallDecay(model: Model, percentile=0.5) -> float:

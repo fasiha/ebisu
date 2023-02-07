@@ -76,8 +76,8 @@ if __name__ == '__main__':
       model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
   gamma3Updator = lambda model, s, t, now: ebisu.updateRecall(model, successes=s, total=t, now=now)
 
-  np.seterr(all='raise')
-  np.seterr(under='warn')
+  # np.seterr(all='raise')
+  # np.seterr(under='warn')
 
   fracs = [0.8]
   # fracs = [1.0]
@@ -133,19 +133,9 @@ if __name__ == '__main__':
     loglikFinal = np.sum(np.array(logliks), axis=0).tolist()
     print(f'loglikFinal={[round(p,3) for p in loglikFinal]}, {card.key=}')
     np.set_printoptions(precision=2, suppress=True)
-    print(
-        np.array([[t + (w,)
-                   for t, w in zip(v[-1].pred.halflifeGammas, v[-1].pred.log2weights)]
-                  for v in modelsPerIter]))
-"""
-[[[     2.        2.        1.        1.  ]
-  [     2.        2.        3.59      0.77]
-  [     2.        2.       12.92      0.6 ]
-  [     2.        2.       46.42      0.46]
-  [     2.        2.      166.81      0.36]
-  [     2.        2.      599.48      0.28]
-  [     2.        2.     2154.43      0.22]
-  [     2.        2.     7742.64      0.17]
-  [     2.        2.    27825.59      0.13]
-  [     2.        2.   100000.        0.1 ]]
-  """
+
+    weightsEvolution = np.array(
+        [[t + (w,)
+          for t, w in zip(v[-1].pred.halflifeGammas, v[-1].pred.log2weights)]
+         for v in modelsPerIter])
+    # print(weightsEvolution)

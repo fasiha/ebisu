@@ -4,9 +4,9 @@ from copy import deepcopy
 from typing import Union, Optional
 from scipy.optimize import minimize_scalar  # type: ignore
 
-from ebisu.ebisuHelpers import _makeWs, posterior, timeMs
-from ebisu.expectionMaxScaledPowBeta import expectationMaxScaledPowBeta
-from ebisu.models import BinomialResult, Ebisu2Model, Model, NoisyBinaryResult, WeightsFormat, Predict, Quiz, Result
+from .ebisuHelpers import _makeWs, posterior, timeMs
+from .expectionMaxScaledPowBeta import expectationMaxScaledPowBeta
+from .models import BinomialResult, Ebisu2Model, Model, NoisyBinaryResult, WeightsFormat, Predict, Quiz, Result
 
 import ebisu2beta
 from ebisu3boost.ebisuHelpers import gammaUpdateBinomial, gammaUpdateNoisy

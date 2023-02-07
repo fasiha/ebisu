@@ -71,6 +71,11 @@ if __name__ == '__main__':
       model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
   gammaUpdator = lambda model, s, t, now: ebisu3wmax.updateRecallGammas(
       model, successes=s, total=t, now=now)
+
+  gamma3Predictor = lambda model, elapsedTime: ebisu.predictRecall(
+      model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
+  gamma3Updator = lambda model, s, t, now: ebisu.updateRecall(model, successes=s, total=t, now=now)
+
   np.seterr(all='raise')
   np.seterr(under='warn')
 
@@ -99,12 +104,13 @@ if __name__ == '__main__':
             now=now),
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
+        ebisu.initModel(0.02, now=now),
     ]
     modelsInit = models
     modelsPerIter = [modelsInit]
 
-    predictors = [ePredictor, v3Predictor, betasPredictor, gammaPredictor]
-    updators = [eUpdator, v3Updator, betasUpdator, gammaUpdator]
+    predictors = [ePredictor, v3Predictor, betasPredictor, gammaPredictor, gamma3Predictor]
+    updators = [eUpdator, v3Updator, betasUpdator, gammaUpdator, gamma3Updator]
 
     logliks = []
     for ankiResult, elapsedTime in zip(card.results, card.dts_hours):
@@ -129,7 +135,7 @@ if __name__ == '__main__':
     np.set_printoptions(precision=2, suppress=True)
     print(
         np.array([[t + (w,)
-                   for t, w in zip(v[-1].pred.gammaParams, v[-1].pred.gammaWeights)]
+                   for t, w in zip(v[-1].pred.halflifeGammas, v[-1].pred.log2weights)]
                   for v in modelsPerIter]))
 """
 [[[     2.        2.        1.        1.  ]

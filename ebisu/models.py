@@ -40,36 +40,21 @@ class Quiz(DataClassJsonMixin):
   startTimestampMs: list[float]
 
 
-WeightsFormat = Literal['exp', 'rational']
-
-Ebisu2Model = tuple[float, float, float]
+HalflifeGamma = tuple[float, float]  # α, β
 
 
 @dataclass
 class Predict(DataClassJsonMixin):
   version: int
   lastEncounterMs: float  # milliseconds since unix epoch
-  wmaxMean: float  # weight for max halflife (it's actually the smallest weight), between 0 and 1
-  log2ws: list[float]
-  hs: list[float]  # same length as log2ws
+  log2weights: list[float]
+  halflifeGammas: list[HalflifeGamma]  # same length as log2weights
+  weightsReached: list[bool]  # same length as log2weights
 
-  format: WeightsFormat
-  m: Optional[float]
-  initHlMean: Optional[float]
-  forSql: list[tuple[float, float]]  # `(log2w, hsInMilliseconds)`
+  forSql: list[tuple[float, float]]  # `(log2weight, halflifeInMillisecond)`
   # recall probability is proportional to:
-  # `MAX(log2ws - ((NOW_MS - lastEncounterMs) * HOURS_PER_MILLISECONDS / hs)`
+  # `MAX(log2weights - ((NOW_MS - lastEncounterMs) * HOURS_PER_MILLISECONDS / halflives)`
   # where NOW_MS is milliseconds since Unix epoch.
-
-  # multiple Ebisu2 beta-on-recall models
-  betaWeights: list[float]
-  betaModels: list[Ebisu2Model]
-  betaWeightsReached: list[bool]
-
-  # multiple gamma-on-halflife models
-  gammaWeights: list[float]
-  gammaParams: list[tuple[float, float]]
-  gammaWeightsReached: list[bool]
 
 
 @dataclass

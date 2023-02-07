@@ -294,6 +294,7 @@ def predictRecallGammas(
     if extra is not None:
       extra['indiv'] = l
     logPrecall = max(l)
+    assert np.isfinite(logPrecall) and logPrecall <= 0
     return logPrecall
   else:
     l = [
@@ -303,7 +304,9 @@ def predictRecallGammas(
     if extra is not None:
       extra['indiv'] = l
 
-    return max(l)
+    ret = max(l)
+    assert np.isfinite(ret) and ret >= 0 and ret <= 1
+    return ret
 
 
 def predictRecallBetas(
@@ -451,4 +454,4 @@ def _meanVarToBeta(mean: float, var: float) -> tuple[float, float]:
 
 def powerMean(v: list[float] | np.ndarray, p: int | float) -> float:
   assert p > 0
-  return np.mean(np.array(v)**p)**(1 / p)
+  return float(np.mean(np.array(v)**p)**(1 / p))

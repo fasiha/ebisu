@@ -135,6 +135,8 @@ def gammaUpdateBinomial(a: float, b: float, t: float, k: int, n: int) -> GammaUp
   logm2 = logmoment(2) - logm0
   logvar = logsumexp([logm2, 2 * logmean], b=[1, -1])
   newAlpha, newBeta = logmeanlogVarToGamma(logmean, logvar)
+  assert np.isfinite(newAlpha)
+  assert np.isfinite(newBeta)
 
   return GammaUpdate(a=newAlpha, b=newBeta, mean=np.exp(logmean))
 
@@ -154,8 +156,15 @@ def _intGammaPdfExp(a: float, b: float, c: float, logDomain: bool):
   z = 2 * np.sqrt(b * c)  # arg to kv
   if not logDomain:
     return 2 * (c / b)**(a * 0.5) * kv(a, z)
+
   # `kve = kv * exp(z)` -> `log(kve) = log(kv) + z` -> `log(kv) = log(kve) - z`
-  return LN2 + log(c / b) * (a * 0.5) + log(kve(a, z)) - z
+  besselK = kve(a, z)
+  if np.isfinite(besselK):
+    return LN2 + log(c / b) * (a * 0.5) + log(besselK) - z
+
+  # Use large-order approximation https://dlmf.nist.gov/10.41 -> 10.41.2
+  logBesselK = log(np.e * z / (2 * a)) * -a + 0.5 * log(np.pi / (2 * a))
+  return LN2 + log(c / b) * (a * 0.5) + logBesselK
 
 
 def currentHalflifePrior(model: Model) -> tuple[tuple[float, float], float]:
@@ -200,6 +209,8 @@ def gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: bool
   logm2 = logmoment(2) - logm0
   logvar = logsumexp([logm2, 2 * logmean], b=[1, -1])
   newAlpha, newBeta = logmeanlogVarToGamma(logmean, logvar)
+  assert np.isfinite(newAlpha)
+  assert np.isfinite(newBeta)
   return GammaUpdate(a=newAlpha, b=newBeta, mean=np.exp(logmean))
 
 

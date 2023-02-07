@@ -71,3 +71,10 @@ def success(res: Result) -> bool:
     return res.successes * 2 > res.total
   else:
     raise Exception("unknown result type")
+
+
+@dataclass
+class GammaUpdate:
+  a: float
+  b: float
+  mean: float

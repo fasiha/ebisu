@@ -5,8 +5,7 @@ from copy import deepcopy
 from typing import Union, Optional
 
 from .models import BinomialResult, HalflifeGamma, Model, NoisyBinaryResult, Predict, Quiz, Result
-
-from ebisu3boost.ebisuHelpers import gammaUpdateBinomial, gammaUpdateNoisy
+from .ebisuHelpers import gammaUpdateBinomial, gammaUpdateNoisy
 
 
 def initModel(

@@ -48,7 +48,7 @@ def initModel(
   )
 
 
-def _genForSql(log2ws, hs) -> list[tuple[float, float]]:
+def _genForSql(log2ws: list[float], hs: list[float]) -> list[tuple[float, float]]:
   return [(lw, h * 3600e3) for lw, h in zip(log2ws, hs)]
 
 
@@ -89,7 +89,7 @@ def updateRecall(
   for m, updated, log2weight, reached in zip(model.pred.halflifeGammas, updateds,
                                              model.pred.log2weights, model.pred.weightsReached):
     weight = np.exp2(log2weight)
-    scal = (updated.a / updated.b) / (m[0] / m[1])
+    scal = updated.mean / _gammaToMean(*m)
     if reached:
       newModels.append((updated.a, updated.b))
       newWeights.append(min(weight * scal if scal > 1 else weight, 1))
@@ -110,6 +110,8 @@ def updateRecall(
   ret.pred.halflifeGammas = newModels
   ret.pred.log2weights = np.log2(newWeights).tolist()
   ret.pred.weightsReached = newReached
+  ret.pred.forSql = _genForSql(ret.pred.log2weights,
+                               [_gammaToMean(*x) for x in ret.pred.halflifeGammas])
 
   return ret
 

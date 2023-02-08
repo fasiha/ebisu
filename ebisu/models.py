@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Literal, Optional, Union
+from typing import Union
 from dataclasses_json import DataClassJsonMixin, config
 
 
@@ -62,19 +62,3 @@ class Model(DataClassJsonMixin):
   version: int
   quiz: Quiz
   pred: Predict
-
-
-def success(res: Result) -> bool:
-  if isinstance(res, NoisyBinaryResult):
-    return res.result > 0.5
-  elif isinstance(res, BinomialResult):
-    return res.successes * 2 > res.total
-  else:
-    raise Exception("unknown result type")
-
-
-@dataclass
-class GammaUpdate:
-  a: float
-  b: float
-  mean: float

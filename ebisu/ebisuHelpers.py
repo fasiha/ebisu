@@ -1,11 +1,18 @@
+from dataclasses import dataclass
 from scipy.special import kv, kve, gammaln, gamma, betaln, logsumexp  #type: ignore
 from functools import cache
 from math import log, exp
 from typing import Callable
 import numpy as np
-from time import time_ns
 from .gammaDistribution import logmeanlogVarToGamma
-from .models import GammaUpdate
+
+
+@dataclass
+class GammaUpdate:
+  a: float
+  b: float
+  mean: float
+
 
 LN2 = log(2)
 logsumexp: Callable = logsumexp

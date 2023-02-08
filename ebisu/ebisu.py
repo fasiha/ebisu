@@ -151,6 +151,24 @@ def predictRecall(
   return logPrecall if logDomain else np.exp2(logPrecall)
 
 
+def predictRecallMonteCarlo(
+    model: Model,
+    now: Optional[float] = None,
+    logDomain=True,
+    size=10_000,
+) -> float:
+  now = now if now is not None else timeMs()
+  elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
+  assert elapsedHours >= 0, "cannot go back in time"
+
+  from scipy.stats import gamma as grv
+  gammas = [grv(a, scale=1 / b) for a, b in model.pred.halflifeGammas]
+  logp = np.max((np.array(model.pred.log2weights)[:, np.newaxis] -
+                 elapsedHours / np.vstack([g.rvs(size=size) for g in gammas])),
+                axis=0)
+  return np.mean(logp) if logDomain else np.mean(np.exp2(logp))
+
+
 def _halflifeToFinalWeight(halflife: float, hs: list[float] | np.ndarray):
   """
   Complement to `hoursForRecallDecay`, which is $halflife(percentile, wmaxMean)$.

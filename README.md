@@ -5,11 +5,15 @@
   - [Install](#install)
   - [API quickstart](#api-quickstart)
   - [How it works](#how-it-works)
-  - [API and math](#api-and-math)
+  - [The Math](#the-math)
+    - [Exponential decay](#exponential-decay)
+    - [Noisy-binary quizzes](#noisy-binary-quizzes)
+    - [Power laws](#power-laws)
     - [Data model](#data-model)
     - [Predict recall probability](#predict-recall-probability)
     - [Update after a quiz](#update-after-a-quiz)
     - [How long till a model reaches some probability?](#how-long-till-a-model-reaches-some-probability)
+  - [Source code](#source-code)
   - [Bibliography](#bibliography)
   - [Acknowledgments](#acknowledgments)
 
@@ -45,13 +49,13 @@ The next sections are installation and an [API Quickstart](#qpi-quickstart). See
 
 Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other scheduling algorithms and describe, non-technically, why you should use it.
 
-Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like nonlinear-transformed Beta-distributed random variables, maximum a posteriori estimation, and incomplete Beta functions, this is for you.
+Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like nonlinear-transformed Gamma-distributed random variables, modified Bessel functions of the second kind, and incomplete Gamma functions, this is for you.
 
-> Nerdy details in a nutshell: Ebisu largely follows Mozer et al.’s multiscale context model (MCM) of `n` leaky integrators, published at NIPS 2009 (see [bibliography](#bibliography)), but with a Bayesian twist. The probability of recall for a given fact is assumed to be governed by an ensemble of decaying exponentials with *fixed* time constants (ranging from an hour to ten years) but *uncertain* mixture weights. These weights decay according to an exponential to a single uncertain value governed by a Beta random variable. Therefore, the recall probability at any given time is a straightforward arithmetic expression of elapsed time, time constants, and weights. After a quiz, the new best estimate of the weights is computed via a simple MAP (maximum a posteriori) estimator that uses a standard Scipy hill-climbing algorithm.
+> Nerdy details in a nutshell: Ebisu posits that your memory for a flashcard decays according to a power law, which it models with a *sequence* of weighted exponentials with halflives following Gamma random variables. Your probability of recall at any given time is the *maximum* of this array weighted exponentials (what Mozer et al. call “leaky integrators” (see [bibliography](#bibliography))), and which we approximate with a simple arithmetic expression that can be run even in SQL. Next, a *quiz* is treated as Bernoulli, binomial, or a neat “noisy-binary” trial; after the Bayesian update, each halflife’s posterior is moment-matched to the closest Gamma random variable. Based on the strength of the posterior update, the weights for each halflife are updated.
 
 Finally, in the [Source Code](#source-code) section, we describe the software testing done to validate the math, including tests comparing Ebisu’s output to Monte Carlo sampling.
 
-A quick note on history—more information is in the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md). This document discusses Ebisu v3. Versions 2 and before used a very different model that was both more complex and that failed to handle the *strenghening* of memory that accompanied quizzes. If you are interested, see the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md) for details and a migration guide.
+A quick note on history—more information is in the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md). This document discusses Ebisu v3, with its Gammas-on-halflives model. Versions 2 and before used a different model (a Beta-on-recall-probability) which didn’t capture the fact that memory is *strengthened* by review—it just viewed future recall probability as an *unknown but static* quantity, leading to pessimistic predictions of recall probability. If you are interested, see the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md) for details and a migration guide.
 
 ## Install
 ```sh
@@ -66,19 +70,26 @@ python -m pip install ebisu
 **Step 1.** Create an Ebisu `Model` for each flashcard when a student learns it:
 ```py
 def initModel(
-    wmaxMean: Optional[float] = None,
-    initHlMean: Optional[float] = None,
-    hmin: float = 1,
-    hmax: float = 1e5,
+    halflife: Optional[float] = None,
+    finalWeight: Optional[float] = None,
+    weights: Optional[list[float] | np.ndarray] = None,
+
+    firstHalflife=1.0,
+    finalHalflife=1e5,
+    halflifeGammas: Optional[list[HalflifeGamma]] = None,
+
     n: int = 10,
+
     now: Optional[float] = None,
 ) -> Model
 ```
-Here, `0 < wmaxMean < 1` (unitless) or `initHlMean > 0` (hours) specify your belief about the durability of the memory: higher `wmaxMean` implies higher initial halflife `initHlMean` and vice versa.
+If you want to do the minimal amount of work to create a model, just provide `halflife` in hours. This is your best guess of how long it will take for this flashcard’s memory to decay to 50% (“half” in “halflife”).
 
-`hmin` and `hmax` (both in units of hours) specify the time constant of `n` exponentials (Mozer et al. call these “leaky integrators” so I will too), each logarithmically-spaced. The default covers one hour to more than a decade.
+This will create a sequence of `n=10` decaying exponentials (“leaky integrators” in Mozer et al.’s terminology) whose halflives are Gamma random variables. The means of these Gammas are logarithmically-spaced from `firstHalflife` of an hour to `finalHalflife` of 1e5 hours (more than 11 years; the standard deviation of each Gamma will be half the mean). This will also assign each of these Gamma random variables a weight that logarithmically-decreases from 1.0 such that the overall probability of recall has your provided `halflife`.
 
-`now` is when this fact was learned (milliseconds in the Unix epoch, midnight UTC on 1 January, 1970).
+So. If you want to tune any of the above, you have all the knobs you need as keyword arguments: you can tweak how many leaky integrators there are, what the range of halflives they cover, and for ultimate control, provide `(alpha, beta)` parameterizations for each Gamma random variable via `halflifeGammas`. You can of course also specify the list of `weights` which governs the overall halflife of this fact.
+
+`now` is when this fact was learned (milliseconds in the Unix epoch, midnight UTC on 1 January, 1970). If you don’t provide it, the current timestamp is used.
 
 **Step 2.** Find the `Model` with the lowest recall probability. You can do this in SQL (see below!) or use:
 ```py
@@ -88,7 +99,7 @@ def predictRecall(
     logDomain=True,
 ) -> float
 ```
-`now` is again milliseconds since the Unix epoch started.
+`now` is again milliseconds since the Unix epoch started. If omitted, the current timestamp is used. By default this returns the *log* of the recall probability (from -∞ to 0, higher is more likely to recall). If you pass in `logDomain=False`, we will call `exp2` at the end to give you linear probability from 0 to 1. We keep the calculations in the log-domain to avoid numerical issues and by default give you the log-probability only because `exp2` (and in general powers of any base) are slow on most CPUs compared to arithmetic.
 
 **Step 3.** After you show the student a flashcard and grade their answer, update the `Model`:
 ```py
@@ -97,13 +108,12 @@ def updateRecall(
     successes: Union[float, int],
     total: int = 1,
     q0: Optional[float] = None,
-    wmaxPrior: Optional[tuple[float, float]] = None,
     now: Optional[float] = None,
 ) -> Model
 ```
-This is a pure function: the input `Model` is left untouched, so you can replace it with the returned `Model`. A binary/binomial quiz is denoted by integer `successes` (points received) out of `total` points possible. A noisy-binary quiz uses `0 < successes < 1`, a float and optionally `q0` to specify its parameters.
-
-`wmaxPrior` is a 2-tuple `(α, β)` of a Beta distribution that captures your belief about the weights of each of the `n` leaky integrators (decaying exponentials, `n` per `initModel` above), via the weight of the last one. If you don’t provide this, Ebisu will pick one based on the maximum interval between quizzes.
+This is a pure function: the input `Model` is left untouched, so you can replace it with the returned `Model`. It supports two quiz modes:
+- a binary/binomial quiz is denoted by integer `successes` (points received) out of `total` points possible. 
+- A noisy-binary quiz is implied by `total=1` and uses `0 < successes < 1`, a float and optionally `q0` to specify its parameters.
 
 `now` is as before milliseconds in the Unix epoch.
 
@@ -126,21 +136,21 @@ There are many flashcard scheduling schemes, e.g.,
 
 Memory research began with Hermann Ebbinghaus’ discovery of the [forgetting curve](https://en.wikipedia.org/w/index.php?title=Forgetting_curve&oldid=766120598#History), published in 1885, when he was thirty-five. He [memorized random](https://en.wikipedia.org/w/index.php?title=Hermann_Ebbinghaus&oldid=773908952#Research_on_memory) consonant–vowel–consonant trigrams (‘PED’, e.g.) and found, among other things, that his recall decayed logarithmically. More recent research has shown, apparently conclusively, that *forgetting* follows a power law decay.
 
-Anki and SuperMemo are extremely popular. They use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little [field guide](https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174) to Anki’s, with links to the source code—since they are optimized to minimize daily review time while maximizing retention. However, because each fact has simply a date of next review, these algorithms do not gracefully accommodate over- or under-reviewing. Even when used as prescribed, they can schedule many facts for review on one day but few on others. (I must note that all three of these issues—over-reviewing (cramming), under-reviewing, and lumpy reviews—have well-supported solutions in Anki by tweaking the rules and third-party plugins.)
+Anki and SuperMemo are extremely popular flashcard apps. They use carefully-tuned mechanical rules to schedule a fact’s future review immediately after its current review. The rules can get complicated—I wrote a little [field guide](https://gist.github.com/fasiha/31ce46c36371ff57fdbc1254af424174) to Anki’s, with links to the source code—since they are optimized to minimize daily review time while maximizing retention. However, because each fact has simply a date of next review, these algorithms do not gracefully accommodate over- or under-reviewing. Even when used as prescribed, they can schedule many facts for review on one day but few on others. (I must note that all three of these issues—over-reviewing (cramming), under-reviewing, and lumpy reviews—have well-supported solutions in Anki by tweaking the rules and third-party plugins.)
 
 Duolingo’s half-life regression explicitly models the probability of you recalling a fact as an exponential, $2^{-Δ/h}$ where Δ is the time since your last review and $h$ is a *half-life*. In this model, your chances of passing a quiz after $h$ days is 50%, which drops to 25% after $2 h$ days, and so on. They estimate this half-life by combining your past performance and fact metadata in a large-scale machine learning technique called half-life regression (a variant of logistic regression or beta regression, more tuned to this forgetting curve). With each fact associated with a half-life, they can predict the likelihood of forgetting a fact if a quiz was given right now. The results of that quiz (for whichever fact was chosen to review) are used to update that fact’s half-life by re-running the machine learning process with the results from the latest quizzes.
 
 The Mozer group’s algorithms (MCM (their 2009 paper) and DASH (their 2014 paper; see [bibliography](#bibliography))) also curve-fit a large quantity of quiz data to high-dimensional models, including, in DASH’s case, a hierarchical Bayesian model that takes into account inter-fact and inter-student variability.
 
-Ebisu is like Duolingo and Mozer’s algorithms, in that it explicitly tracks the recall probability as it decays. Ebisu further adapts the mathematical form of the memory decay after Mozer et al.’s MCM (multiscale context model): a cascade of weighted exponentials.
+Like Duolingo and Mozer et al., Ebisu explicitly tracks a forgetting curve for each flashcard, enabling it to sort a list of flashcards from most to least likely to be forgotten. However, Ebisu formulates the problem very differently—while memory is understood to decay according to a specific formula, Ebisu posits *probability distributions* on the halflives governing this decay and uses quiz results to update its beliefs about those halflives in a fully Bayesian way. These updates, while a bit more computationally-burdensome than Anki’s scheduler, are much lighter-weight than Duolingo’s industrial-strength approach.
 
-However, Ebisu adds a few Bayesian twists to these approaches:
-1. Ebisu posits an explicit probability distribution on the parameters of the memory decay. This allows you to treat your subjective belief about each flashcard’s difficulty as a Bayesian prior that governs its memory decay over time as well as its memory strengthening via reviews.
-2. We also support a rich variety of quizzes fully analytically: 
+Being Bayesian grants Ebisu some really useful features:
+1. Quiz app authors can encode quite specific beliefs about their students’ initial memory of a flashcard. If you have a reason to believe that vocabulary item A is much more easy to learn than item B, you can specify that exactly and quantitatively.
+2. You can *always* ask, “what is the expected recall probability of this fact”. Therefore you can *always* sort a set of flashcards from most likely to be forgotten to least likely.
+3. Being Bayesian lets us support a rich variety of quizzes fully analytically: 
     - binary quizzes—pass/fail,
     - binomial quizzes—e.g., three points out of four,
     - even exotic noisy-binary quizzes that let you fully specify the odds of the student “passing” the quiz when they actually don’t know the answer (handy for deweighting multiple-choice vs. active recall, as well as for reader apps described above).
-3. Both predicting memory *and* incorporating quizzes are done computationally-efficiently on a quiz-by-quiz basis. Once ported to JavaScript or Kotlin or Swift, the algorithm can readily run on your phone, no need for large sets of historic quiz data and expensive training. The most you need in terms of computational mathematics is a one-dimensional function minimization (e.g., golden section search) and the Gamma function.
 
 Note that Ebisu treats each flashcard’s memory as independent of the others. It can’t handle flashcard correlation or interference, alas, so you have to handle this in your application.
 
@@ -148,7 +158,148 @@ The hope is that Ebisu can be used by flashcard apps that continue to unleash th
 
 Now let’s jump into a more formal description of the mathematics and the resultant Ebisu Python API.
 
-## API and math
+## The Math
+### Exponential decay
+While much psychological literature has identified that forgetting follows power-law decay (e.g., probability of recall $t$ time units after last review $p(t) = (t+1)^{-α}$ for some positive shape parameter $α$), we start by discussing a simpler case, exponential decay, because we will use a string of exponentially-decaying functions to approximate a power law.
+
+So let’s imagine a flashcard with halflife $h ∼ \mathrm{Gamma}(α, β)$, in hours, that is, a Gamma random variable with known parameters $α$ and $β$.
+
+This flashcard’s probability of recall after $t$ hours since last encountering it is
+$$p(t) = 2^{-t/h}.$$
+At the halflife, the recall probability $p(h) = 0.5$ has decayed to half-strength. At twice the halflife, $p(2 h) = 0.25$, and so on.
+
+Now suppose at time $t$ hours since last review, we obtain a  binomial quiz:
+$$k|h ∼ \mathrm{Binomial}(n, p(t) = 2^{-t/h})$$
+In words: the student got $k$ points out of $n$ total where each point was independent and had probability $p(t)$. (For $n=1$ of course the binomial trial simplifies to a Bernoulli trial, i.e., a binary quiz.)
+
+What is the posterior, $P(h | k)$? By Bayes, we have
+$$P(h|k) = \frac{P(k|h) P(h)}{\int_0^∞ P(k|h) P(h) \,\mathrm{d}h}$$
+In words: the posterior is proportional to the likelihood $P(k|h)$ (the binomial distribution’s probability mass function) scaled by the prior $P(h)$ (the Gamma distribution’s probability density function), normalized by a constant to ensure everything sums to 1.
+
+We can rewrite things in terms of base $e$ to consolidate. Since $2^x = e^{(\log 2) x}$, where $\log(⋅)$ denotes natural log (base $e$), the numerator
+$$
+\begin{split}
+P(k|h)P(h) &∝ \left(e^{-(\log 2)  t/h}\right)^k \left(1-e^{-(\log 2) t/h}\right)^{n-k} h^{α - 1} e^{-β h}
+\\
+  &∝ \left(1-e^{-(\log 2) t/h}\right)^{n-k} h^{α - 1} e^{-β h - k(\log 2) t/h}.
+\end{split}
+$$
+Recall the “$∝$” symbol is “proportional to”, and it lets us drop constants that will cancel out anyway when we normalize by the denominator above.
+
+This is the form of the posterior $P(h|k)$, and we will eventually want to compute the moments of this (its mean and variance) in order to moment-match to a new Gamma random variable and treat that as the *new* prior for the *next* quiz. To get there, let’s define a series of useful constants: for integer $N≥0$,
+$$
+m_N = ∫_0^∞ h^N ⋅  \left(1-e^{-(\log 2) t/h}\right)^{n-k} h^{α - 1} e^{-β h - k(\log 2) t/h} \,\mathrm{d}h.
+$$
+(Note how $m_0$ is simply equal to the normalizing denominator of the overall posterior, hint hint.) Despite appearing fearsome, this is actually close to being manageable. The major annoyance is that $(1-e^{-(\log 2)t/h})^{n-k}$ term. We can simplify that via the [binomial theorem](https://en.wikipedia.org/w/index.php?title=Binomial_theorem&oldid=944317290#Theorem_statement): in general,
+$$
+  ∫_0^∞ f(x) (1-g(x))^n \, \mathrm{d}x = \sum_{i=0}^{n} \left[ (-1)^i \binom{n}{i} ∫_0^∞ g(x)^i ⋅ f(x) \, \mathrm{d}x \right],
+$$
+that is, we can replace the polynomial with a sum:
+$$
+m_N = ∑_{i=0}^{n-k} \left[
+  (-1)^i \binom{n-k}{i}
+  ∫_0^∞ h^{α + N - 1} e^{-β h - (k-i)(\log 2) t / h} \,\mathrm{d}h
+\right].
+$$
+Sympy comes in clutch to do this inner integral: in general, for positive constants $a$, $b$, and $c$,
+$$
+  ∫_0^∞ h^{a - 1} e^{-b h - c / h} \,\mathrm{d}h = 2 \left(\frac{c}{b}\right)^{a/2} K_{a}(2\sqrt{b c}).
+$$
+$K_ν(z)$ here is the modified Bessel function of the second kind with order $ν$ (lol which is Greek letter “nu”) and argument $z$. Frankly, I don’t know much about this function but [Scipy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.kv.html) provides it—lucky!
+
+> For completeness, note that when $c=0$ (which can happen in our application when the time elapsed since last quiz is $t=0$), there’s a simpler solution. The integrand is just the Gamma distribution’s density, so $∫_0^∞ h^{a-1} e^{-b h} \,\mathrm{d}h = b^{-a}Γ(a)$, i.e., the reciprocal of the normalizing constant in the Gamma density.
+
+So the constant
+$$m_N = ∑_{i=0}^{n-k}
+  (-1)^i \binom{n-k}{i}
+  2 \left(\frac{(k-i)(\log 2) t}{β}\right)^{(α+N)/2} K_{α+N}(2\sqrt{β  (k-i)(\log 2) t})
+.$$
+This is… good! I promise! We’ll see later how this is implemented quite carefully in Python using `gammaln` and `kve` and `logsumexp` to maintain numerical accuracy but this is really useful because the moments of the posterior $P(h|k)$ follow very straightforwardly from the way we’ve constructed $m_N$. The mean
+$$E[h|k] = μ = \frac{1}{m_0} ∫_0^∞ h \left(1-e^{-(\log 2) t/h}\right)^{n-k} h^{α - 1} e^{-β h - k(\log 2) t/h}$$
+is simply $μ = \frac{m_1}{m_0}$. The second non-central moment $E[(h|k)^2] = \frac{m2}{m_0}$, so the variance is $σ^2 = m_2/m_0 - μ^2$.
+
+With the mean and variance of the posterior $h|k$ in place, we can moment-match to a Gamma random variable with the same mean and variance: that is, with
+- $α' = μ^2/ σ^2$ for mean $μ$ and variance $σ^2$ as above, and
+- $β' = μ / σ^2$,
+
+$\mathrm{Gamma}(α', β')$ is a reasonable approximation for the true posterior halflife.
+
+Let’s stop and take stock of where we’ve been and where we’ve arrived.
+1. We began with a prior on the halflife of a fact: in hours, $h ∼ \mathrm{Gamma}(α, β)$ for some known parameters $α$ and $β$.
+2. After $t$ hours since last seeing this fact, the student underwent a quiz and got $k$ points out of a possible $n$. We treated this as a binomial trial with underlying probability $2^{-t/h}$.
+3. We went through the Bayesian machinery to obtain the moments of the posterior $h | k$, that is, our new belief about the distribution of the fact’s halflife in light of the quiz.
+4. With those moments, we created a new distribution $\mathrm{Gamma}(α', β')$ which matches the true posterior in mean and variance. We can now return to step 1!
+
+Let’s take a quick detour and look at how to handle the other quiz type Ebisu supports—the noisy-binary quiz—before seeing how to use this exponential decay to construct power-law decay.
+
+### Noisy-binary quizzes
+Can we imagine a quiz type where the student could score 0 or 1 point (out of max 1) but also somewhere in between? As luck would have it, Stack Exchange user [@mef](https://stats.stackexchange.com/a/419320) has invented a lovely way to model this and it is quite useful in capturing some advanced quiz types.
+
+Let $x ∼ \mathrm{Bernoulli}(p(t))$ be a “true” Bernoulli draw representing the answer to the question, “does the student *really* know this fact?” ($p(t)=2^{-t/h}$ here is the same exponential recall probability as before.)
+
+We don’t observe $x$, we observe a “noisy report” $z|x ∼ \mathrm{Bernoulli}(q_x)$ where
+- $q_1 = P(z = 1 | x = 1)$, that is, the probability of us observing a successful quiz when the student *really* knows the fact, while
+- $q_0 = P(z = 1 | x = 0)$, i.e., the probability of us observing a successful quiz when the student has in fact forgotten the fact.
+
+In the plain binary case without fuzziness, $q_1 = 1$ and $q_0 = 0$, but in the soft-binary case, these two parameters are independent and free for you to specify as any numbers between 0 and 1 inclusive.
+
+Given $h∼\mathrm{Gamma}(α, β)$ and known $α$, $β$, $q_1$, and $q_0$, we can ask what the posterior $h | z$ is, we can use the fact that the likelihood
+$$
+\begin{split}
+P(z|h) &= P(z|x) ⋅ P(x|h)
+  \\
+  &= \mathrm{Bernoulli}(z; q_x) ⋅ \mathrm{Bernoulli}\left(x; p(t)=2^{-t/h}\right).
+\end{split}
+$$
+Then, as before,
+$$
+P(h|z) = \frac{P(z|h)P(h)}{∫_0^∞ P(z|h)P(h) \,\mathrm{d}h},
+$$
+and this time we can break things up into the two cases, where $z=1$ vs $z=0$:
+$$
+P(z|h)P(h) ∝  \begin{cases}
+   h^{α - 1} e^{-β h} \left( (q_1 - q_0)e^{-(\log2) t / h} + q_0\right) &\text{if } z=1 \\
+   h^{α - 1} e^{-β h} \left( (q_0 - q_1)e^{-(\log2) t / h} + (1-q_0)\right) &\text{if } z=0
+\end{cases}
+$$
+As before, we can define a sequence of pseudo-moments $m_N$ for integer $N≥0$ for the noisy-binary case—the calculus we derived for the binomial quiz case above helps us immensely and we just give the result here:
+$$
+m_N = 2 \left(\frac{(\log 2) t}{β}\right)^{(α+N)/2} K_{α+N}(2\sqrt{β(\log 2) t}) ⋅ r_z + s_z \frac{Γ(α+N)}{β^{α + N}}
+$$
+for constants
+$$
+r_z = \begin{cases}
+q_1 - q_0 &\text{if } z=1 \\
+q_0 - q_1 &\text{if } z=0
+\end{cases}
+$$
+and
+$$
+s_z = \begin{cases}
+  q_0 &\text{if } z=1 \\
+1-q_0 &\text{if } z=0.
+\end{cases}
+$$
+(You can verify that these simplify to the binary quiz case, i.e., the binomial $n=1$ case, for $q_0=0$ and $q_1=1$!)
+
+The rest is the same as before, in the binomial quiz case. The mean (the first moment) of the posterior $E[h|z]=μ=\frac{m_1}{m_0}$ while the second non-central moment is $E[(h|z)^2]=\frac{m_2}{m_0}$ leading the variance to be $σ^2 = \frac{m_2}{m_0} - μ^2$. This mean and variance can again be moment-matched to a new $\mathrm{Gamma}(α' =  μ^2/ σ^2, β' = μ / σ^2)$.
+
+We should note here that both $q_1 = P(z = 1 | x = 1)$ and $q_0 = P(z = 1 | x = 0)$ are *free* here, and apps have total flexibility in specifying these. In the API presented above, both $z$ and $q_1$ are encoded without loss of generality in `0 <= successes <= 1`:
+- $z=1$ if `successes > 0`, otherwise $z=0$.
+- $q_1$ is `max(successes, 1 - successes)`.
+
+Therefore if `successes = 0.1`, then we know $z=0$ and $q_1 = 0.9$.
+
+$q_0$ is provided in a keyword argument and for the sake of developer experience, $q_0=1-q_1$ is picked as a default when none is provided.
+
+> While this choice for the default $q_0$ is ad hoc, it does have the nice property that `successes` between 0 and 1 will smoothly and symmetrically (around 0.5) scale the posterior halflife between the binary fail/pass cases. Also, as a satisfying bonus, a *totally* uninformative quiz with  `successes = 0.5` results in *no change* to the prior, i.e., $α' = α$ and $β' = β$!
+
+### Power laws
+
+> Recall that exponential decay, where the time factor $t$ is in the power, is qualitatively different than power-law decay, where $t$ is in the base. $2^{-t}$ decays *incredibly* quickly—you recall what Einstein apparently said about exponentials being the most powerful force in the universe. After seven halflives, the probability of recall has dropped less than 1%: $2^{-7} = 1/128$. Meanwhile, power laws decay much more slowly: $(t+1)^{-1}$ has decayed to 0.5 at $t=1$, making 1 hour its halflife; after seven halflives, the probability of recall is still $1/8$ or 12.5%. 12.5% is much more than 0.8%!
+
+
+
 ### Data model
 ```py
 def initModel(
@@ -324,6 +475,8 @@ This is sometimes useful for quizzes that seek to schedule a review in the futur
 
 That’s it. Four functions in the API.
 
+
+## Source code
 
 ## Bibliography
 

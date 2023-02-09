@@ -10,13 +10,13 @@ from .ebisuHelpers import gammaUpdateBinomial, gammaUpdateNoisy
 
 def initModel(
     halflife: Optional[float] = None,
-    finalWeight: Optional[float] = None,
+    weights: Optional[list[float] | np.ndarray] = None,
+    # above: weights, below: halflives
     firstHalflife=1.0,
     finalHalflife=1e5,
-    weights: Optional[list[float] | np.ndarray] = None,
     halflifeGammas: Optional[list[HalflifeGamma]] = None,
-    n: int = 10,
-    now: Optional[float] = None,
+    n: int = 10,  # both weights and halflives
+    now: Optional[float] = None,  # totally separate
 ) -> Model:
   """
   Create brand new Ebisu model
@@ -28,15 +28,17 @@ def initModel(
     halflives = np.logspace(log10(firstHalflife), log10(finalHalflife), n).tolist()
     halflifeGammas = [_meanVarToGamma(t, (t * .5)**2) for t in halflives]
   else:
+    n = len(halflifeGammas)
     halflives = [_gammaToMean(alpha, beta) for alpha, beta in halflifeGammas]
 
   if weights is None:
-    if finalWeight is not None:
-      weights = _makeWs(n, finalWeight)
-    elif halflife is not None:
+    if halflife is not None:
       weights = _makeWs(n, _halflifeToFinalWeight(halflife, halflives))
     else:
-      raise Exception('need weights, finalWeight, or halflife')
+      raise Exception('need weights or halflife')
+  else:
+    assert len(halflifeGammas) == len(weights), "# of Gammas must equal # of weights"
+    n = len(weights)  # might overwrite, that's fine
   log2weights = np.log2(weights).tolist()
 
   return Model(

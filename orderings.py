@@ -33,9 +33,9 @@ if __name__ == "__main__":
   print(f'split flashcards into train/test, {len(train)} cards in train set')
 
   models: dict[str, dict[int, Any]] = {
-      'v3': dict(),
+      'v3wmax': dict(),
       'v2beta': dict(),
-      'v3gamma': dict(),
+      'v3boost': dict(),
       'v3betas': dict(),
       'v3gammas': dict(),
   }
@@ -55,31 +55,30 @@ if __name__ == "__main__":
   for (unixMillis, elapsedHours, key, ankiResult) in history:
     if ankiResult < 0:
       # first learned
-      assert key not in models['v3']
-      models['v3'][key] = ebisu3wmax.initModel(initHlMean=12., now=unixMillis)
+      assert key not in models['v3wmax']
+      models['v3wmax'][key] = ebisu3wmax.initModel(initHlMean=12., now=unixMillis)
       models['v2beta'][key] = ebisu2beta.defaultModel(12., 2.0)
-      models['v3gamma'][key] = ebisu3boost.initModel(12.0, 3.0, now=unixMillis)
+      models['v3boost'][key] = ebisu3boost.initModel(12.0, 3.0, now=unixMillis)
       models['v3betas'][key] = ebisu3wmax.initModel(0.02, now=unixMillis)
-      models['v3gammas'][key] = ebisu3wmax.initModel(0.02, now=unixMillis)
+      models['v3gammas'][key] = ebisu.initModel(halflife=10, now=unixMillis)
     else:
       n += 1
       ranked = dict()
 
-      ranked['v3'] = [
-          (k, ebisu3wmax.predictRecall(model, now=unixMillis)) for k, model in models['v3'].items()
-      ]
+      ranked['v3wmax'] = [(k, ebisu3wmax.predictRecall(model, now=unixMillis))
+                          for k, model in models['v3wmax'].items()]
       ranked['v2beta'] = [(k,
                            ebisu2beta.predictRecall(model,
                                                     (unixMillis - lastSeenMillis[k]) / 3600e3))
                           for k, model in models['v2beta'].items()]
-      ranked['v3gamma'] = [(k, ebisu3boost.predictRecall(model, now=unixMillis))
-                           for k, model in models['v3gamma'].items()]
+      ranked['v3boost'] = [(k, ebisu3boost.predictRecall(model, now=unixMillis))
+                           for k, model in models['v3boost'].items()]
       ranked['v3betas'] = [(k, ebisu3wmax.predictRecallBetas(model, now=unixMillis))
                            for k, model in models['v3betas'].items()]
-      ranked['v3gammas'] = [(k, ebisu3wmax.predictRecallGammas(model, now=unixMillis))
+      ranked['v3gammas'] = [(k, ebisu.predictRecall(model, now=unixMillis))
                             for k, model in models['v3gammas'].items()]
 
-      if len(ranked['v3']) >= 3:
+      if len(ranked['v3wmax']) >= 3:
         for algo in ranked:
           ranked[algo].sort(key=lambda v: v[1])
         print(f'{unixMillis=}')
@@ -93,14 +92,15 @@ if __name__ == "__main__":
       oldModels = deepcopy(models)
 
       successes = 1 if ankiResult >= 2 else 0
-      models['v3'][key] = ebisu3wmax.updateRecall(models['v3'][key], successes, now=unixMillis)
+      models['v3wmax'][key] = ebisu3wmax.updateRecall(
+          models['v3wmax'][key], successes, now=unixMillis)
       models['v2beta'][key] = ebisu2beta.updateRecall(
           models['v2beta'][key], successes, total=1, tnow=elapsedHours)
-      models['v3gamma'][key] = ebisu3boost.updateRecall(
-          models['v3gamma'][key], successes, now=unixMillis)
+      models['v3boost'][key] = ebisu3boost.updateRecall(
+          models['v3boost'][key], successes, now=unixMillis)
       models['v3betas'][key] = ebisu3wmax.updateRecallBetas(
           models['v3betas'][key], successes, now=unixMillis)
-      models['v3gammas'][key] = ebisu3wmax.updateRecallGammas(
+      models['v3gammas'][key] = ebisu.updateRecall(
           models['v3gammas'][key], successes, now=unixMillis)
 
     lastSeenMillis[key] = unixMillis

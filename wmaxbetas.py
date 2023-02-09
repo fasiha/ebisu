@@ -104,7 +104,7 @@ if __name__ == '__main__':
             now=now),
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
-        ebisu.initModel(0.02, now=now),
+        ebisu.initModel(halflife=10, now=now),
     ]
     modelsInit = models
     modelsPerIter = [modelsInit]

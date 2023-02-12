@@ -19,7 +19,7 @@ import mpmath as mp  # type:ignore
 import csv
 import io
 
-from ebisu.ebisuHelpers import gammaUpdateBinomial, gammaUpdateNoisy
+from ebisu.ebisuHelpers import GammaUpdate, gammaUpdateBinomial, gammaUpdateNoisy
 from ebisu.gammaDistribution import gammaToMean, meanVarToGamma, _weightedMeanVarLogw, gammaToStats, gammaToStd
 
 results: dict[Union[str, tuple], Any] = dict()
@@ -60,10 +60,10 @@ def _gammaUpdateBinomialMonteCarlo(
     k: int,
     n: int,
     size=1_000_000,
-) -> ebisu.GammaUpdate:
+) -> GammaUpdate:
   # Scipy Gamma random variable is inverted: it needs (a, scale=1/b) for the usual (a, b) parameterization
   halflife = gammarv.rvs(a, scale=1 / b, size=size)
-  pRecall = np.exp(-t / halflife)
+  pRecall = np.exp2(-t / halflife)
 
   logweight = binomrv.logpmf(k, n, pRecall)  # this is the likelihood of observing the data
   weight = np.exp(logweight)
@@ -88,7 +88,7 @@ def _gammaUpdateBinomialMonteCarlo(
     fit = (khat2, 1 / that2)
 
   newA, newB = meanVarToGamma(postMean, postVar)
-  return ebisu.GammaUpdate(newA, newB, postMean)
+  return GammaUpdate(newA, newB, postMean)
 
 
 def _gammaUpdateNoisyMonteCarlo(
@@ -99,10 +99,9 @@ def _gammaUpdateNoisyMonteCarlo(
     q0: float,
     z: bool,
     size=1_000_000,
-) -> ebisu.GammaUpdate:
+) -> GammaUpdate:
   halflife = gammarv.rvs(a, scale=1 / b, size=size)
-  # pRecall = 2**(-t/halflife) FIXME
-  pRecall = np.exp(-t / halflife)
+  pRecall = np.exp2(-t / halflife)
 
   # this weight is `P(z | pRecall)` and derived and checked via Stan in
   # https://github.com/fasiha/ebisu/issues/52
@@ -115,7 +114,7 @@ def _gammaUpdateNoisyMonteCarlo(
   postVar = math.fsum(weight * (halflife - postMean)**2) / wsum
 
   newA, newB = meanVarToGamma(postMean, postVar)
-  return ebisu.GammaUpdate(newA, newB, postMean)
+  return GammaUpdate(newA, newB, postMean)
 
 
 def relativeError(actual, expected):
@@ -146,7 +145,7 @@ class TestEbisu(unittest.TestCase):
     for fraction in [0.1, 0.5, 1., 2., 10.]:
       t = initHlMean * fraction
       for q0 in [.15, 0, None]:
-        prev: Optional[ebisu.GammaUpdate] = None
+        prev: Optional[GammaUpdate] = None
         for noisy in [0.1, 0.3, 0.7, 0.9]:
           z = noisy >= 0.5
           q1 = noisy if z else 1 - noisy
@@ -195,7 +194,7 @@ class TestEbisu(unittest.TestCase):
 
     maxN = 4
     ts = [fraction * initHlMean for fraction in [0.1, 0.5, 1., 2., 10.]]
-    us: dict[tuple[int, int, int], ebisu.GammaUpdate] = dict()
+    us: dict[tuple[int, int, int], GammaUpdate] = dict()
     for tidx, t in enumerate(ts):
       for n in range(1, maxN + 1):
         for result in range(n + 1):

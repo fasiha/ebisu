@@ -38,12 +38,14 @@ def gammaUpdateBinomial(a: float, b: float, t: float, k: int, n: int) -> GammaUp
 
   See also `gammaUpdateNoisy`.
   """
+  tScaled = t * LN2
 
   def logmoment(nth) -> float:
     loglik = []
     scales = []
     for i in range(0, n - k + 1):
-      loglik.append(_binomln(n - k, i) + _intGammaPdfExp(a + nth, b, t * (k + i), logDomain=True))
+      loglik.append(
+          _binomln(n - k, i) + _intGammaPdfExp(a + nth, b, tScaled * (k + i), logDomain=True))
       scales.append((-1)**i)
     return logsumexp(loglik, b=scales)
 
@@ -100,11 +102,12 @@ def gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: bool
   See also `gammaUpdateBinomial`.
   """
   qz = (q0, q1) if z else (1 - q0, 1 - q1)
+  tScaled = t * LN2
 
   def logmoment(n):
     an = a + n
     res, sgn = logsumexp([
-        _intGammaPdfExp(an, b, t, logDomain=True),
+        _intGammaPdfExp(an, b, tScaled, logDomain=True),
         log(qz[0] or np.spacing(1)) + gammaln(an) - an * log(b)
     ],
                          b=[qz[1] - qz[0], 1],

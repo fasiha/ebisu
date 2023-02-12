@@ -1,18 +1,21 @@
+import re
 import numpy as np
-import pylab as plt
 import ebisu
+import pylab as plt
 
 plt.ion()
 
 hs = np.logspace(0, 4, 5)
-ws = ebisu.ebisu._makeWs(len(hs), 0.1, 'exp')
+hl = 2
+finalWeight = ebisu.ebisu._halflifeToFinalWeight(hl, hs)
+ws = ebisu.ebisu._makeWs(len(hs), finalWeight)
+print(finalWeight, ws)
 
 plt.figure()
 plt.plot(hs, ws, 'o-')
 plt.xlabel('halflife (hours)')
 plt.ylabel('weight (unitless)')
-plt.suptitle('Weights per halflife (wMax=0.1)')
-plt.title('wmaxMean=0.1, hmax=1e4, n=5')
+plt.suptitle(f'Weights per halflife')
 plt.ylim([0, np.max(plt.ylim())])
 plt.grid()
 plt.savefig('leaky-integrators-weights.png', dpi=300)
@@ -37,10 +40,10 @@ plt.plot(
 plt.legend()
 plt.xlabel('hours since last review')
 plt.ylabel('recall probability')
-plt.suptitle('Overall recall probability')
-plt.title('wmaxMean=0.1, hmax=1e4, n=5')
+plt.title('Overall recall probability')
 plt.grid()
-plt.xlim([-10, 260])
+plt.xlim([-10, 220])
+plt.tight_layout()
 
 plt.savefig('leaky-integrators-precall.png', dpi=300)
 plt.savefig('leaky-integrators-precall.svg')
@@ -49,5 +52,15 @@ plt.gca().set_xscale("log")
 plt.gca().set_yscale("log")
 plt.ylim([.05, 1.2])
 plt.xlim([1e-1, 1e4])
+
+plt.hlines([0.5], np.min(plt.xlim()), hl, color=(.1, .1, .1), alpha=0.4, linestyles='dotted')
+plt.vlines([hl], np.min(plt.ylim()), 0.5, color=(.1, .1, .1), alpha=0.4, linestyles='dotted')
+
+ax = plt.gca()
+fixup = lambda vec: [re.sub(r'.0$', '', f'{x:,}') for x in vec]
+ax.set_xticklabels(fixup(ax.get_xticks()))
+ax.set_yticklabels(fixup(ax.get_yticks()))
+
+plt.tight_layout()
 plt.savefig('leaky-integrators-precall-loglog.png', dpi=300)
 plt.savefig('leaky-integrators-precall-loglog.svg')

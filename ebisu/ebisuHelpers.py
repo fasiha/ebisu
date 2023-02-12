@@ -65,7 +65,7 @@ def _intGammaPdf(a: float, b: float, logDomain: bool):
 
 
 def _intGammaPdfExp(a: float, b: float, c: float, logDomain: bool):
-  # $s(a,b,c) = \int_0^∞ h^(a-1) \exp(-b h - c / h) dh$, via sympy
+  "Returns $∫_0^∞ h^(a-1) e^{-b h - c / h} dh$, or its log"
   if c == 0:
     return _intGammaPdf(a, b, logDomain=logDomain)
 
@@ -120,3 +120,10 @@ def gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: bool
   assert np.isfinite(newAlpha)
   assert np.isfinite(newBeta)
   return GammaUpdate(a=newAlpha, b=newBeta, mean=exp(logmean))
+
+
+def gammaPredictRecall(alpha: float, beta: float, hoursElapsed: float, logDomain: bool) -> float:
+  res = _intGammaPdfExp(alpha, beta, hoursElapsed * LN2, logDomain=logDomain)
+  if logDomain:
+    return res + alpha * log(beta) - gammaln(alpha)
+  return res * (beta**alpha) / gamma(alpha)

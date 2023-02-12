@@ -70,24 +70,18 @@ python -m pip install ebisu
 **Step 1.** Create an Ebisu `Model` for each flashcard when a student learns it:
 ```py
 def initModel(
-    halflife: Optional[float] = None,
-    finalWeight: Optional[float] = None,
-    weights: Optional[list[float] | np.ndarray] = None,
-
-    firstHalflife=1.0,
-    finalHalflife=1e5,
-    halflifeGammas: Optional[list[HalflifeGamma]] = None,
-
+    halflife: float,  # hours
+    finalHalflife=1e5,  # hours
     n: int = 10,
-
-    now: Optional[float] = None,
+    weightsHalflifeGammas: Optional[list[tuple[float, HalflifeGamma]]] = None,
+    now: Optional[float] = None,  # totally separate
 ) -> Model
 ```
-If you want to do the minimal amount of work to create a model, just provide `halflife` in hours. This is your best guess of how long it will take for this flashcard’s memory to decay to 50% (“half” in “halflife”).
+If you want to do the minimal amount of work to create a model, just provide `halflife` in hours. This is your best guess of how long it will take for this flashcard’s memory to decay to 50% (the “half” in “halflife”).
 
-This will create a sequence of `n=10` decaying exponentials (“leaky integrators” in Mozer et al.’s terminology) whose halflives are Gamma random variables. The means of these Gammas are logarithmically-spaced from `firstHalflife` of an hour to `finalHalflife` of 1e5 hours (more than 11 years; the standard deviation of each Gamma will be half the mean). This will also assign each of these Gamma random variables a weight that logarithmically-decreases from 1.0 such that the overall probability of recall has your provided `halflife`.
+This will create a sequence of `n=10` decaying exponentials (“leaky integrators” in Mozer et al.’s terminology) whose halflives are Gamma random variables. The means of these Gammas are logarithmically-spaced from some fraction of `halflife` to `finalHalflife` of 1e5 hours (more than 11 years), and their standard deviations are some proportion of the mean. This will also assign each of these Gamma random variables a weight that logarithmically-decreases from 1.0 such that the overall probability of recall has your provided `halflife`.
 
-So. If you want to tune any of the above, you have all the knobs you need as keyword arguments: you can tweak how many leaky integrators there are, what the range of halflives they cover, and for ultimate control, provide `(alpha, beta)` parameterizations for each Gamma random variable via `halflifeGammas`. You can of course also specify the list of `weights` which governs the overall halflife of this fact.
+If you dislike any of the above defaults, you can tune them using the keyword arguments, or, for total control, pass in `weightsHalflifeGammas`, a list of tuples containing each leaky integrator’s weight and `HalflifeGamma` (a tuple of `alpha, beta` parameters of each Gamma random variable).
 
 `now` is when this fact was learned (milliseconds in the Unix epoch, midnight UTC on 1 January, 1970). If you don’t provide it, the current timestamp is used.
 
@@ -162,13 +156,33 @@ Now let’s jump into a more formal description of the mathematics and the resul
 ### Exponential decay
 While much psychological literature has identified that forgetting follows power-law decay (e.g., probability of recall $t$ time units after last review $p(t) = (t+1)^{-α}$ for some positive shape parameter $α$), we start by discussing a simpler case, exponential decay, because we will use a string of exponentially-decaying functions to approximate a power law.
 
-So let’s imagine a flashcard with halflife $h ∼ \mathrm{Gamma}(α, β)$, in hours, that is, a Gamma random variable with known parameters $α$ and $β$.
+So let’s imagine a flashcard with halflife in hours $h ∼ \mathrm{Gamma}(α, β)$, that is, a Gamma random variable with known parameters $α$ and $β$.
 
 This flashcard’s probability of recall after $t$ hours since last encountering it is
 $$p(t) = 2^{-t/h}.$$
 At the halflife, the recall probability $p(h) = 0.5$ has decayed to half-strength. At twice the halflife, $p(2 h) = 0.25$, and so on.
 
-Now suppose at time $t$ hours since last review, we obtain a  binomial quiz:
+For any given time elapsed $t$, we can compute the expected value of this recall probability via the law of the unconscious statistician ([LOTUS](https://en.wikipedia.org/wiki/Law_of_the_unconscious_statistician)), whereby for random variable $X$, $E[g(X)] = ∫_{-∞}^∞ g(x) f_X(x) \,\mathrm{d}x$, that is, the expectation of a function ($g$) of a random variable involves integrating that function and the random variable’s density ($f_X$). In our case we use the Gamma’s density:
+$$
+E\left[p(t) = 2^{-t/h}\right] = \frac{β^α}{Γ(α)}  ∫_0^∞ 2^{-t/h} h^{α - 1} e^{β h} \,\mathrm{d}h.
+$$
+This is not as ferocious as it first looks. Since $2^x = e^{x \log 2}$ (where $\log$ is the natural log, with base $e$), we can absorb terms, and then let <a name="sympy-integral"></a>Sympy do all the heavy lifting: it turns out that for positive constants $a$, $b$, and $c$,
+$$
+  ∫_0^∞ h^{a - 1} e^{-b h - c / h} \,\mathrm{d}h = 2 \left(\frac{c}{b}\right)^{a/2} K_{a}(2\sqrt{b c}).
+$$
+$K_ν(z)$ here is the modified Bessel function of the second kind with order $ν$ (lol which is Greek letter “nu”) and argument $z$. Frankly, I don’t know much about this function but [Scipy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.kv.html) provides it—lucky!
+
+> For completeness, note that when $c=0$ (which can happen in our application when the time elapsed since last quiz is $t=0$), there’s a simpler solution. The integrand is just the Gamma distribution’s density, so $∫_0^∞ h^{a-1} e^{-b h} \,\mathrm{d}h = b^{-a}Γ(a)$, i.e., the reciprocal of the normalizing constant in the Gamma density.
+
+Therefore, we have
+$$
+  E\left[p(t) \right] = \frac{2 β^α}{Γ(α)} \left(\frac{t \log 2}{β}\right)^{α/2} K_{α}(2\sqrt{β t \log 2}),
+$$
+which could be simplified a bit more but I’ll leave it like this because it uses the result of the Sympy integral above which we’ll have occasion to invoke later.
+
+Nota bene, Ebisu doesn’t actually use this expectation anywhere since it never has a single Gamma-distributed halflife (only a series of them). I’ve belabored this derivation mainly because it introduces some results we’ll use next—quizzes.
+
+So. Suppose at time $t$ hours since last review, we obtain a  binomial quiz:
 $$k|h ∼ \mathrm{Binomial}(n, p(t) = 2^{-t/h})$$
 In words: the student got $k$ points out of $n$ total where each point was independent and had probability $p(t)$. (For $n=1$ of course the binomial trial simplifies to a Bernoulli trial, i.e., a binary quiz.)
 
@@ -201,20 +215,12 @@ m_N = ∑_{i=0}^{n-k} \left[
   ∫_0^∞ h^{α + N - 1} e^{-β h - (k-i)(\log 2) t / h} \,\mathrm{d}h
 \right].
 $$
-Sympy comes in clutch to do this inner integral: in general, for positive constants $a$, $b$, and $c$,
-$$
-  ∫_0^∞ h^{a - 1} e^{-b h - c / h} \,\mathrm{d}h = 2 \left(\frac{c}{b}\right)^{a/2} K_{a}(2\sqrt{b c}).
-$$
-$K_ν(z)$ here is the modified Bessel function of the second kind with order $ν$ (lol which is Greek letter “nu”) and argument $z$. Frankly, I don’t know much about this function but [Scipy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.kv.html) provides it—lucky!
-
-> For completeness, note that when $c=0$ (which can happen in our application when the time elapsed since last quiz is $t=0$), there’s a simpler solution. The integrand is just the Gamma distribution’s density, so $∫_0^∞ h^{a-1} e^{-b h} \,\mathrm{d}h = b^{-a}Γ(a)$, i.e., the reciprocal of the normalizing constant in the Gamma density.
-
-So the constant
+Note that the inner integral is in the same form as the one we solved with Sympy [above](#sympy-integral), for the expected probability of recall. So the constant is
 $$m_N = ∑_{i=0}^{n-k}
   (-1)^i \binom{n-k}{i}
   2 \left(\frac{(k-i)(\log 2) t}{β}\right)^{(α+N)/2} K_{α+N}(2\sqrt{β  (k-i)(\log 2) t})
 .$$
-This is… good! I promise! We’ll see later how this is implemented quite carefully in Python using `gammaln` and `kve` and `logsumexp` to maintain numerical accuracy but this is really useful because the moments of the posterior $P(h|k)$ follow very straightforwardly from the way we’ve constructed $m_N$. The mean
+This is… good! I promise! We’ll see later how this is implemented quite carefully in Python using `gammaln` and `kve` and `logsumexp` to maintain numerical accuracy but for now note how this is really useful because the moments of the posterior $P(h|k)$ follow very straightforwardly from the way we’ve constructed $m_N$. The mean
 $$E[h|k] = μ = \frac{1}{m_0} ∫_0^∞ h \left(1-e^{-(\log 2) t/h}\right)^{n-k} h^{α - 1} e^{-β h - k(\log 2) t/h}$$
 is simply $μ = \frac{m_1}{m_0}$. The second non-central moment $E[(h|k)^2] = \frac{m2}{m_0}$, so the variance is $σ^2 = m_2/m_0 - μ^2$.
 
@@ -295,8 +301,30 @@ $q_0$ is provided in a keyword argument and for the sake of developer experience
 > While this choice for the default $q_0$ is ad hoc, it does have the nice property that `successes` between 0 and 1 will smoothly and symmetrically (around 0.5) scale the posterior halflife between the binary fail/pass cases. Also, as a satisfying bonus, a *totally* uninformative quiz with  `successes = 0.5` results in *no change* to the prior, i.e., $α' = α$ and $β' = β$!
 
 ### Power laws
+So we’ve derived the mathematical specifics of two quiz styles for the *exponential* forgetting model, where our beliefs about the halflife of a fact $h$ are converted to recall probabilities via $p(t) = 2^{-t/h}$, even though considerable research has shown forgetting is a power-law phenomenon. In this section, we will show how a staggered sequence of exponentials leads us to the power law we’d like to govern Ebisu recall.
 
-> Recall that exponential decay, where the time factor $t$ is in the power, is qualitatively different than power-law decay, where $t$ is in the base. $2^{-t}$ decays *incredibly* quickly—you recall what Einstein apparently said about exponentials being the most powerful force in the universe. After seven halflives, the probability of recall has dropped less than 1%: $2^{-7} = 1/128$. Meanwhile, power laws decay much more slowly: $(t+1)^{-1}$ has decayed to 0.5 at $t=1$, making 1 hour its halflife; after seven halflives, the probability of recall is still $1/8$ or 12.5%. 12.5% is much more than 0.8%!
+To set the stage first—recall that exponential decay, where the time factor $t$ is in the exponent, is truly *fundamentally* different than power-law decay where $t$ is in the base. $2^{-t}$ decays *incredibly* quickly—you will recall what Einstein apparently said about exponentials being the most powerful force in the universe. After seven halflives, the probability of recall has dropped less than 1%: $2^{-7} = 1/128$. Meanwhile, power laws decay much more slowly: $(t+1)^{-1}$ has the same halflife as $2^{-t}$ (both have decayed to 0.5 at $t=1$) but after seven halflives, the probability of recall for the power law is still $1/8$, i.e., 12.5%, an order of magnitude higher than 0.8%!
+
+Mozer et al. in both their 2009 NIPS conference paper and their 2014 <cite>Psychological Science</cite> journal article (see [bibliography](#bibliography)) propose a model recall that uses a *series* of exponentials, which they call a “cascade of leaky integrators”. Here’s what that could look like, for a notional example: we have a sequence of five decaying exponentials whose halflives are logarithmically-spaced from one hour to `1e4` hours (1.4 years), and each exponential is scaled by a exponentially-decreasing weight, from 1.0 down. Here’s a plot of these five weighted exponentials, superimposed on which is a line (thick, dotted, gray) representing the *max* of any of these at any point in time:
+
+![Recall probability for each leaky integrator, with max](leaky-integrators-precall.png)
+
+At the left-most part of the plot, the first leaky integrator with the shortest time constant (blue solid line) dominates but also very quickly fades away due to the crush of its fast exponential. But as it decays, the second leaky integrator, with a strictly lower starting value (weight; orange dotted line), steps up to keep the recall probability from collapsing. And so on till the last leaky integrator.
+
+Switching the above plot’s x and y scales to log-log gives and zooming out to see more time gives us this:
+
+![Recall probability, as above, on log-log plot](leaky-integrators-precall-loglog.png)
+
+By taking the *max* of the output of each leaky integrator, we get this *sequence* of bumps, which describe a bumpy power law for times ranging between minutes to 1+ year. A *true* power law would, in a log-log plot such as this, be a straight line for all time—not only is ours bumpy, it’s also flat at either end (horizontal on the left, vertical on the right). At very short intervals, this makes sense—we can’t have probability of recall exceed 1—but for times beyond a year, after we’ve run out of leaky integrators, the probability of recall collapses quickly to zero under the crush of the exponential (Einstein’s most powerful force in the universe and all that).
+
+Nevertheless, this is very encouraging. So instead of probability of recall $p(t) = 2^{-t/h}$ for a single unknown halflife which we discussed previously, we can consider 
+$$p(t) = \max_{i=1}^{n} \left\lbrace w_i ⋅ 2^{-t/h_i} \right\rbrace$$
+for $h_i ∼ \mathrm{Gamma}(α_i, β_i)$. That is, we have $n$ Gamma-distributed random variables with known parameters $(α_i, β_i)$ whose means $μ_i = \frac{α_i}{β_i}$ are logarithmically-spaced between a low and high of our choice (e.g., one hour to `1e4` hours in the plot above).
+
+We also assume that each of the $n$ weights, $w_i$, are known and deterministic—this is a modeling choice to keep Ebisu’s posterior inference lightweight in a manner that seems psychologically plausible. So while we need $w_i ∈ [0, 1]$, we are otherwise quite free in choosing these weights. Mozer et al.’s (2009, see [bibliography](#bibliography)) model proposes exponentially-spaced weights, so we have
+$$w_i = (w_n)^{\frac{i-1}{n-1}}$$
+for some fixed final weight $w_n$, thereby setting the first weight on our shortest/fastest leaky integrator to 1.
+
 
 
 

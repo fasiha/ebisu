@@ -5,17 +5,15 @@ from copy import deepcopy
 from typing import Union, Optional
 
 from .models import BinomialResult, HalflifeGamma, Model, NoisyBinaryResult, Predict, Quiz, Result
-from .ebisuHelpers import gammaUpdateBinomial, gammaUpdateNoisy
+from .ebisuHelpers import gammaPredictRecall, gammaUpdateBinomial, gammaUpdateNoisy
 
 
 def initModel(
-    halflife: Optional[float] = None,
-    weights: Optional[list[float] | np.ndarray] = None,
-    # above: weights, below: halflives
-    firstHalflife=1.0,
-    finalHalflife=1e5,
-    halflifeGammas: Optional[list[HalflifeGamma]] = None,
-    n: int = 10,  # both weights and halflives
+    halflife: float,  # hours
+    finalHalflife=1e5,  # hours
+    n: int = 10,
+    # above: lazy inputs, below: exact inputs
+    weightsHalflifeGammas: Optional[list[tuple[float, HalflifeGamma]]] = None,
     now: Optional[float] = None,  # totally separate
 ) -> Model:
   """
@@ -24,21 +22,22 @@ def initModel(
   Optional `now`: milliseconds since the Unix epoch when the fact was learned.
   """
   now = now if now is not None else timeMs()
-  if halflifeGammas is None:
-    halflives = np.logspace(log10(firstHalflife), log10(finalHalflife), n).tolist()
+  if weightsHalflifeGammas is not None:
+    n = len(weightsHalflifeGammas)
+    weights: list[float] = []
+    halflifeGammas: list[tuple[float, float]] = []
+    halflives: list[float] = []
+    # could use `zip` here but then types get mixed
+    for w, g in weightsHalflifeGammas:
+      weights.append(w)
+      halflifeGammas.append(g)
+      halflives.append(_gammaToMean(*g))
+  else:
+    halflives = np.logspace(log10(halflife * .1), log10(finalHalflife), n).tolist()
+    # pick standard deviation to be half of the mean
     halflifeGammas = [_meanVarToGamma(t, (t * .5)**2) for t in halflives]
-  else:
-    n = len(halflifeGammas)
-    halflives = [_gammaToMean(alpha, beta) for alpha, beta in halflifeGammas]
+    weights = _makeWs(n, _halflifeToFinalWeight(halflife, halflives)).tolist()
 
-  if weights is None:
-    if halflife is not None:
-      weights = _makeWs(n, _halflifeToFinalWeight(halflife, halflives))
-    else:
-      raise Exception('need weights or halflife')
-  else:
-    assert len(halflifeGammas) == len(weights), "# of Gammas must equal # of weights"
-    n = len(weights)  # might overwrite, that's fine
   log2weights = np.log2(weights).tolist()
 
   return Model(
@@ -153,6 +152,29 @@ def predictRecall(
   return logPrecall if logDomain else np.exp2(logPrecall)
 
 
+LN2 = np.log(2)
+
+
+def predictRecallSemiBayesian(
+    model: Model,
+    now: Optional[float] = None,
+    logDomain=True,
+    extra: Optional[dict] = None,
+) -> float:
+  now = now if now is not None else timeMs()
+  elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
+  assert elapsedHours >= 0, "cannot go back in time"
+  l = [
+      log2w * LN2 + gammaPredictRecall(alpha, beta, elapsedHours, True)
+      for (alpha, beta), log2w in zip(model.pred.halflifeGammas, model.pred.log2weights)
+  ]
+  if extra is not None:
+    extra['indiv'] = l
+  logPrecall = max(l)
+  assert np.isfinite(logPrecall) and logPrecall <= 0
+  return logPrecall if logDomain else np.exp(logPrecall)
+
+
 def predictRecallMonteCarlo(
     model: Model,
     now: Optional[float] = None,
@@ -168,16 +190,19 @@ def predictRecallMonteCarlo(
   logp = np.max((np.array(model.pred.log2weights)[:, np.newaxis] -
                  elapsedHours / np.vstack([g.rvs(size=size) for g in gammas])),
                 axis=0)
-  return np.mean(logp) if logDomain else np.mean(np.exp2(logp))
+  expectation = np.mean(np.exp2(logp))
+  return np.log(expectation) if logDomain else expectation
 
 
 def _halflifeToFinalWeight(halflife: float, hs: list[float] | np.ndarray):
   """
   Complement to `hoursForRecallDecay`, which is $halflife(percentile, wmaxMean)$.
 
-  This is $wmaxMean(halflife, percentile=0.5)$.
+  This is $finalWeight(halflife, percentile=0.5)$.
   """
   n = len(hs)
+  if n == 1:
+    return 1.0
   i = np.arange(0, n)
   hs = np.array(hs)
   # Avoid divide-by-0 below by skipping first `i` and `hs`
@@ -209,6 +234,8 @@ def _meanVarToGamma(mean, var) -> tuple[float, float]:
 
 
 def _makeWs(n: int, finalWeight: float) -> np.ndarray:
+  if n == 1:
+    return np.array([finalWeight])
   return finalWeight**(np.arange(n) / (n - 1))
 
 

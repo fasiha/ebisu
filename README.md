@@ -178,7 +178,7 @@ Therefore, we have
 $$
   E\left[p(t) \right] = \frac{2 β^α}{Γ(α)} \left(\frac{t \log 2}{β}\right)^{α/2} K_{α}(2\sqrt{β t \log 2}),
 $$
-which could be simplified a bit more but I’ll leave it like this because it uses the result of the Sympy integral above which we’ll have occasion to invoke later.
+which could be simplified a bit more but I’ll leave it like this because it uses the result of the Sympy integral above, which we’ll have occasion to invoke later.
 
 Nota bene, Ebisu doesn’t actually use this expectation anywhere since it never has a single Gamma-distributed halflife (only a series of them). I’ve belabored this derivation mainly because it introduces some results we’ll use next—quizzes.
 
@@ -230,8 +230,8 @@ With the mean and variance of the posterior $h|k$ in place, we can moment-match 
 
 $\mathrm{Gamma}(α', β')$ is a reasonable approximation for the true posterior halflife.
 
-Let’s stop and take stock of where we’ve been and where we’ve arrived.
-1. We began with a prior on the halflife of a fact: in hours, $h ∼ \mathrm{Gamma}(α, β)$ for some known parameters $α$ and $β$.
+Let’s stop and take stock of where we are and how we got here.
+1. We began with a prior on the halflife of a fact: in hours, $h ∼ \mathrm{Gamma}(α, β)$ for known parameters $α$ and $β$.
 2. After $t$ hours since last seeing this fact, the student underwent a quiz and got $k$ points out of a possible $n$. We treated this as a binomial trial with underlying probability $2^{-t/h}$.
 3. We went through the Bayesian machinery to obtain the moments of the posterior $h | k$, that is, our new belief about the distribution of the fact’s halflife in light of the quiz.
 4. With those moments, we created a new distribution $\mathrm{Gamma}(α', β')$ which matches the true posterior in mean and variance. We can now return to step 1!
@@ -243,9 +243,11 @@ Can we imagine a quiz type where the student could score 0 or 1 point (out of ma
 
 Let $x ∼ \mathrm{Bernoulli}(p(t))$ be a “true” Bernoulli draw representing the answer to the question, “does the student *really* know this fact?” ($p(t)=2^{-t/h}$ here is the same exponential recall probability as before.)
 
-We don’t observe $x$, we observe a “noisy report” $z|x ∼ \mathrm{Bernoulli}(q_x)$ where
+But this random variable is hidden from us: we don’t observe $x$. Rather, we observe a quiz, a “noisy report”, $z|x ∼ \mathrm{Bernoulli}(q_x)$ where
 - $q_1 = P(z = 1 | x = 1)$, that is, the probability of us observing a successful quiz when the student *really* knows the fact, while
 - $q_0 = P(z = 1 | x = 0)$, i.e., the probability of us observing a successful quiz when the student has in fact forgotten the fact.
+
+In signal processing terms, the true but hidden result $x$ goes through a noisy channel, which might flip the bit, and what we observe is the output of that channel, $z$.
 
 In the plain binary case without fuzziness, $q_1 = 1$ and $q_0 = 0$, but in the soft-binary case, these two parameters are independent and free for you to specify as any numbers between 0 and 1 inclusive.
 
@@ -288,9 +290,9 @@ s_z = \begin{cases}
 $$
 (You can verify that these simplify to the binary quiz case, i.e., the binomial $n=1$ case, for $q_0=0$ and $q_1=1$!)
 
-The rest is the same as before, in the binomial quiz case. The mean (the first moment) of the posterior $E[h|z]=μ=\frac{m_1}{m_0}$ while the second non-central moment is $E[(h|z)^2]=\frac{m_2}{m_0}$ leading the variance to be $σ^2 = \frac{m_2}{m_0} - μ^2$. This mean and variance can again be moment-matched to a new $\mathrm{Gamma}(α' =  μ^2/ σ^2, β' = μ / σ^2)$.
+The rest is the same as before, from the binomial quiz case. The mean (the first moment) of the posterior $E[h|z]=μ=\frac{m_1}{m_0}$ while the second non-central moment is $E[(h|z)^2]=\frac{m_2}{m_0}$, yielding a variance that is $σ^2 = \frac{m_2}{m_0} - μ^2$. This mean and variance can again be moment-matched to a new $\mathrm{Gamma}(α' =  μ^2/ σ^2, β' = μ / σ^2)$.
 
-We should note here that both $q_1 = P(z = 1 | x = 1)$ and $q_0 = P(z = 1 | x = 0)$ are *free* here, and apps have total flexibility in specifying these. In the API presented above, both $z$ and $q_1$ are encoded without loss of generality in `0 <= successes <= 1`:
+We should note here that both $q_1 = P(z = 1 | x = 1)$ and $q_0 = P(z = 1 | x = 0)$ are *free* parameters, and apps have total flexibility in specifying these. In Ebisu’s API presented [above](#api-quickstart) (step 3), both $z$ and $q_1$ are encoded without loss of generality in `0 <= successes <= 1`:
 - $z=1$ if `successes > 0`, otherwise $z=0$.
 - $q_1$ is `max(successes, 1 - successes)`.
 
@@ -309,7 +311,7 @@ Mozer et al. in both their 2009 NIPS conference paper and their 2014 <cite>Psych
 
 ![Recall probability for each leaky integrator, with max](leaky-integrators-precall.png)
 
-At the left-most part of the plot, the first leaky integrator with the shortest time constant (blue solid line) dominates but also very quickly fades away due to the crush of its fast exponential. But as it decays, the second leaky integrator, with a strictly lower starting value (weight; orange dotted line), steps up to keep the recall probability from collapsing. And so on till the last leaky integrator.
+At the left-most part of the plot, the first leaky integrator with the shortest time constant (blue solid line) dominates but also very quickly fades away due to the crush of its fast exponential. But as it decays, the second leaky integrator (orange dotted line), with a strictly lower starting value/weight, steps up to keep the recall probability from collapsing. And so on till the last leaky integrator.
 
 Switching the above plot’s x and y scales to log-log gives and zooming out to see more time gives us this:
 
@@ -317,15 +319,15 @@ Switching the above plot’s x and y scales to log-log gives and zooming out to 
 
 By taking the *max* of the output of each leaky integrator, we get this *sequence* of bumps, which describe a bumpy power law for times ranging between minutes to 1+ year. A *true* power law would, in a log-log plot such as this, be a straight line for all time—not only is ours bumpy, it’s also flat at either end (horizontal on the left, vertical on the right). At very short intervals, this makes sense—we can’t have probability of recall exceed 1—but for times beyond a year, after we’ve run out of leaky integrators, the probability of recall collapses quickly to zero under the crush of the exponential (Einstein’s most powerful force in the universe and all that).
 
-Nevertheless, this is very encouraging. So instead of probability of recall $p(t) = 2^{-t/h}$ for a single unknown halflife which we discussed previously, we can consider 
+Nevertheless, this is very encouraging. Instead of probability of recall $p(t) = 2^{-t/h}$ for a *single* unknown halflife which we discussed previously, we can consider 
 $$p(t) = \max_{i=1}^{n} \left\lbrace w_i ⋅ 2^{-t/h_i} \right\rbrace$$
 for $h_i ∼ \mathrm{Gamma}(α_i, β_i)$. That is, we have $n$ Gamma-distributed random variables with known parameters $(α_i, β_i)$ whose means $μ_i = \frac{α_i}{β_i}$ are logarithmically-spaced between a low and high of our choice (e.g., one hour to `1e4` hours in the plot above).
 
-We also assume that each of the $n$ weights, $w_i$, are known and deterministic—this is a modeling choice to keep Ebisu’s posterior inference lightweight in a manner that seems psychologically plausible. So while we need $w_i ∈ [0, 1]$, we are otherwise quite free in choosing these weights. Mozer et al.’s (2009, see [bibliography](#bibliography)) model proposes exponentially-spaced weights, so we have
+We also assume that $n$ weights, $w_i$, are known and deterministic—this is a modeling choice to keep Ebisu’s posterior inference lightweight in a manner that seems psychologically plausible. So while we need $w_i ∈ [0, 1]$, we are otherwise quite free in choosing these weights. Mozer et al.’s (2009, see [bibliography](#bibliography)) model proposes exponentially-spaced weights, so we have
 $$w_i = (w_n)^{\frac{i-1}{n-1}}$$
 for some fixed final weight $w_n$, thereby setting the first weight on our shortest/fastest leaky integrator to 1.
 
-
+Note that we have assiduously avoided calling our collection of $n$ Gamma random variables a mixture model, because we don’t want the weights to sum to one and we don’t want the overall recall probability to be a weighted-mean of the random variables. The `max` operator is preferable to the classic mixture model because we very much want 
 
 
 ### Data model

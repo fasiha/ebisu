@@ -9,12 +9,12 @@ from .ebisuHelpers import gammaPredictRecall, gammaUpdateBinomial, gammaUpdateNo
 
 
 def initModel(
-    halflife: float,  # hours
+    halflife: Optional[float] = None,  # hours
     finalHalflife=1e5,  # hours
     n: int = 10,
     # above: lazy inputs, below: exact inputs
     weightsHalflifeGammas: Optional[list[tuple[float, HalflifeGamma]]] = None,
-    now: Optional[float] = None,  # totally separate
+    now: Optional[float] = None,
 ) -> Model:
   """
   Create brand new Ebisu model
@@ -33,6 +33,7 @@ def initModel(
       halflifeGammas.append(g)
       halflives.append(_gammaToMean(*g))
   else:
+    assert halflife, "halflife or weightsHalflifeGammas needed"
     halflives = np.logspace(log10(halflife * .1), log10(finalHalflife), n).tolist()
     # pick standard deviation to be half of the mean
     halflifeGammas = [_meanVarToGamma(t, (t * .5)**2) for t in halflives]
@@ -180,6 +181,7 @@ def predictRecallMonteCarlo(
     now: Optional[float] = None,
     logDomain=True,
     size=10_000,
+    extra: Optional[dict] = None,
 ) -> float:
   now = now if now is not None else timeMs()
   elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
@@ -190,7 +192,10 @@ def predictRecallMonteCarlo(
   logp = np.max((np.array(model.pred.log2weights)[:, np.newaxis] -
                  elapsedHours / np.vstack([g.rvs(size=size) for g in gammas])),
                 axis=0)
-  expectation = np.mean(np.exp2(logp))
+  p = np.exp2(logp)
+  expectation = np.mean(p)
+  if extra is not None:
+    extra['std'] = np.std(p)
   return np.log(expectation) if logDomain else expectation
 
 

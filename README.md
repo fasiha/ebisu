@@ -70,11 +70,11 @@ python -m pip install ebisu
 **Step 1.** Create an Ebisu `Model` for each flashcard when a student learns it:
 ```py
 def initModel(
-    halflife: float,  # hours
+    halflife: Optional[float] = None,  # hours
     finalHalflife=1e5,  # hours
     n: int = 10,
     weightsHalflifeGammas: Optional[list[tuple[float, HalflifeGamma]]] = None,
-    now: Optional[float] = None,  # totally separate
+    now: Optional[float] = None,
 ) -> Model
 ```
 If you want to do the minimal amount of work to create a model, just provide `halflife` in hours. This is your best guess of how long it will take for this flashcard’s memory to decay to 50% (the “half” in “halflife”).
@@ -174,7 +174,7 @@ $K_ν(z)$ here is the modified Bessel function of the second kind with order $ν
 
 > For completeness, note that when $c=0$ (which can happen in our application when the time elapsed since last quiz is $t=0$), there’s a simpler solution. The integrand is just the Gamma distribution’s density, so $∫_0^∞ h^{a-1} e^{-b h} \,\mathrm{d}h = b^{-a}Γ(a)$, i.e., the reciprocal of the normalizing constant in the Gamma density.
 
-Therefore, we have
+<a name="expectation-p-recall"></a>Therefore, we have
 $$
   E\left[p(t) \right] = \frac{2 β^α}{Γ(α)} \left(\frac{t \log 2}{β}\right)^{α/2} K_{α}(2\sqrt{β t \log 2}),
 $$
@@ -323,11 +323,48 @@ Nevertheless, this is very encouraging. Instead of probability of recall $p(t) =
 $$p(t) = \max_{i=1}^{n} \left\lbrace w_i ⋅ 2^{-t/h_i} \right\rbrace$$
 for $h_i ∼ \mathrm{Gamma}(α_i, β_i)$. That is, we have $n$ Gamma-distributed random variables with known parameters $(α_i, β_i)$ whose means $μ_i = \frac{α_i}{β_i}$ are logarithmically-spaced between a low and high of our choice (e.g., one hour to `1e4` hours in the plot above).
 
-We also assume that $n$ weights, $w_i$, are known and deterministic—this is a modeling choice to keep Ebisu’s posterior inference lightweight in a manner that seems psychologically plausible. So while we need $w_i ∈ [0, 1]$, we are otherwise quite free in choosing these weights. Mozer et al.’s (2009, see [bibliography](#bibliography)) model proposes exponentially-spaced weights, so we have
+We also assume that $n$ weights, $w_i$, are known and deterministic—this is a modeling choice to keep Ebisu’s posterior inference lightweight in a manner that seems psychologically plausible. So while we need $w_i ∈ [0, 1]$, we are otherwise quite free in choosing these weights. Mozer et al. (2009, see [bibliography](#bibliography)) propose exponentially-spaced weights, which we also use, giving us
 $$w_i = (w_n)^{\frac{i-1}{n-1}}$$
-for some fixed final weight $w_n$, thereby setting the first weight on our shortest/fastest leaky integrator to 1.
+for some fixed final weight $w_n$, thereby setting the first weight on our shortest/fastest leaky integrator $w_1 = 1$.
 
-Note that we have assiduously avoided calling our collection of $n$ Gamma random variables a mixture model, because we don’t want the weights to sum to one and we don’t want the overall recall probability to be a weighted-mean of the random variables. The `max` operator is preferable to the classic mixture model because we very much want 
+> Note that I have assiduously avoided calling our model a mixture model, because I don’t want the weights to sum to one and we don’t want the overall recall probability to be a weighted mean (something like $``∑_{i=1}^n \tilde w_i 2^{-t/h_i}"$ where $w̃_i = w_i / ∑_{i=1}^n w_i$). A While such a mixture model would also yield a power law, and has a more convenient expression for the expected value of recall probability, we have a gentle preference for the `max` operator (and weights starting with $w_1=1$ and decreasing) because it lets the weight-update step (below) be simpler and more robust. (It's plausible that in the future we will switch to a mixture model.)
+
+So let us take stock.
+- We have $n$ different Gamma-distributed halflives, $h_i ∼ \mathrm{Gamma}(α_i, β_i)$, and
+- $n$ corresponding weights $w_i = (w_n)^\frac{i-1}{n-1}$, for $i$ running from 1 to $n$.
+- We assume $n$, all $α_i$ and $β_i$ and $w_i$ are known deterministic quantities.
+- And we have the probability of recall $p(t) = \max_i  \lbrace w_i ⋅ 2^{-t/h_i} \rbrace$.
+
+Let us answer the two questions at the heart of Ebisu—what’s the recall probability at time $t$ and what does a quiz do?
+
+So. What is $E[p(t) = \max_i  \lbrace w_i ⋅ 2^{-t/h_i} \rbrace]$, the expected value of recall probability $t$ hours after last seeing this flashcard? The $\max$ makes this impossible to compute this analytically (it would be easier with a mixture model admittedly). 😭. 
+
+<details>
+<summary>(Why this expectation is hard)</summary>
+
+> To see why this is hard, consider that in general, if you have $n$ random variables $X_i$ for $i$ running from 1 to $n$, and take $X = \max_{i=1}^n X_i$, the probability density function (PDF) of the max $X$ can be found by first noticing that its cumulative distribution function (CDF) is
+> $$F_X(x) = P[X \leq x] = P[X_1\leq x,...,X_n\leq x] = ∏_{i=1}^n P[X_i\leq x] = ∏_{i=1}^n F_{X_i}(x).$$
+> Differentiating the distribution (CDF) via [product rule](https://en.wikipedia.org/w/index.php?title=Product_rule&oldid=1119757448#Product_of_more_than_two_factors) and some massaging gives us the density (PDF),
+> $$f_X(x) = ∑_{i=1}^n \left( f_{X_i}(x) \prod_{j\neq i} F_{X_j}(x) \right).$$
+> Unhappily, because our $X_i = w_i 2^{-t/h_i}$, for Gamma-distributed $h_i$, the distribution of $w_i 2^{-t/h_i}$ is 🤷, so we can’t get the expectation this way.
+> 
+> There’s another expression for this expectation, via [user76284](https://math.stackexchange.com/q/3679707) on the Mathematics Stack Exchange, but it’s just as hard:
+> $$E[X] = 1 - ∫_{-∞}^∞ ∏_{i=1}^n F_{X_i}(x) \,\mathrm{d}x.$$
+
+</details>
+
+But we have good approximations for this expectation $E[p(t)]$!
+
+We know via [Jensen’s inequality](https://mathworld.wolfram.com/JensensInequality.html) that for random variable $X$ and some nonlinear function $f$, in general $E[f(X)] ≠ f(E[X])$. You can’t just move the expectation inside a nonlinear expression—my mnemonic for this is, for $X ∼ \mathrm{Normal}(0, 1)$ the unit normal/Gaussian, $(E[X])^2 = 0$, but that’s very different from whatever $E[X^2]$ is!
+
+But just consider how much computationally straightforward these successive approximations are!
+- Exact: $E[\max_i \lbrace w_i ⋅ 2^{-t/h_i} \rbrace ]$, unknown 😵.
+- Semi-Bayesian: $\max_i \lbrace w_i ⋅ E[2^{-t/h_i}] \rbrace$, doable! We calculated this inner expectation [above](#expectation-p-recall), and it needs Bessel and Gamma functions but doable!
+- Full approximation: $\max_i \lbrace w_i ⋅ 2^{-t/ E[h_i]} \rbrace$, trivial! We could do this in SQL!
+
+How bad are these approximations? Not too bad! The three choices are shown below for a notional model. The exact expectation computed via Monte Carlo (thick dotted blue) and describes a nice power law—the random overlap between adjacent Gamma random variables smooths out the bumps we saw before. The two successive approximations wobble around the exact expectation, describing the bumps. Notice the semi-Bayesian approximation (thin solid orange line) matches the Monte Carlo curve at the very left and very right of the curve, when a single Gamma-distributed halflife dominates. 
+
+![Monte Carlo vs semi-Bayesian vs full approximation of recall probability expectation](./predictRecall-approx.png)
 
 
 ### Data model

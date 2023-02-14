@@ -9,6 +9,9 @@
     - [Exponential decay](#exponential-decay)
     - [Noisy-binary quizzes](#noisy-binary-quizzes)
     - [Power laws](#power-laws)
+    - [Leaky integrators: recall probability](#leaky-integrators-recall-probability)
+    - [Recall probability in SQL](#recall-probability-in-sql)
+    - [Leaky integrators: update recall](#leaky-integrators-update-recall)
   - [Source code](#source-code)
   - [Bibliography](#bibliography)
   - [Acknowledgments](#acknowledgments)
@@ -27,7 +30,7 @@ Consider a student memorizing a set of facts.
 - How does the student’s performance on a review change the fact’s future review schedule?
 
 Ebisu is an open-source public-domain library that answers these two questions. It is intended to be used by software developers writing quiz apps, and provides a simple API to deal with these two aspects of scheduling quizzes, centered on two functions:
-- `predictRecall` gives the current recall probability for a given fact.
+- `predictRecall` gives the recall probability for a given fact at any given timestamp.
 - `updateRecall` adjusts the belief about future recall probability given a quiz result.
 
 Behind this simple API, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and sum-of-exponentials (power law) forgetting. Thanks to these probabilistic foundations, Ebisu is able to handle quite a rich variety of quiz types:
@@ -47,7 +50,7 @@ Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other sch
 
 Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like nonlinear-transformed Gamma-distributed random variables, modified Bessel functions of the second kind, and incomplete Gamma functions, this is for you.
 
-> Nerdy details in a nutshell: Ebisu posits that your memory for a flashcard decays according to a power law, which it models with a *sequence* of weighted exponentials with halflives following Gamma random variables. Your probability of recall at any given time is the *maximum* of this array weighted exponentials (what Mozer et al. call “leaky integrators” (see [bibliography](#bibliography))), and which we approximate with a simple arithmetic expression that can be run even in SQL. Next, a *quiz* is treated as Bernoulli, binomial, or a neat “noisy-binary” trial; after the Bayesian update, each halflife’s posterior is moment-matched to the closest Gamma random variable. Based on the strength of the posterior update, the weights for each halflife are updated.
+> Nerdy details in a nutshell: Ebisu posits that your memory for a flashcard decays according to a power law, which it models with a *sequence* of weighted exponentials with halflives following Gamma random variables. Your probability of recall at any given time is the *maximum* of this array weighted exponentials (what Mozer et al. call “leaky integrators” (see [bibliography](#bibliography))), and which we approximate with a simple arithmetic expression that can be run even in [SQL](#recall-probability-in-sql). Next, a *quiz* is treated as Bernoulli, binomial, or a neat “noisy-binary” trial; after the Bayesian update, each halflife’s posterior is moment-matched to the closest Gamma random variable. Based on the strength of the posterior update, the weights for each halflife are updated.
 
 Finally, in the [Source Code](#source-code) section, we describe the software testing done to validate the math, including tests comparing Ebisu’s output to Monte Carlo sampling.
 
@@ -81,7 +84,7 @@ If you dislike any of the above defaults, you can tune them using the keyword ar
 
 `now` is when this fact was learned (milliseconds in the Unix epoch, midnight UTC on 1 January, 1970). If you don’t provide it, the current timestamp is used.
 
-**Step 2.** Find the `Model` with the lowest recall probability. You can do this in SQL (see below!) or use:
+**Step 2.** Find the `Model` with the lowest recall probability. You can do this in SQL (see [below](#recall-probability-in-sql)!) or use:
 ```py
 def predictRecall(
     model: Model,
@@ -325,6 +328,8 @@ for some fixed final weight $w_n$, thereby setting the first weight on our short
 
 > Note that I have assiduously avoided calling our model a mixture model, because I don’t want the weights to sum to one and we don’t want the overall recall probability to be a weighted mean (something like $``∑_{i=1}^n \tilde w_i 2^{-t/h_i}"$ where $w̃_i = w_i / ∑_{i=1}^n w_i$). A While such a mixture model would also yield a power law, and has a more convenient expression for the expected value of recall probability, we have a gentle preference for the `max` operator (and weights starting with $w_1=1$ and decreasing) because it lets the weight-update step (below) be simpler and more robust. (It's plausible that in the future we will switch to a mixture model.)
 
+### Leaky integrators: recall probability
+
 So let us take stock.
 - We have $n$ different Gamma-distributed halflives, $h_i ∼ \mathrm{Gamma}(α_i, β_i)$, and
 - $n$ corresponding weights $w_i = (w_n)^\frac{i-1}{n-1}$, for $i$ running from 1 to $n$.
@@ -354,13 +359,45 @@ But we have good approximations for this expectation $E[p(t)]$!
 We know via [Jensen’s inequality](https://mathworld.wolfram.com/JensensInequality.html) that for random variable $X$ and some nonlinear function $f$, in general $E[f(X)] ≠ f(E[X])$. You can’t just move the expectation inside a nonlinear expression—my mnemonic for this is, for $X ∼ \mathrm{Normal}(0, 1)$ the unit normal/Gaussian, $(E[X])^2 = 0$, but that’s very different from whatever $E[X^2]$ is!
 
 But just consider how much computationally straightforward these successive approximations are!
-- Exact: $E[\max_i \lbrace w_i ⋅ 2^{-t/h_i} \rbrace ]$, unknown 😵.
+- Exact: $E[\max_i \lbrace w_i ⋅ 2^{-t/h_i} \rbrace]$, unknown 😵.
 - Semi-Bayesian: $\max_i \lbrace w_i ⋅ E[2^{-t/h_i}] \rbrace$, doable! We calculated this inner expectation [above](#expectation-p-recall), and it needs Bessel and Gamma functions but doable!
-- Full approximation: $\max_i \lbrace w_i ⋅ 2^{-t/ E[h_i]} \rbrace$, trivial! We could do this in SQL!
+- Full approximation: $\max_i \lbrace w_i ⋅ 2^{-t/ E[h_i]} \rbrace$, trivial! We could do this in SQL (see [below](#predict-recall-sql))!
 
 How bad are these approximations? Not too bad! The three choices are shown below for a notional model. The exact expectation computed via Monte Carlo (thick dotted blue) and describes a nice power law—the random overlap between adjacent Gamma random variables smooths out the bumps we saw before. The two successive approximations wobble around the exact expectation, describing the bumps. Notice the semi-Bayesian approximation (thin solid orange line) matches the Monte Carlo curve at the very left and very right of the curve, when a single Gamma-distributed halflife dominates. 
 
 ![Monte Carlo vs semi-Bayesian vs full approximation of recall probability expectation](./predictRecall-approx.png)
+
+Because of the immense computational attractiveness of the fully-approximated expectation (solid thick green line), where the expectation operator is moved all the way inside, i.e., $E[\max_i \lbrace w_i ⋅ 2^{-t/h_i} \rbrace] → \max_i \lbrace w_i ⋅ 2^{-t/ E[h_i]} \rbrace$, and the fact that the approximation follows the overall shape of the exact expectation (apparently achievable only via Monte Carlo), Ebisu’s `predictRecall` function uses it.
+
+### Recall probability in SQL
+As promised, this can be done in SQL! Assuming you have a SQLite table `mytable` with a column `json_column` contaiing your JSON-encoded Ebisu models, the following returns row IDs, the JSON, and a third value called `logPredictRecall` below computing `predictRecall`.
+```sql
+SELECT
+  t.id,
+  t.json_column,
+  MAX(
+    (
+      json_extract(value, '$[0]') - (
+        (?) - json_extract(json_column, '$.pred.lastEncounterMs')
+      ) / json_extract(value, '$[1]')
+    )
+  ) AS logPredictRecall
+FROM
+  mytable t,
+  json_each(json_extract(t.json_column, '$.pred.forSql'))
+GROUP BY t.id
+```
+Check the bundled script [`sql-example.py`](./sql-example.py) for a fully-worked example.
+
+### Leaky integrators: update recall
+In this section, we describe a simple way to extend the single-Gamma-distributed-halflife quizzes (the [binomial](#exponential-decay) and [noisy-binary](#noisy-binary-quizzes) cases above) to a series of $n$ leaky integrators, i.e., $n$ weighted Gamma random variables governing halflife. The approach is not probabilistically motivated and therefore is ad hoc, but it has some attractive properties to commend it.
+
+So.
+1. We start with $n$ leaky integrators, i.e., $h_i ∼ \mathrm{Gamma}(α_i, β_i)$ for $i$ from 1 to $n$ with all parameters known, as well as corresponding weights $w_i$, also known.
+2. At time $t$ we get a binomial or noisy-binary quiz result with underlying probability $p(t) = \max_i \lbrace w_i ⋅ 2^{-t/h_i} \rbrace$.
+3. We then apply the appropriate quiz update to each leaky integrator, i.e., find $\mathrm{Gamma}(α_i', β_i')$ that best approximate each posterior $h_i | \mathrm{quiz}$ (where we use “quiz” to denote the binomial or noisy-binary trail).
+4. This is the magic (i.e., ad hoc) part: update the weights, $w_i' = (μ_i' / μ_i)w_i$, where $μ_i = α_i / β_i$, the mean of the $i$th prior, and where $μ_i' = α_i' / β_i'$ is the mean of the $i$th posterior.
+
 
 
 ## Source code

@@ -224,7 +224,6 @@ def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
 
 
 def _powerMean(v: list[float] | np.ndarray, p: int | float) -> float:
-  assert p > 0
   return float(np.mean(np.array(v)**p)**(1 / p))
 
 

@@ -28,7 +28,7 @@ if not True:
           ((4.0, 4e-05), -2.353669592990435)]
   m = ebisu.initModel(weightsHalflifeGammas=[(np.exp2(w), ab) for ab, w in args], now=0)
 
-t = np.logspace(-2, 5, 201)
+t = np.logspace(-2, 5, 601)
 
 mc: list[float] = []
 mcErr: list[float] = []
@@ -50,7 +50,7 @@ plt.plot(t, approx, label='Full Approx', alpha=0.6, linewidth=3)
 plt.gca().set_xscale("log")
 plt.gca().set_yscale("log")
 
-if True:
+if not True:
   plt.ylim([.09, 1.2])
   plt.xlim([.05, 10e3])
 

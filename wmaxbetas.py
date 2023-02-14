@@ -124,7 +124,7 @@ if __name__ == '__main__':
       logliks.append(ll)
       if intermediate:
         print(
-            f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[round(l,3) for l in ll]}'
+            f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[round(l,3) for l in ll]}, hl={ebisu.hoursForRecallDecay(models[-1])}'
         )
 
       models = [update(model, s, t, now) for model, update in zip(models, updators)]

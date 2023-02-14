@@ -1,6 +1,3 @@
-import json
-from itertools import product
-import math
 import ebisu
 import sqlite3
 import os.path
@@ -23,34 +20,29 @@ if not file_exists:
 
   # Insert some data into the table
   models = []
-  for wmax in [.01, .1, .2, .3, .4, .5]:
-    model = ebisu.initModel(wmax, now=learnTime)
+  for initHl in [1, 5, 25, 125]:
+    model = ebisu.initModel(initHl, now=learnTime)
     models.append(model)
     orig = model.to_json()
     cursor.execute("INSERT INTO mytable (json_column) VALUES (?)", (orig,))
   conn.commit()
 
 query = """
-SELECT f.id, (json_extract(value, '$[0]') - ( (?) - JSON_EXTRACT(json_column, '$.pred.lastEncounterMs'))  / (json_extract(value, '$[1]')))
-FROM mytable f, json_each(json_extract(f.json_column, '$.pred.forSql'))
-    """
-queryGOOD = """
 SELECT
   t.id,
   t.json_column,
   MAX(
     (
       json_extract(value, '$[0]') - (
-        (?) - JSON_EXTRACT(json_column, '$.pred.lastEncounterMs')
+        (?) - json_extract(json_column, '$.pred.lastEncounterMs')
       ) / json_extract(value, '$[1]')
     )
   ) AS logPredictRecall
 FROM
   mytable t,
   json_each(json_extract(t.json_column, '$.pred.forSql'))
-group by t.id
+GROUP BY t.id
     """
-query = queryGOOD
 
 quizTime = ebisu.timeMs()
 cursor.execute(query, (quizTime,))

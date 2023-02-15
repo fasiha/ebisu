@@ -106,12 +106,9 @@ def gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: bool
 
   def logmoment(n):
     an = a + n
-    res, sgn = logsumexp([
-        _intGammaPdfExp(an, b, tScaled, logDomain=True),
-        log(qz[0] or np.spacing(1)) + gammaln(an) - an * log(b)
-    ],
-                         b=[qz[1] - qz[0], 1],
-                         return_sign=True)
+    x = _intGammaPdfExp(an, b, tScaled, logDomain=True)
+    y = (log(qz[0]) if qz[0] else -np.inf) + gammaln(an) + -an * log(b)
+    res, sgn = logsumexp([x, y], b=[qz[1] - qz[0], 1], return_sign=True)
     assert sgn > 0
     return res
 

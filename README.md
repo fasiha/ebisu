@@ -444,9 +444,13 @@ In practice, Ebisu keeps a boolean representing “weight reached” for each le
 
 A leaky integrator’s “weight reached” flag is set from `False` to `True` when
 - $w_l ≤ Δ_i ≤ 1$ or
-- $w_r ≤ Δ_i$.
+- $1 ≤ w_r ≤ Δ_i$.
 
-Currently $w_l = 0.95$ (the “left” bound) and $w_r = 1.01$ (the “right” bound).
+Currently $w_l = 0.95$ (the “left” bound) and $w_r = 1.01$ (the “right” bound). Assuming the $i$th leaky integrator’s “weight reached” flag is `False`, consider
+- $Δ_i = 0.5$: this is likely an early failed quiz that this leaky integrator shouldn’t respond to.
+- $Δ_i = 0.99$: this is likely a genuine failed quiz that this leaky integrator *should* respond to. It will respond to all future quizzes too, by applying the weight update: it’s “weight reached” is now `True`.
+- $Δ_i = 1.001$: this is likely an early success and the leaky integrator doesn’t need to bother with.
+- $Δ_i = 1.5$: this quiz exceeded the halflife of this leaky integrator. It should definitely incorporate this quiz and future ones by setting its “weight reached” to `True`.
 
 Once the “weights reached” flag is set `True`, it is never unset.
 

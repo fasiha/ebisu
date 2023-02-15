@@ -108,6 +108,8 @@ This is a pure function: the input `Model` is left untouched, so you can replace
 - a binary/binomial quiz is denoted by integer `successes` (points received) out of `total` points possible. 
 - A noisy-binary quiz is implied by `total=1` and uses `0 < successes < 1`, a float and optionally `q0` to specify its parameters.
 
+`q0 = P(successful quiz | actually forgot)`, that is, the probability that the quiz was successful given the student actually has actually forgotten the fact. Notionally there exists `q1 = P(successful quiz | actually remembers)`, the probability of successful quiz given the student truly remembers the fact, and is independent of `q0`. But `q1` is taken to be `max(successes, 1 - successes)`. So `successes=0.1` and `successes=0.9` both encode the `q1 = 0.9` case but overall quiz fail and pass, respectively. (See the [math section](#noisy-binary-quizzes) for more details, I know this can be confusing!)
+
 `now` is as before milliseconds in the Unix epoch.
 
 **Bonus** It can be useful to know when a `Model`’s memory will decay to some probability:
@@ -165,7 +167,7 @@ For any given time elapsed $t$, we can compute the expected value of this recall
 $$
 E\left[p(t) = 2^{-t/h}\right] = \frac{β^α}{Γ(α)}  ∫_0^∞ 2^{-t/h} h^{α - 1} e^{β h} \,\mathrm{d}h.
 $$
-This is not as ferocious as it first looks. Since $2^x = e^{x \log 2}$ (where $\log$ is the natural log, with base $e$), we can absorb terms, and then let <a name="sympy-integral"></a>Sympy do all the heavy lifting: it turns out that for positive constants $a$, $b$, and $c$,
+This is not as ferocious as it first looks. Since $2^x = e^{x \log 2}$ (where $\log$ is the natural log, with base $e$), we can absorb terms, and then let <a name="sympy-integral"></a>Sympy do all the real work: it turns out that for positive constants $a$, $b$, and $c$,
 $$
   ∫_0^∞ h^{a - 1} e^{-b h - c / h} \,\mathrm{d}h = 2 \left(\frac{c}{b}\right)^{a/2} K_{a}(2\sqrt{b c}).
 $$
@@ -187,9 +189,9 @@ In words: the student got $k$ points out of $n$ total where each point was indep
 
 What is the posterior, $P(h | k)$? By Bayes, we have
 $$P(h|k) = \frac{P(k|h) P(h)}{\int_0^∞ P(k|h) P(h) \,\mathrm{d}h}$$
-In words: the posterior is proportional to the likelihood $P(k|h)$ (the binomial distribution’s probability mass function) scaled by the prior $P(h)$ (the Gamma distribution’s probability density function), normalized by a constant to ensure everything sums to 1.
+In words: the posterior is proportional to the likelihood $P(k|h)$ (the binomial distribution’s probability mass function, PMF) scaled by the prior $P(h)$ (the Gamma distribution’s probability density function, PDF), normalized by a constant to ensure everything sums to 1.
 
-We can rewrite things in terms of base $e$ to consolidate. Since $2^x = e^{(\log 2) x}$, where $\log(⋅)$ denotes natural log (base $e$), the numerator
+Let’s rewrite things in terms of base $e$ to consolidate. The numerator
 $$
 \begin{split}
 P(k|h)P(h) &∝ \left(e^{-(\log 2)  t/h}\right)^k \left(1-e^{-(\log 2) t/h}\right)^{n-k} h^{α - 1} e^{-β h}
@@ -207,7 +209,7 @@ $$
 $$
   ∫_0^∞ f(x) (1-g(x))^n \, \mathrm{d}x = \sum_{i=0}^{n} \left[ (-1)^i \binom{n}{i} ∫_0^∞ g(x)^i ⋅ f(x) \, \mathrm{d}x \right],
 $$
-that is, we can replace the polynomial with a sum:
+that is, we can replace the polynomial in $m_N$’s integrand with a sum:
 $$
 m_N = ∑_{i=0}^{n-k} \left[
   (-1)^i \binom{n-k}{i}
@@ -231,11 +233,36 @@ $\mathrm{Gamma}(α', β')$ is a reasonable approximation for the true posterior 
 
 Let’s stop and take stock of where we are and how we got here.
 1. We began with a prior on the halflife of a fact: in hours, $h ∼ \mathrm{Gamma}(α, β)$ for known parameters $α$ and $β$.
-2. After $t$ hours since last seeing this fact, the student underwent a quiz and got $k$ points out of a possible $n$. We treated this as a binomial trial with underlying probability $2^{-t/h}$.
+2. After $t$ hours since last seeing this fact, the student underwent a quiz and got $k$ points out of a possible $n$. We treated $k ∼ \mathrm{Binomial}(k; n, 2^{-t/h})$, as a binomial trial with underlying probability $2^{-t/h}$.
 3. We went through the Bayesian machinery to obtain the moments of the posterior $h | k$, that is, our new belief about the distribution of the fact’s halflife in light of the quiz.
 4. With those moments, we created a new distribution $\mathrm{Gamma}(α', β')$ which matches the true posterior in mean and variance. We can now return to step 1!
 
-Let’s take a quick detour and look at how to handle the other quiz type Ebisu supports—the noisy-binary quiz—before seeing how to use this exponential decay to construct power-law decay.
+To get some feel for this behavior, consider two models—two Gamma random variables—with the same mean, seven hours. One has standard deviation of 4.5 and the other 10.5 hours—call these the “low σ” and “high σ” models, respectively. Below we see the mean posterior after a binary $n=1$ quiz for a range of times $t$ (hours after last review).<a name="binom-updates-plot"></a>
+
+![Pass vs fail, high vs low σ](./binom-updates.png)
+
+This shows some nice properties of Ebisu:
+- failures strictly reduce the halflife while successes strictly increase it.
+- However, a failure far beyond the halflife barely budges the halflife: we expected that quiz to fail, so it isn’t that informative about our belief of the true halflife.
+- Similarly, very early successes also only slightly increase the halflife, for the same reason.
+- Conversely, early *failures* and late *successes* result in large posterior updates because they are so unexpected.
+  - Do note that this isn’t coded up anywhere. This is simply the result of the Bayesian framework doing it’s thing: updating prior beliefs in light of new data.
+- The high σ model encodes more uncertainty about the halflife so it gets a far more aggressive update in either direction compared to the low σ model, whose prior is more insistent on the true halflife being seven hours.
+  - This too is a crucial aspect of Bayesian methods: your prior is your anchor. If you have strong reasons to believe that a flashcard has a certain halflife, you can encode this in the α and β of the Gamma distribution you pick. If your belief about the true halflife is only vague, this is valuable information too—in this situation, the Bayesian formulation naturally will elevate data over prior.
+
+Compare this binary case to the binomial $n=2$ case, for the low σ model:
+
+![Comparing the binary quiz case to the n=2 binomial cases](./binom-n2-updates.png)
+
+The left plot shows the same two lines as the low σ model above. On the right, we show three curves, for $k=2$ to $k=0$.
+
+Only the $k=0$ case, i.e., zero points out of max two, has the property that its posterior mean halflife remains strictly below the prior’s mean (seven hours). And similarly the $k=2$ case’s posterior mean is strictly *above* the prior mean.
+
+For $k=1$, however, the posterior mean is less than or greater than the prior mean, depending on how much time elapsed the quiz and the last encounter with this fact. It’s also bounded between the pass and fail curves of the binary case.
+
+Furthermore, the $k=0$ and $k=2$ cases lead to much more pronounced updates than the binary $n=1$ model’s results on the left. Therefore, the binomial $n>1$ updates might be used by quiz apps to potentially encode “difficulty”. While ad hoc, a “very easy” or “very hard” binary quiz could be encoded as a $k=2$ or $k=0$ binomial trial for $n=2$, respectively.
+
+Now. Let’s take a quick detour to look at how to handle the other quiz type Ebisu supports—the noisy-binary quiz—before seeing how to use this exponential decay to construct power-law decay.
 
 ### Noisy-binary quizzes
 Can we imagine a quiz type where the student could score 0 or 1 point (out of max 1) but also somewhere in between? As luck would have it, Stack Exchange user [@mef](https://stats.stackexchange.com/a/419320) has invented a lovely way to model this and it is quite useful in capturing some advanced quiz types.
@@ -250,7 +277,7 @@ In signal processing terms, the true but hidden result $x$ goes through a noisy 
 
 In the plain binary case without fuzziness, $q_1 = 1$ and $q_0 = 0$, but in the soft-binary case, these two parameters are independent and free for you to specify as any numbers between 0 and 1 inclusive.
 
-Given $h∼\mathrm{Gamma}(α, β)$ and known $α$, $β$, $q_1$, and $q_0$, we can ask what the posterior $h | z$ is, we can use the fact that the likelihood
+Given $h∼\mathrm{Gamma}(α, β)$ and known $α$, $β$, $q_1$, and $q_0$, we can ask what the posterior $h | z$ is. We can use the fact that the likelihood is
 $$
 \begin{split}
 P(z|h) &= P(z|x) ⋅ P(x|h)
@@ -269,9 +296,11 @@ P(z|h)P(h) ∝  \begin{cases}
    h^{α - 1} e^{-β h} \left( (q_0 - q_1)e^{-(\log2) t / h} + (1-q_0)\right) &\text{if } z=0
 \end{cases}
 $$
+These expressions are the Gamma density and the expansion of the likelihood $P(z|h)$, a product of two Bernoulli probability mass functions.
+
 As before, we can define a sequence of pseudo-moments $m_N$ for integer $N≥0$ for the noisy-binary case—the calculus we derived for the binomial quiz case above helps us immensely and we just give the result here:
 $$
-m_N = 2 \left(\frac{(\log 2) t}{β}\right)^{(α+N)/2} K_{α+N}(2\sqrt{β(\log 2) t}) ⋅ r_z + s_z \frac{Γ(α+N)}{β^{α + N}}
+m_N = 2 \left(\frac{(\log 2) t}{β}\right)^{(α+N)/2} K_{α+N}\left(2\sqrt{β(\log 2) t}\right) ⋅ r_z + s_z \frac{Γ(α+N)}{β^{α + N}}
 $$
 for constants
 $$
@@ -306,7 +335,7 @@ So we’ve derived the mathematical specifics of two quiz styles for the *expone
 
 To set the stage first—recall that exponential decay, where the time factor $t$ is in the exponent, is truly *fundamentally* different than power-law decay where $t$ is in the base. $2^{-t}$ decays *incredibly* quickly—you will recall what Einstein apparently said about exponentials being the most powerful force in the universe. After seven halflives, the probability of recall has dropped less than 1%: $2^{-7} = 1/128$. Meanwhile, power laws decay much more slowly: $(t+1)^{-1}$ has the same halflife as $2^{-t}$ (both have decayed to 0.5 at $t=1$) but after seven halflives, the probability of recall for the power law is still $1/8$, i.e., 12.5%, an order of magnitude higher than 0.8%!
 
-Mozer et al. in both their 2009 NIPS conference paper and their 2014 <cite>Psychological Science</cite> journal article (see [bibliography](#bibliography)) propose a model recall that uses a *series* of exponentials, which they call a “cascade of leaky integrators”. Here’s what that could look like, for a notional example: we have a sequence of five decaying exponentials whose halflives are logarithmically-spaced from one hour to `1e4` hours (1.4 years), and each exponential is scaled by a exponentially-decreasing weight, from 1.0 down. Here’s a plot of these five weighted exponentials, superimposed on which is a line (thick, dotted, gray) representing the *max* of any of these at any point in time:
+Mozer et al. in both their 2009 NIPS conference paper and their 2014 <cite>Psychological Science</cite> journal article (see [bibliography](#bibliography)) propose a model recall that uses a *series* of exponentials, which they call a “cascade of leaky integrators”. Here’s what that could look like, for a notional example: we have a sequence of five decaying exponentials whose halflives are logarithmically-spaced from one hour to `1e4` hours (1.1 years), and each exponential is scaled by a exponentially-decreasing weight, from 1.0 down. Here’s a plot of these five weighted exponentials, superimposed on which is a line (thick, dotted, gray) representing the *max* of any of these at any point in time:
 
 ![Recall probability for each leaky integrator, with max](leaky-integrators-precall.png)
 
@@ -326,7 +355,7 @@ We also assume that $n$ weights, $w_i$, are known and deterministic—this is a 
 $$w_i = (w_n)^{\frac{i-1}{n-1}}$$
 for some fixed final weight $w_n$, thereby setting the first weight on our shortest/fastest leaky integrator $w_1 = 1$.
 
-> Note that I have assiduously avoided calling our model a mixture model, because I don’t want the weights to sum to one and we don’t want the overall recall probability to be a weighted mean (something like $``∑_{i=1}^n \tilde w_i 2^{-t/h_i}"$ where $w̃_i = w_i / ∑_{i=1}^n w_i$). A While such a mixture model would also yield a power law, and has a more convenient expression for the expected value of recall probability, we have a gentle preference for the `max` operator (and weights starting with $w_1=1$ and decreasing) because it lets the weight-update step (below) be simpler and more robust. (It's plausible that in the future we will switch to a mixture model.)
+> Note that I have assiduously avoided calling our model a mixture model, because I don’t want the weights to sum to one and we don’t want the overall recall probability to be a weighted mean (something like $``∑_{i=1}^n \tilde w_i 2^{-t/h_i}"$ where $\tilde w_i = w_i / ∑_{i=1}^n w_i$). While such a mixture model would also yield a power law, and has a more convenient expression for the expected value of recall probability, we have a gentle preference for the `max` operator (and weights starting with $w_1=1$ and decreasing) because it lets the weight-update step (below) be simpler and more robust. (It's plausible that in the future we will switch to a mixture model.)
 
 ### Leaky integrators: recall probability
 
@@ -395,10 +424,31 @@ In this section, we describe a simple way to extend the single-Gamma-distributed
 So.
 1. We start with $n$ leaky integrators, i.e., $h_i ∼ \mathrm{Gamma}(α_i, β_i)$ for $i$ from 1 to $n$ with all parameters known, as well as corresponding weights $w_i$, also known.
 2. At time $t$ we get a binomial or noisy-binary quiz result with underlying probability $p(t) = \max_i \lbrace w_i ⋅ 2^{-t/h_i} \rbrace$.
-3. We then apply the appropriate quiz update to each leaky integrator, i.e., find $\mathrm{Gamma}(α_i', β_i')$ that best approximate each posterior $h_i | \mathrm{quiz}$ (where we use “quiz” to denote the binomial or noisy-binary trail).
-4. This is the magic (i.e., ad hoc) part: update the weights, $w_i' = (μ_i' / μ_i)w_i$, where $μ_i = α_i / β_i$, the mean of the $i$th prior, and where $μ_i' = α_i' / β_i'$ is the mean of the $i$th posterior.
+3. We then apply the appropriate quiz update to each leaky integrator, i.e., find $\mathrm{Gamma}(α_i', β_i')$ that best approximate each posterior $h_i | \mathrm{quiz}$.
+    - This gives us a scalar $Δ_i = μ_i' / μ_i$ where $μ_i = α_i / β_i$ and its primed version $μ_i' = α_i' / β_i'$ are the mean of the $i$th prior and posterior, respectively.
+4. This is the magic (i.e., ad hoc) part: update the weights, $w_i'=\max(Δ_i w_i, 1)$.
+    - (¡Small print applies, see below!)
 
 
+The scale factor $Δ_i > 0$ represents the strengthening or weakening ($Δ_i > 1$ or $Δ_i < 1$, respectively) of the posterior over the prior due to the quiz. More specifically, it is the change in our belief about the $i$th halflife as a *purely static quantity*: in the basic Bayesian analysis above ([§ binomial](#exponential-decay) and [§ noisy-binary](#noisy-binary-quizzes)), the random variable $h_i$ is unknown but *fixed*. However, we know that memory is actually strengthened through the act of recall, which the posterior update represented by $Δ_i$ fails to capture. 
+
+By scaling the $i$th leaky integrator’s weight $w_i$ with $Δ_i$, we attempt to recapture this psychological reality. There is nothing Bayesian about this, and we use it because it’s an inexpensive way to quantitatively boost the leaky integrator to capture the dynamicity of the problem, and one that seems to work well for a variety of quiz histories and simulations.
+
+However, we need some small print because the above simple weight update doesn’t work well as is (given that it’s totally ad hoc, that isn’t surprising). To see why, note that we don’t want to *always* scale the weights—consider when a student first learns a flaschard, their memory is weak and they are likely to fail some initial quizzes. However, a long-halflife leaky integrator would find such failures very surprising and drastically reduce it’s posterior halflife (refer again to the [binary updates plot](#binom-updates-plot)). We don’t want this. We don’t want long-duration leaky integrators to be responding to very early quizzes. We want them to be there to prop up the probability of recall at long timescales (power law!), which is defeated by them becoming low-weight, short-timescale leaky integrators.
+
+Similarly recall that a successful quiz with a very short amount of time elapsed since last review can result in a posterior mean that’s slightly higher than the prior. We would also prefer early *successes* to avoid “polluting” long-duration leaky integrators.
+
+In short, we want a leaky integrator to smoothly kick in and begin updating itself with quizzes when quiz delays have reached and exceeded its halflife.
+
+In practice, Ebisu keeps a boolean representing “weight reached” for each leaky integrator. If the boolean is `True`, this leaky integrator has been reached and its weight should be updating per $w_i'=\max(Δ_i w_i, 1)$. Otherwise its $Δ_i$ is ignored and its weight *and* model $(α_i, β_i)$ are left untouched. Initially only the first shortest-duration leaky integrator has its “wegiths reached” flag set to `True`.
+
+A leaky integrator’s “weight reached” flag is set from `False` to `True` when
+- $w_l ≤ Δ_i ≤ 1$ or
+- $w_r ≤ Δ_i$.
+
+Currently $w_l = 0.95$ (the “left” bound) and $w_r = 1.01$ (the “right” bound).
+
+Once the “weights reached” flag is set `True`, it is never unset.
 
 ## Source code
 

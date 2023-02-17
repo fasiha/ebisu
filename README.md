@@ -26,25 +26,25 @@
 
 Consider a student memorizing a set of facts.
 
-- Which facts need reviewing?
+- Which facts need to be reviewed?
 - How does the student’s performance on a review change the fact’s future review schedule?
 
 Ebisu is an open-source public-domain library that answers these two questions. It is intended to be used by software developers writing quiz apps, and provides a simple API to deal with these two aspects of scheduling quizzes, centered on two functions:
-- `predictRecall` gives the recall probability for a given fact at any given timestamp.
-- `updateRecall` adjusts the belief about future recall probability given a quiz result.
+- `predictRecall` gives the recall probability for a given fact *right now* (or at any given timestamp).
+- `updateRecall` adjusts the belief about *future* recall given a quiz result.
 
-Behind this simple API, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and sum-of-exponentials (power law) forgetting. Thanks to these probabilistic foundations, Ebisu is able to handle quite a rich variety of quiz types:
+Behind this simple API, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and series-of-exponentials (power law) forgetting. Thanks to these probabilistic foundations, Ebisu allows quiz applications to move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today—an app using Ebisu can ensure that only the facts most in danger of being forgotten are presented for review. And since every fact always has a recall probability at any given time, Ebisu also enables apps to provide an infinite stream of quizzes for students who are cramming. Thus, Ebisu intelligently handles over-reviewing as well as under-reviewing.
+
+The probabilistic foundation also allows Ebisu to handle quite a rich variety of quiz types:
 - of course you have your binary quizzes, i.e., pass/fail;
 - you also have Duolingo-style quizzes where the student got X points out of a maximum of Y points (binomial quizzes);
-- you can even customize the probability that the student “passed” the quiz even if they forgot the fact—this is handy for deweighting multiple-choice quizzes, and also for reader apps where the readers can click on words they don’t know (“the dog that didn’t bark”).
+- you can even customize the probability that the student “passed” the quiz even if they forgot the fact—this is handy for deweighting multiple-choice quizzes, or for reader apps where the readers can click on words they don’t know, or not.
 
-So with Ebisu, quiz applications can move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today, so an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed. And since every flashcard always has a recall probability at any given time, Ebisu also enables apps to provide an infinite stream of quizzes for students who are cramming. Thus, Ebisu intelligently handles over-reviewing as well as under-reviewing.
+In a nutshell, Ebisu has been able to support creative quiz apps with innovative review systems, not just simple pass/fail flashcards.
 
-Ebisu also has been able to support creative quiz apps that move beyond simple pass/fail flashcards.
+This document contains both a detailed mathematical description of the underlying algorithm as well as the software API it exports. Separate implementations in other languages are detailed below.
 
-So. This document contains both a detailed mathematical description of the underlying algorithm as well as the software API it exports. Separate implementations in other languages are detailed below.
-
-The next sections are installation and an [API Quickstart](#qpi-quickstart). See these if you know you want to use Ebisu in your app.
+The next sections are installation and an [API Quickstart](#api-quickstart). See these if you know you want to use Ebisu in your app.
 
 Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other scheduling algorithms and describe, non-technically, why you should use it.
 
@@ -54,7 +54,7 @@ Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm
 
 Finally, in the [Source Code](#source-code) section, we describe the software testing done to validate the math, including tests comparing Ebisu’s output to Monte Carlo sampling.
 
-A quick note on history—more information is in the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md). This document discusses Ebisu v3, with its Gammas-on-halflives model. Versions 2 and before used a different model (a Beta-on-recall-probability) which didn’t capture the fact that memory is *strengthened* by review—it just viewed future recall probability as an *unknown but static* quantity, leading to pessimistic predictions of recall probability. If you are interested, see the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md) for details and a migration guide.
+A quick note on history. This document discusses Ebisu v3, with its Gammas-on-halflives model. Versions 2 and before used a different model (a Beta-on-recall-probability) which didn’t capture the fact that memory is *strengthened* by review—it just viewed future recall probability as an *unknown but static* quantity, leading to pessimistic predictions of recall probability. If you are interested, see the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md) for details and a migration guide.
 
 ## Install
 ```sh
@@ -62,8 +62,6 @@ python -m pip install ebisu
 ```
 
 ## API quickstart
-> This is intended to be a quick refresher for those already familiar with the Ebisu API. If it doesn't make sense, jump to the full [API](#api-and-math) section!
-
 **Step 0.** `import ebisu`
 
 **Step 1.** Create an Ebisu `Model` for each flashcard when a student learns it:
@@ -78,9 +76,9 @@ def initModel(
 ```
 If you want to do the minimal amount of work to create a model, just provide `halflife` in hours. This is your best guess of how long it will take for this flashcard’s memory to decay to 50% (the “half” in “halflife”).
 
-This will create a sequence of `n=10` decaying exponentials (“leaky integrators” in Mozer et al.’s terminology) whose halflives are Gamma random variables. The means of these Gammas are logarithmically-spaced from some fraction of `halflife` to `finalHalflife` of 1e5 hours (more than 11 years), and their standard deviations are some proportion of the mean. This will also assign each of these Gamma random variables a weight that logarithmically-decreases from 1.0 such that the overall probability of recall has your provided `halflife`.
-
-If you dislike any of the above defaults, you can tune them using the keyword arguments, or, for total control, pass in `weightsHalflifeGammas`, a list of tuples containing each leaky integrator’s weight and `HalflifeGamma` (a tuple of `alpha, beta` parameters of each Gamma random variable).
+> Mathy details: this will create a sequence of `n=10` decaying exponentials (“leaky integrators” in Mozer et al.’s terminology) whose halflives are Gamma random variables. The means of these Gammas are logarithmically-spaced from some fraction of `halflife` to `finalHalflife` of 1e5 hours (more than 11 years), and their standard deviations are some proportion of the mean. This will also assign each of these Gamma random variables a weight that logarithmically-decreases from 1.0 such that the overall probability of recall has your provided `halflife`.
+>
+> If you dislike any of the above defaults, you can tune them using the keyword arguments, or, for total control, pass in `weightsHalflifeGammas`, a list of tuples containing each leaky integrator’s weight and `HalflifeGamma` (a tuple of `alpha, beta` parameters of each Gamma random variable).
 
 `now` is when this fact was learned (milliseconds in the Unix epoch, midnight UTC on 1 January, 1970). If you don’t provide it, the current timestamp is used.
 
@@ -92,9 +90,9 @@ def predictRecall(
     logDomain=True,
 ) -> float
 ```
-`now` is again milliseconds since the Unix epoch started. If omitted, the current timestamp is used. By default this returns the *log* of the recall probability (from -∞ to 0, higher is more likely to recall). If you pass in `logDomain=False`, we will call `exp2` at the end to give you linear probability from 0 to 1. We keep the calculations in the log-domain to avoid numerical issues and by default give you the log-probability only because `exp2` (and in general powers of any base) are slow on most CPUs compared to arithmetic.
+`now` is again milliseconds since the Unix epoch started. If omitted, the current timestamp is used. By default this returns the *log* of the recall probability (from -∞ to 0, higher is more likely to recall). If you pass in `logDomain=False`, we will call `exp2` at the end to give you linear probability from 0 to 1. We prefer the log-domain to avoid numerical issues and because floating-point powers like `exp2` are slow on most CPUs compared to arithmetic.
 
-**Step 3.** After you show the student a flashcard and grade their answer, update the `Model`:
+<a name="step-3">**Step 3.**</a> After you show the student a flashcard and grade their answer, update the `Model`:
 ```py
 def updateRecall(
     model: Model,
@@ -155,7 +153,7 @@ Now let’s jump into a more formal description of the mathematics and the resul
 
 ## The Math
 ### Exponential decay
-While much psychological literature has identified that forgetting follows power-law decay (e.g., probability of recall $t$ time units after last review $p(t) = (t+1)^{-α}$ for some positive shape parameter $α$), we start by discussing a simpler case, exponential decay, because we will use a string of exponentially-decaying functions to approximate a power law.
+While much psychological literature has identified that forgetting follows power-law decay (e.g., probability of recall $t$ time units after last review $p(t) = (t+1)^{-α}$ for some positive shape parameter $α$), we start by discussing a simpler case, exponential decay, because we will [eventually](#power-laws) use a string of exponentially-decaying functions to approximate a power law.
 
 So let’s imagine a flashcard with halflife in hours $h ∼ \mathrm{Gamma}(α, β)$, that is, a Gamma random variable with known parameters $α$ and $β$.
 
@@ -320,7 +318,7 @@ $$
 
 The rest is the same as before, from the binomial quiz case. The mean (the first moment) of the posterior $E[h|z]=μ=\frac{m_1}{m_0}$ while the second non-central moment is $E[(h|z)^2]=\frac{m_2}{m_0}$, yielding a variance that is $σ^2 = \frac{m_2}{m_0} - μ^2$. This mean and variance can again be moment-matched to a new $\mathrm{Gamma}(α' =  μ^2/ σ^2, β' = μ / σ^2)$.
 
-We should note here that both $q_1 = P(z = 1 | x = 1)$ and $q_0 = P(z = 1 | x = 0)$ are *free* parameters, and apps have total flexibility in specifying these. In Ebisu’s API presented [above](#api-quickstart) (step 3), both $z$ and $q_1$ are encoded without loss of generality in `0 <= successes <= 1`:
+We should note here that both $q_1 = P(z = 1 | x = 1)$ and $q_0 = P(z = 1 | x = 0)$ are *free* parameters, and apps have total flexibility in specifying these. In Ebisu’s API presented [above](#step-3) (step 3), both $z$ and $q_1$ are encoded without loss of generality in `0 <= successes <= 1`:
 - $z=1$ if `successes > 0`, otherwise $z=0$.
 - $q_1$ is `max(successes, 1 - successes)`.
 
@@ -385,7 +383,7 @@ So. What is $E[p(t) = \max_i  \lbrace w_i ⋅ 2^{-t/h_i} \rbrace]$, the expected
 
 But we have good approximations for this expectation $E[p(t)]$!
 
-We know via [Jensen’s inequality](https://mathworld.wolfram.com/JensensInequality.html) that for random variable $X$ and some nonlinear function $f$, in general $E[f(X)] ≠ f(E[X])$. You can’t just move the expectation inside a nonlinear expression—my mnemonic for this is, for $X ∼ \mathrm{Normal}(0, 1)$ the unit normal/Gaussian, $(E[X])^2 = 0$, but that’s very different from whatever $E[X^2]$ is!
+We know via [Jensen’s inequality](https://mathworld.wolfram.com/JensensInequality.html) that for random variable $X$ and some nonlinear function $f$, in general $E[f(X)] ≠ f(E[X])$. You can’t just move the expectation inside a nonlinear expression—my mnemonic for this is, for $X ∼ \mathrm{Normal}(0, 1)$ the unit normal/Gaussian, $E[X^2]$ is *something*, but whatever it is, it’s not $(E[X])^2 = 0$!
 
 But just consider how much computationally straightforward these successive approximations are!
 - Exact: $E[\max_i \lbrace w_i ⋅ 2^{-t/h_i} \rbrace]$, unknown 😵.
@@ -419,12 +417,12 @@ GROUP BY t.id
 Check the bundled script [`sql-example.py`](./sql-example.py) for a fully-worked example.
 
 ### Leaky integrators: update recall
-In this section, we describe a simple way to extend the single-Gamma-distributed-halflife quizzes (the [binomial](#exponential-decay) and [noisy-binary](#noisy-binary-quizzes) cases above) to a series of $n$ leaky integrators, i.e., $n$ weighted Gamma random variables governing halflife. The approach is not probabilistically motivated and therefore is ad hoc, but it has some attractive properties to commend it.
+In this section, we describe our simple way to extend the *single*  Gamma-distributed halflife situation (the [binomial](#exponential-decay) and [noisy-binary](#noisy-binary-quizzes) cases above) to a *series* of $n$ leaky integrators, i.e., $n$ weighted Gamma random variables governing halflife. The approach is not probabilistically motivated and therefore is ad hoc, but it has some attractive properties to commend it.
 
-So.
+Here’s how it works.
 1. We start with $n$ leaky integrators, i.e., $h_i ∼ \mathrm{Gamma}(α_i, β_i)$ for $i$ from 1 to $n$ with all parameters known, as well as corresponding weights $w_i$, also known.
-2. At time $t$ we get a binomial or noisy-binary quiz result with underlying probability $p(t) = \max_i \lbrace w_i ⋅ 2^{-t/h_i} \rbrace$.
-3. We then apply the appropriate quiz update to each leaky integrator, i.e., find $\mathrm{Gamma}(α_i', β_i')$ that best approximate each posterior $h_i | \mathrm{quiz}$.
+2. At time $t$ we get a [binomial](#exponential-decay) or [noisy-binary](#noisy-binary-quizzes) quiz result with underlying probability $p(t) = \max_i \lbrace w_i ⋅ 2^{-t/h_i} \rbrace$.
+3. We update each leaky integrator with the quiz result, i.e., find $\mathrm{Gamma}(α_i', β_i')$ that best approximate each posterior $h_i | \mathrm{quiz}$.
     - This gives us a scalar $Δ_i = μ_i' / μ_i$ where $μ_i = α_i / β_i$ and its primed version $μ_i' = α_i' / β_i'$ are the mean of the $i$th prior and posterior, respectively.
 4. This is the magic (i.e., ad hoc) part: update the weights, $w_i'=\max(Δ_i w_i, 1)$.
     - (¡Small print applies, see below!)

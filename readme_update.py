@@ -58,7 +58,7 @@ for a in ax:
   a.set_xlabel('Quiz time (hours)')
 ax[0].set_ylabel('Mean posterior halflife (hours)')
 
-fig.suptitle('Comparing binary to n=1 binomial quizzes (old halflife 7 hours)')
+fig.suptitle('Comparing binary to n=2 binomial quizzes (old halflife 7 hours)')
 fig.tight_layout()
 
 plt.savefig('binom-n2-updates.png', dpi=300)

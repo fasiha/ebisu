@@ -75,10 +75,11 @@ def _intGammaPdfExp(a: float, b: float, c: float, logDomain: bool):
   if not logDomain:
     return 2 * (c / b)**(a * 0.5) * kv(a, z)
 
-  # `kve = kv * exp(z)` -> `log(kve) = log(kv) + z` -> `log(kv) = log(kve) - z`
-  besselK = kve(a, z)
-  if np.isfinite(besselK):
-    return LN2 + log(c / b) * (a * 0.5) + log(besselK) - z
+  if z < 400:
+    # `kve = kv * exp(z)` -> `log(kve) = log(kv) + z` -> `log(kv) = log(kve) - z`
+    besselK = kve(a, z)
+    if np.isfinite(besselK):
+      return LN2 + log(c / b) * (a * 0.5) + log(besselK) - z
 
   # Use large-order approximation https://dlmf.nist.gov/10.41 -> 10.41.2
   logBesselK = log(np.e * z / (2 * a)) * -a + 0.5 * log(np.pi / (2 * a))

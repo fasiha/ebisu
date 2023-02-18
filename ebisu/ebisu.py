@@ -65,6 +65,7 @@ def updateRecall(
     total: int = 1,
     q0: Optional[float] = None,
     now: Optional[float] = None,
+    extra: Optional[dict] = None,
 ) -> Model:
   now = now or timeMs()
   t = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
@@ -93,6 +94,7 @@ def updateRecall(
   newModels: list[tuple[float, float]] = []
   newWeights: list[float] = []
   newReached: list[bool] = []
+  scales: list[float] = []
   for m, updated, log2weight, reached in zip(model.pred.halflifeGammas, updateds,
                                              model.pred.log2weights, model.pred.weightsReached):
     weight = np.exp2(log2weight)
@@ -111,6 +113,10 @@ def updateRecall(
         newModels.append((updated.a, updated.b))
         newWeights.append(min(_powerMean([weight, scal], 2), 1))
         newReached.append(True)
+    scales.append(scal)
+
+  if extra is not None:
+    extra['scales'] = scales
 
   ret.pred.lastEncounterMs = now
 

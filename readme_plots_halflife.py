@@ -35,7 +35,7 @@ mcErr: list[float] = []
 
 extra = dict()
 for h in t:
-  res = ebisu.predictRecallMonteCarlo(m, now=3600e3 * h, size=10_000, logDomain=False, extra=extra)
+  res = ebisu.predictRecallMonteCarlo(m, now=3600e3 * h, size=1_000, logDomain=False, extra=extra)
   mc.append(res)
   mcErr.append(extra['std'])
 
@@ -73,15 +73,15 @@ if not True:
   plt.savefig('predictRecall-approx.png', dpi=300)
   plt.savefig('predictRecall-approx.svg')
 
-plt.figure()
-plt.semilogx(t, np.array(semibayes) / np.array(mc), label='SemiBayes vs MC')
-plt.semilogx(t, np.array(approx) / np.array(mc), label='FullApprox vs MC')
-plt.legend()
-plt.grid()
+  plt.figure()
+  plt.semilogx(t, np.array(semibayes) / np.array(mc), label='SemiBayes vs MC')
+  plt.semilogx(t, np.array(approx) / np.array(mc), label='FullApprox vs MC')
+  plt.legend()
+  plt.grid()
 
-relerr = lambda act, exp: np.abs((np.array(act) - np.array(exp)) / np.array(exp))
-plt.figure()
-plt.loglog(t, relerr(semibayes, mc), label='SemiBayes vs MC')
-plt.loglog(t, relerr(approx, mc), label='FullApprox vs MC')
-plt.legend()
-plt.grid()
+  relerr = lambda act, exp: np.abs((np.array(act) - np.array(exp)) / np.array(exp))
+  plt.figure()
+  plt.loglog(t, relerr(semibayes, mc), label='SemiBayes vs MC')
+  plt.loglog(t, relerr(approx, mc), label='FullApprox vs MC')
+  plt.legend()
+  plt.grid()

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Union
+from typing import Optional, Union
 from dataclasses_json import DataClassJsonMixin, config
 
 
@@ -55,6 +55,7 @@ class Predict(DataClassJsonMixin):
   # recall probability is proportional to:
   # `MAX(log2weights - ((NOW_MS - lastEncounterMs) * HOURS_PER_MILLISECONDS / halflives)`
   # where NOW_MS is milliseconds since Unix epoch.
+  power: Optional[int]
 
 
 @dataclass

@@ -7,9 +7,7 @@ plt.ion()
 
 hs = np.logspace(0, 4, 5)
 hl = 2
-finalWeight = ebisu.ebisu._halflifeToFinalWeight(hl, hs)
-ws = ebisu.ebisu._makeWs(len(hs), finalWeight)
-print(finalWeight, ws)
+ws = ebisu.ebisu._halflifeToFinalWeight(hl, hs)
 
 plt.figure()
 plt.plot(hs, ws, 'o-')

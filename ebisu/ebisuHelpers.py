@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from scipy.special import kv, kve, gammaln, gamma, betaln, logsumexp  #type: ignore
 from functools import cache
 from math import log, exp
-from typing import Callable
+from typing import Any, Callable
 import numpy as np
 from .gammaDistribution import logmeanlogVarToGamma
 
@@ -15,7 +15,7 @@ class GammaUpdate:
 
 
 LN2 = log(2)
-logsumexp: Callable = logsumexp
+# logsumexp: Callable[..., float] = logsumexp
 
 
 @cache
@@ -40,14 +40,19 @@ def gammaUpdateBinomial(a: float, b: float, t: float, k: int, n: int) -> GammaUp
   """
   tScaled = t * LN2
 
+  integrals = []
+  for i in range(0, n - k + 1):
+    integrals.append(_intGammaPdfExp2(a + np.arange(3), b, tScaled * (k + i), logDomain=True))
+
   def logmoment(nth) -> float:
     loglik = []
     scales = []
     for i in range(0, n - k + 1):
-      loglik.append(
-          _binomln(n - k, i) + _intGammaPdfExp(a + nth, b, tScaled * (k + i), logDomain=True))
+      loglik.append(_binomln(n - k, i) + integrals[i][nth])
       scales.append((-1)**i)
-    return logsumexp(loglik, b=scales)
+    res, sgn = logsumexp(loglik, b=scales, return_sign=True)
+    assert sgn>0
+    return res
 
   logm0 = logmoment(0)
   logmean = logmoment(1) - logm0
@@ -59,11 +64,40 @@ def gammaUpdateBinomial(a: float, b: float, t: float, k: int, n: int) -> GammaUp
   return GammaUpdate(a=newAlpha, b=newBeta, mean=exp(logmean))
 
 
-def _intGammaPdf(a: float, b: float, logDomain: bool):
+def _intGammaPdf(a: float|np.ndarray, b: float, logDomain: bool):
   # \int_0^∞ h^(a-1) \exp(-b h) dh$, via Wolfram Alpha, etc.
   if not logDomain:
     return b**(-a) * gamma(a)
   return -a * log(b) + gammaln(a)
+
+
+def _intGammaPdfExp2(av: list[float] | np.ndarray, b: float, c: float, logDomain: bool):
+  "Returns $∫_0^∞ h^(a-1) e^{-b h - c / h} dh$, or its log"
+  if c == 0:
+    return _intGammaPdf(np.array(av), b, logDomain=logDomain)
+
+  z = 2 * np.sqrt(b * c)  # arg to kv
+  av = np.array(av)
+  if not logDomain:
+    return 2 * (c / b)**(av * 0.5) * kv(av, z)
+
+  log = np.log
+
+  besselK2 = kv(av, z)
+  if np.all(np.isfinite(besselK2)):
+    ret2 = LN2 + (av * 0.5) * log(c / b) + np.log(besselK2)
+    return ret2
+
+  # `kve = kv * exp(z)` -> `log(kve) = log(kv) + z` -> `log(kv) = log(kve) - z`
+  besselK = kve(av, z)
+  if np.all(np.isfinite(besselK)):
+    ret1 = LN2 + log(c / b) * (av * 0.5) + log(besselK) - z
+    return ret1
+
+  # Use large-order approximation https://dlmf.nist.gov/10.41 -> 10.41.2
+  logBesselK = log(np.e * z / (2 * av)) * -av + 0.5 * log(np.pi / (2 * av))
+  ret3 = LN2 + log(c / b) * (av * 0.5) + logBesselK
+  return ret3
 
 
 def _intGammaPdfExp(a: float, b: float, c: float, logDomain: bool):
@@ -105,9 +139,11 @@ def gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: bool
   qz = (q0, q1) if z else (1 - q0, 1 - q1)
   tScaled = t * LN2
 
+  integrals = _intGammaPdfExp2(a + np.arange(3), b, tScaled, logDomain=True)
+
   def logmoment(n):
     an = a + n
-    x = _intGammaPdfExp(an, b, tScaled, logDomain=True)
+    x = integrals[n]
     y = (log(qz[0]) if qz[0] else -np.inf) + gammaln(an) + -an * log(b)
     res, sgn = logsumexp([x, y], b=[qz[1] - qz[0], 1], return_sign=True)
     assert sgn > 0

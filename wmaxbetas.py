@@ -7,6 +7,7 @@ import typing
 import ebisu
 import ebisu3wmax
 import ebisu3boost
+import ebisu2beta
 import utils
 
 plt.ion()
@@ -50,6 +51,8 @@ if __name__ == '__main__':
   models = None
   modelsPerIter = None
 
+  e2pred = lambda model, elapsedTime: ebisu2beta.predictRecall(model, elapsedTime, True)
+  # e2upd = lambda model, s, t, now: ebisu2beta.updateRecall(model, s, t, )
   ePredictor, v3Predictor = [
       lambda model, elapsedTime: ebisu3wmax.predictRecall(
           model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False),
@@ -82,9 +85,9 @@ if __name__ == '__main__':
   fracs = [0.8]
   # fracs = [1.0]
   fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
-  # fracs = [0.8]
-  for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
-    # for card in train:
+  # fracs = [0.75]
+  # for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
+  for card in train:
     hlMeanStd = (24., 24 * .7)
     boostMeanStd = (3, 3 * .7)
     convertMode: ConvertAnkiMode = 'binary'
@@ -105,12 +108,15 @@ if __name__ == '__main__':
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
         ebisu.initModel(halflife=10, now=now),
+        ebisu.initModel(halflife=10, now=now, power=4),
     ]
     modelsInit = models
     modelsPerIter = [modelsInit]
 
-    predictors = [ePredictor, v3Predictor, betasPredictor, gammaPredictor, gamma3Predictor]
-    updators = [eUpdator, v3Updator, betasUpdator, gammaUpdator, gamma3Updator]
+    predictors = [
+        ePredictor, v3Predictor, betasPredictor, gammaPredictor, gamma3Predictor, gamma3Predictor
+    ]
+    updators = [eUpdator, v3Updator, betasUpdator, gammaUpdator, gamma3Updator, gamma3Updator]
 
     logliks = []
     for ankiResult, elapsedTime in zip(card.results, card.dts_hours):
@@ -139,3 +145,4 @@ if __name__ == '__main__':
           for t, w in zip(v[-1].pred.halflifeGammas, v[-1].pred.log2weights)]
          for v in modelsPerIter])
     # print(weightsEvolution)
+norm = lambda v: np.array(v) / np.sum(v)

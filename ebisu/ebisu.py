@@ -2,7 +2,10 @@ from math import log10, log2
 from time import time_ns
 import numpy as np
 from copy import deepcopy
-from typing import Union, Optional
+from typing import Callable, Union, Optional
+from itertools import takewhile
+from scipy.optimize import golden
+from scipy.special import logsumexp
 
 from .models import BinomialResult, HalflifeGamma, Model, NoisyBinaryResult, Predict, Quiz, Result
 from .ebisuHelpers import gammaPredictRecall, gammaUpdateBinomial, gammaUpdateNoisy
@@ -14,6 +17,7 @@ def initModel(
     n: int = 10,
     # above: lazy inputs, below: exact inputs
     weightsHalflifeGammas: Optional[list[tuple[float, HalflifeGamma]]] = None,
+    power: Optional[int] = None,
     now: Optional[float] = None,
 ) -> Model:
   """
@@ -37,7 +41,7 @@ def initModel(
     halflives = np.logspace(log10(halflife * .1), log10(finalHalflife), n).tolist()
     # pick standard deviation to be half of the mean
     halflifeGammas = [_meanVarToGamma(t, (t * .5)**2) for t in halflives]
-    weights = _makeWs(n, _halflifeToFinalWeight(halflife, halflives)).tolist()
+    weights = _halflifeToFinalWeight(halflife, halflives, power)
 
   log2weights = np.log2(weights).tolist()
 
@@ -51,6 +55,7 @@ def initModel(
           halflifeGammas=halflifeGammas,
           weightsReached=[x == 0 for x in range(n)],
           forSql=_genForSql(log2weights, halflives),
+          power=power,
       ),
   )
 
@@ -99,6 +104,26 @@ def updateRecall(
                                              model.pred.log2weights, model.pred.weightsReached):
     weight = np.exp2(log2weight)
     scal = updated.mean / _gammaToMean(*m)
+    scales.append(scal)
+
+    if model.pred.power is not None:
+      if reached:
+        newModels.append((updated.a, updated.b))
+        newWeights.append(1)
+        newReached.append(True)
+      else:
+        if (scal < 1 and scal < SCALE_THRESH) or (scal > 1 and scal < 1.01):
+          # early failure or success
+          newModels.append(m)
+          newWeights.append(weight)
+          newReached.append(False)
+        else:
+          newModels.append((updated.a, updated.b))
+          newWeights.append(1)
+          newReached.append(True)
+
+      continue
+
     if reached:
       newModels.append((updated.a, updated.b))
       newWeights.append(min(weight * scal if scal > 1 else weight, 1))
@@ -113,10 +138,18 @@ def updateRecall(
         newModels.append((updated.a, updated.b))
         newWeights.append(min(_powerMean([weight, scal], 2), 1))
         newReached.append(True)
-    scales.append(scal)
 
   if extra is not None:
     extra['scales'] = scales
+
+  if model.pred.power is not None:
+    leadingReached = sum(takewhile(lambda x: x, newReached))
+    MAX = 4
+    if leadingReached > MAX:
+      toDrop = leadingReached - MAX
+      newModels = newModels[toDrop:]
+      newWeights = newWeights[toDrop:]
+      newReached = newReached[toDrop:]
 
   ret.pred.lastEncounterMs = now
 
@@ -148,15 +181,22 @@ def predictRecall(
   now = now if now is not None else timeMs()
   elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   assert elapsedHours >= 0, "cannot go back in time"
-  l = [
-      log2w + -elapsedHours / (alpha / beta)
-      for (alpha, beta), log2w in zip(model.pred.halflifeGammas, model.pred.log2weights)
-  ]
+  if model.pred.power:
+    l = [-elapsedHours / (alpha / beta) for (alpha, beta) in model.pred.halflifeGammas]
+    log2Precall = (
+        _powerMeanLogW(np.array(l) * np.log(2), model.pred.power, np.exp2(model.pred.log2weights)) /
+        np.log(2))
+  else:
+    l = [
+        log2w + -elapsedHours / (alpha / beta)
+        for (alpha, beta), log2w in zip(model.pred.halflifeGammas, model.pred.log2weights)
+    ]
+    log2Precall = max(l)
   if extra is not None:
     extra['indiv'] = l
-  logPrecall = max(l)
-  assert np.isfinite(logPrecall) and logPrecall <= 0
-  return logPrecall if logDomain else np.exp2(logPrecall)
+
+  assert np.isfinite(log2Precall) and log2Precall <= 0
+  return log2Precall if logDomain else np.exp2(log2Precall)
 
 
 LN2 = np.log(2)
@@ -205,25 +245,55 @@ def predictRecallMonteCarlo(
   return np.log(expectation) if logDomain else expectation
 
 
-def _halflifeToFinalWeight(halflife: float, hs: list[float] | np.ndarray):
+def _halflifeToFinalWeight(halflife: float,
+                           hs: list[float] | np.ndarray,
+                           pow: Optional[int] = None) -> list[float]:
   """
   Complement to `hoursForRecallDecay`, which is $halflife(percentile, wmaxMean)$.
 
   This is $finalWeight(halflife, percentile=0.5)$.
   """
   n = len(hs)
+
+  if pow is not None:
+    logv = (-halflife * np.log(2)) / np.array(hs)
+    lp = np.log(0.5)
+    n = len(hs)
+    ivec = (np.arange(n) / (n - 1))
+
+    # ivec = np.arange(n + 1)[1:] / (n)
+
+    def opt(wfinal):
+      ws = wfinal**ivec
+      return abs(lp - _powerMeanLogW(logv, pow, ws))
+
+    res = golden(opt, brack=[1e-4, 1 - 1e-4], tol=1e-14)
+    return (res**ivec).tolist()
+
   if n == 1:
-    return 1.0
+    return _makeWs(n, 1.0).tolist()
   i = np.arange(0, n)
   hs = np.array(hs)
   # Avoid divide-by-0 below by skipping first `i` and `hs`
-  return 2**(min((halflife / hs[1:] + log2(0.5)) * (n - 1) / i[1:]))
+  res = 2**(min((halflife / hs[1:] + log2(0.5)) * (n - 1) / i[1:]))
+  return _makeWs(n, res).tolist()
 
 
 def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
   "How many hours for this model's recall probability to decay to `percentile`?"
   assert (0 < percentile <= 1), "percentile must be in (0, 1]"
   lp = log2(percentile)
+
+  if model.pred.power:
+    from scipy.optimize import minimize_scalar
+    res = minimize_scalar(
+        lambda h: abs(lp - predictRecall(model, now=model.pred.lastEncounterMs + 3600e3 * h)),
+        bounds=[.01, 1e3],
+        tol=1e-12)
+    assert res.success
+    # print(res)
+    return res.x
+
   return max((lw - lp) * _gammaToMean(*alphaBeta)
              for lw, alphaBeta in zip(model.pred.log2weights, model.pred.halflifeGammas))
   # max above will ALWAYS get at least one result given percentile ∈ (0, 1]
@@ -251,3 +321,14 @@ def _makeWs(n: int, finalWeight: float) -> np.ndarray:
 
 def timeMs() -> float:
   return time_ns() / 1_000_000
+
+
+def _powerMeanLogW(logv: list[float] | np.ndarray,
+                   p: int | float,
+                   ws: Optional[list[float] | np.ndarray] = None) -> float:
+  "same as _powerMean but pass in log (base e) of `v`"
+  logv = np.array(logv)
+  ws = np.array(ws) / np.sum(ws) if ws is not None else [1 / logv.size] * logv.size
+  res, sgn = logsumexp(p * logv, b=ws)
+  assert sgn > 0
+  return float(res / p)

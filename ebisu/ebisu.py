@@ -4,7 +4,7 @@ import numpy as np
 from copy import deepcopy
 from typing import Callable, Union, Optional
 from itertools import takewhile
-from scipy.optimize import golden
+from scipy.optimize import minimize_scalar
 from scipy.special import logsumexp
 
 from .models import BinomialResult, HalflifeGamma, Model, NoisyBinaryResult, Predict, Quiz, Result
@@ -211,13 +211,20 @@ def predictRecallSemiBayesian(
   now = now if now is not None else timeMs()
   elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   assert elapsedHours >= 0, "cannot go back in time"
-  l = [
-      log2w * LN2 + gammaPredictRecall(alpha, beta, elapsedHours, True)
-      for (alpha, beta), log2w in zip(model.pred.halflifeGammas, model.pred.log2weights)
-  ]
+  if model.pred.power is not None:
+    l = [
+        gammaPredictRecall(alpha, beta, elapsedHours, True)
+        for (alpha, beta) in model.pred.halflifeGammas
+    ]
+    logPrecall = _powerMeanLogW(l, model.pred.power, np.exp2(model.pred.log2weights))
+  else:
+    l = [
+        log2w * LN2 + gammaPredictRecall(alpha, beta, elapsedHours, True)
+        for (alpha, beta), log2w in zip(model.pred.halflifeGammas, model.pred.log2weights)
+    ]
+    logPrecall = max(l)
   if extra is not None:
     extra['indiv'] = l
-  logPrecall = max(l)
   assert np.isfinite(logPrecall) and logPrecall <= 0
   return logPrecall if logDomain else np.exp(logPrecall)
 
@@ -235,10 +242,18 @@ def predictRecallMonteCarlo(
 
   from scipy.stats import gamma as grv
   gammas = [grv(a, scale=1 / b) for a, b in model.pred.halflifeGammas]
-  logp = np.max((np.array(model.pred.log2weights)[:, np.newaxis] -
-                 elapsedHours / np.vstack([g.rvs(size=size) for g in gammas])),
-                axis=0)
-  p = np.exp2(logp)
+  if model.pred.power is not None:
+    ws = np.exp2(model.pred.log2weights)
+    ws /= sum(ws)
+    hmat = np.vstack([g.rvs(size=size) for g in gammas])
+    p = np.sum(
+        ws[:, np.newaxis] * np.exp2(-elapsedHours / hmat * model.pred.power),
+        axis=0)**(1 / model.pred.power)
+  else:
+    logp = np.max((np.array(model.pred.log2weights)[:, np.newaxis] -
+                   elapsedHours / np.vstack([g.rvs(size=size) for g in gammas])),
+                  axis=0)
+    p = np.exp2(logp)
   expectation = np.mean(p)
   if extra is not None:
     extra['std'] = np.std(p)
@@ -267,8 +282,9 @@ def _halflifeToFinalWeight(halflife: float,
       ws = wfinal**ivec
       return abs(lp - _powerMeanLogW(logv, pow, ws))
 
-    res = golden(opt, brack=[1e-4, 1 - 1e-4], tol=1e-14)
-    return (res**ivec).tolist()
+    res = minimize_scalar(opt, bounds=[1e-4, 1 - 1e-4])
+    assert res.success
+    return (res.x**ivec).tolist()
 
   if n == 1:
     return _makeWs(n, 1.0).tolist()
@@ -299,10 +315,6 @@ def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
   # max above will ALWAYS get at least one result given percentile ∈ (0, 1]
 
 
-def _powerMean(v: list[float] | np.ndarray, p: int | float) -> float:
-  return float(np.mean(np.array(v)**p)**(1 / p))
-
-
 def _gammaToMean(alpha: float, beta: float) -> float:
   return alpha / beta
 
@@ -329,6 +341,15 @@ def _powerMeanLogW(logv: list[float] | np.ndarray,
   "same as _powerMean but pass in log (base e) of `v`"
   logv = np.array(logv)
   ws = np.array(ws) / np.sum(ws) if ws is not None else [1 / logv.size] * logv.size
-  res, sgn = logsumexp(p * logv, b=ws)
+  res, sgn = logsumexp(p * logv, b=ws, return_sign=True)
   assert sgn > 0
   return float(res / p)
+
+
+def _powerMean(v: list[float] | np.ndarray, p: int | float) -> float:
+  return float(np.mean(np.array(v)**p)**(1 / p))
+
+
+def _powerMeanW(v: list[float] | np.ndarray, p: int | float, ws: list[float] | np.ndarray) -> float:
+  ws = np.array(ws) / np.sum(ws)
+  return float(sum(np.array(v)**p * ws))**(1 / p)

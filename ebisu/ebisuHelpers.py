@@ -15,7 +15,6 @@ class GammaUpdate:
 
 
 LN2 = log(2)
-# logsumexp: Callable[..., float] = logsumexp
 
 
 @cache
@@ -42,7 +41,7 @@ def gammaUpdateBinomial(a: float, b: float, t: float, k: int, n: int) -> GammaUp
 
   integrals = []
   for i in range(0, n - k + 1):
-    integrals.append(_intGammaPdfExp2(a + np.arange(3), b, tScaled * (k + i), logDomain=True))
+    integrals.append(_intGammaPdfExp(a + np.arange(3), b, tScaled * (k + i), logDomain=True))
 
   def logmoment(nth) -> float:
     loglik = []
@@ -51,7 +50,7 @@ def gammaUpdateBinomial(a: float, b: float, t: float, k: int, n: int) -> GammaUp
       loglik.append(_binomln(n - k, i) + integrals[i][nth])
       scales.append((-1)**i)
     res, sgn = logsumexp(loglik, b=scales, return_sign=True)
-    assert sgn>0
+    assert sgn > 0
     return res
 
   logm0 = logmoment(0)
@@ -64,14 +63,14 @@ def gammaUpdateBinomial(a: float, b: float, t: float, k: int, n: int) -> GammaUp
   return GammaUpdate(a=newAlpha, b=newBeta, mean=exp(logmean))
 
 
-def _intGammaPdf(a: float|np.ndarray, b: float, logDomain: bool):
+def _intGammaPdf(a: float | np.ndarray, b: float, logDomain: bool):
   # \int_0^∞ h^(a-1) \exp(-b h) dh$, via Wolfram Alpha, etc.
   if not logDomain:
     return b**(-a) * gamma(a)
   return -a * log(b) + gammaln(a)
 
 
-def _intGammaPdfExp2(av: list[float] | np.ndarray, b: float, c: float, logDomain: bool):
+def _intGammaPdfExp(av: list[float] | np.ndarray, b: float, c: float, logDomain: bool):
   "Returns $∫_0^∞ h^(a-1) e^{-b h - c / h} dh$, or its log"
   if c == 0:
     return _intGammaPdf(np.array(av), b, logDomain=logDomain)
@@ -83,41 +82,18 @@ def _intGammaPdfExp2(av: list[float] | np.ndarray, b: float, c: float, logDomain
 
   log = np.log
 
-  besselK2 = kv(av, z)
-  if np.all(np.isfinite(besselK2)):
-    ret2 = LN2 + (av * 0.5) * log(c / b) + np.log(besselK2)
-    return ret2
-
   # `kve = kv * exp(z)` -> `log(kve) = log(kv) + z` -> `log(kv) = log(kve) - z`
   besselK = kve(av, z)
-  if np.all(np.isfinite(besselK)):
-    ret1 = LN2 + log(c / b) * (av * 0.5) + log(besselK) - z
-    return ret1
+  if np.all(np.isfinite(besselK)) and np.all(besselK > 0):
+    return LN2 + log(c / b) * (av * 0.5) + log(besselK) - z
+
+  besselK2 = kv(av, z)
+  if np.all(np.isfinite(besselK2)) and np.all(besselK2 > 0):
+    return LN2 + (av * 0.5) * log(c / b) + np.log(besselK2)
 
   # Use large-order approximation https://dlmf.nist.gov/10.41 -> 10.41.2
   logBesselK = log(np.e * z / (2 * av)) * -av + 0.5 * log(np.pi / (2 * av))
-  ret3 = LN2 + log(c / b) * (av * 0.5) + logBesselK
-  return ret3
-
-
-def _intGammaPdfExp(a: float, b: float, c: float, logDomain: bool):
-  "Returns $∫_0^∞ h^(a-1) e^{-b h - c / h} dh$, or its log"
-  if c == 0:
-    return _intGammaPdf(a, b, logDomain=logDomain)
-
-  z = 2 * np.sqrt(b * c)  # arg to kv
-  if not logDomain:
-    return 2 * (c / b)**(a * 0.5) * kv(a, z)
-
-  if z < 400:
-    # `kve = kv * exp(z)` -> `log(kve) = log(kv) + z` -> `log(kv) = log(kve) - z`
-    besselK = kve(a, z)
-    if np.isfinite(besselK):
-      return LN2 + log(c / b) * (a * 0.5) + log(besselK) - z
-
-  # Use large-order approximation https://dlmf.nist.gov/10.41 -> 10.41.2
-  logBesselK = log(np.e * z / (2 * a)) * -a + 0.5 * log(np.pi / (2 * a))
-  return LN2 + log(c / b) * (a * 0.5) + logBesselK
+  return LN2 + log(c / b) * (av * 0.5) + logBesselK
 
 
 def gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: bool) -> GammaUpdate:
@@ -139,7 +115,7 @@ def gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: bool
   qz = (q0, q1) if z else (1 - q0, 1 - q1)
   tScaled = t * LN2
 
-  integrals = _intGammaPdfExp2(a + np.arange(3), b, tScaled, logDomain=True)
+  integrals = _intGammaPdfExp(a + np.arange(3), b, tScaled, logDomain=True)
 
   def logmoment(n):
     an = a + n
@@ -160,7 +136,7 @@ def gammaUpdateNoisy(a: float, b: float, t: float, q1: float, q0: float, z: bool
 
 
 def gammaPredictRecall(alpha: float, beta: float, hoursElapsed: float, logDomain: bool) -> float:
-  res = _intGammaPdfExp(alpha, beta, hoursElapsed * LN2, logDomain=logDomain)
+  res = _intGammaPdfExp([alpha], beta, hoursElapsed * LN2, logDomain=logDomain)[0]
   if logDomain:
     return res + alpha * log(beta) - gammaln(alpha)
   return res * (beta**alpha) / gamma(alpha)

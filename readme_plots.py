@@ -3,23 +3,23 @@ import numpy as np
 import ebisu
 import pylab as plt
 
+from ebisu.ebisu import _meanVarToGamma
+
 plt.ion()
+norm = lambda v: np.array(v) / np.sum(v)
 
-hs = np.logspace(0, 4, 5)
-hl = 2
-ws = ebisu.ebisu._halflifeToFinalWeight(hl, hs)
+hs = np.logspace(0, 3, 4)
+hl = 100
+power = 4
+ws = ebisu.ebisu._halflifeToFinalWeight(hl, hs, power)
+# ws = norm(ws)
 
-plt.figure()
-plt.plot(hs, ws, 'o-')
-plt.xlabel('halflife (hours)')
-plt.ylabel('weight (unitless)')
-plt.suptitle(f'Weights per halflife')
-plt.ylim([0, np.max(plt.ylim())])
-plt.grid()
-plt.savefig('leaky-integrators-weights.png', dpi=300)
-plt.savefig('leaky-integrators-weights.svg')
+m = ebisu.initModel(
+    power=power,
+    weightsHalflifeGammas=[(w, _meanVarToGamma(h, (h * .5)**2)) for w, h in zip(ws, hs)],
+    now=0)
 
-ts = np.linspace(0, 10000, 100001)
+ts = np.logspace(-2, 4, 501)
 
 styles = [('-', 1.5), ('--', 1.5), ('-.', 2), ('-', 2.5), ('--', 2.5)]
 plt.figure()
@@ -32,33 +32,22 @@ for w, h, style in zip(ws, hs, styles):
       label=f'{h=:,g} hours')
   plt.plot(ts[0], w, marker='o', color=ret.get_color())
 
-arr = np.exp2(-ts[:, np.newaxis] * (1 / hs[np.newaxis, :])) * ws
-plt.plot(
-    ts, np.max(arr, axis=1), linewidth=4, color='black', alpha=0.66, linestyle=':', label='pRecall')
+pRecalls = [ebisu.predictRecall(m, now=3600e3 * t, logDomain=False) for t in ts]
+plt.plot(ts, pRecalls, 'k:', alpha=0.6, linewidth=4, label='pRecall')
+
+plt.grid()
 plt.legend()
+plt.gca().set_xscale("log")
+
 plt.xlabel('hours since last review')
 plt.ylabel('recall probability')
-plt.title('Overall recall probability')
-plt.grid()
-plt.xlim([-10, 220])
-plt.tight_layout()
-
-plt.savefig('leaky-integrators-precall.png', dpi=300)
-plt.savefig('leaky-integrators-precall.svg')
-
-plt.gca().set_xscale("log")
-plt.gca().set_yscale("log")
-plt.ylim([.05, 1.2])
-plt.xlim([1e-1, 1e4])
-
-plt.hlines([0.5], np.min(plt.xlim()), hl, color=(.1, .1, .1), alpha=0.4, linestyles='dotted')
-plt.vlines([hl], np.min(plt.ylim()), 0.5, color=(.1, .1, .1), alpha=0.4, linestyles='dotted')
+plt.title('Power law recall probability from ensemble of exponentials')
 
 ax = plt.gca()
 fixup = lambda vec: [re.sub(r'.0$', '', f'{x:,}') for x in vec]
 ax.set_xticklabels(fixup(ax.get_xticks()))
-ax.set_yticklabels(fixup(ax.get_yticks()))
 
 plt.tight_layout()
-plt.savefig('leaky-integrators-precall-loglog.png', dpi=300)
-plt.savefig('leaky-integrators-precall-loglog.svg')
+
+plt.savefig('leaky-integrators-precall.png', dpi=300)
+plt.savefig('leaky-integrators-precall.svg')

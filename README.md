@@ -173,9 +173,9 @@ $K_ν(z)$ here is the modified Bessel function of the second kind with order $ν
 
 > For completeness, note that when $c=0$ (which can happen in our application when the time elapsed since last quiz is $t=0$), there’s a simpler solution. The integrand is just the Gamma distribution’s density, so $∫_0^∞ h^{a-1} e^{-b h} \,\mathrm{d}h = b^{-a}Γ(a)$, i.e., the reciprocal of the normalizing constant in the Gamma density.
 
-<a name="expectation-p-recall"></a>Therefore, we have
+<a name="expectation-p-recall"></a>Therefore, for $h ∼ \mathrm{Gamma}(α, β)$, we have
 $$
-  E\left[p(t) \right] = \frac{2 β^α}{Γ(α)} \left(\frac{t \log 2}{β}\right)^{α/2} K_{α}(2\sqrt{β t \log 2}),
+  E\left[2^{-t/h} \right] = \frac{2 β^α}{Γ(α)} \left(\frac{t \log 2}{β}\right)^{α/2} K_{α}(2\sqrt{β t \log 2}),
 $$
 which could be simplified a bit more but I’ll leave it like this because it uses the result of the Sympy integral above, which we’ll have occasion to invoke later.
 
@@ -331,70 +331,70 @@ $q_0$ is provided in a keyword argument and for the sake of developer experience
 ### Power laws
 So we’ve derived the mathematical specifics of two quiz styles for the *exponential* forgetting model, where our beliefs about the halflife of a fact $h$ are converted to recall probabilities via $p(t) = 2^{-t/h}$, even though considerable research has shown forgetting is a power-law phenomenon. In this section, we will show how a staggered sequence of exponentials leads us to the power law we’d like to govern Ebisu recall.
 
-To set the stage first—recall that exponential decay, where the time factor $t$ is in the exponent, is truly *fundamentally* different than power-law decay where $t$ is in the base. $2^{-t}$ decays *incredibly* quickly—you will recall what Einstein apparently said about exponentials being the most powerful force in the universe. After seven halflives, the probability of recall has dropped less than 1%: $2^{-7} = 1/128$. Meanwhile, power laws decay much more slowly: $(t+1)^{-1}$ has the same halflife as $2^{-t}$ (both have decayed to 0.5 at $t=1$) but after seven halflives, the probability of recall for the power law is still $1/8$, i.e., 12.5%, an order of magnitude higher than 0.8%!
+To set the stage first—recall that there is a truly *fundamental* difference between *exponential* decay, where the time factor $t$ is in the exponent, versus power-law decay, where $t$ is in the base. An exponential like $2^{-t}$ decays *incredibly* quickly—you will recall what Einstein apparently said about exponentials being the most powerful force in the universe. After seven halflives, the probability of recall has dropped less than 1%: $2^{-7} = 1/128$. Meanwhile, power laws decay much more slowly: $(t+1)^{-1}$ has the same halflife as $2^{-t}$ (both have decayed to 0.5 at $t=1$) but after seven halflives, the probability of recall for the power law is still $1/8$, i.e., 12.5%, an order of magnitude higher than 0.8%!
 
-Mozer et al. in both their 2009 NIPS conference paper and their 2014 <cite>Psychological Science</cite> journal article (see [bibliography](#bibliography)) propose a model recall that uses a *series* of exponentials, which they call a “cascade of leaky integrators”. Here’s what that could look like, for a notional example: we have a sequence of five decaying exponentials whose halflives are logarithmically-spaced from one hour to `1e4` hours (1.1 years), and each exponential is scaled by a exponentially-decreasing weight, from 1.0 down. Here’s a plot of these five weighted exponentials, superimposed on which is a line (thick, dotted, gray) representing the *max* of any of these at any point in time:
+> This captures the experience we’ve all had where lots of things just “stick in your head”, i.e., have very durable memories, despite having not studied them intensively.
+
+Mozer et al. in both their 2009 NIPS conference paper and their 2014 <cite>Psychological Science</cite> journal article (see [bibliography](#bibliography)) propose a model of recall that uses a *series* of exponentials, which they call a “cascade of leaky integrators”. Here’s our take on that: instead of a *single* random halflife that governs the current probability of recall (which we’ve discussed above), let us consider
+- $N$ unknown random variables $h ∼ \mathrm{Gamma}(α_i, β_i)$, with parameters $α_i$ and $β_i$ known, and
+- $N$ known weights: we follow Mozer et al. in exponentially-spaced weights, so $w_i = (w_N)^\frac{i-1}{N-1}$.
+
+This expression for weights results in them starting at $w_1 = 1$ and decaying to some known final $w_N$, picked to set the overall probability of recall to a desired halflife—and that overall probability is a weighted power $q$-[mean](https://en.wikipedia.org/wiki/Generalized_mean) (or $q$-norm):
+$$p(t) = \left( ∑_{i=1}^N \tilde w_i 2^{-q t/h_i}  \right)^{1/q}$$
+where $\tilde w_i = w_i / ∑_{i=1}^N w_i$ is just the weights normalized to 1.
+
+Here’s a plot of $N=4$ weighted exponentials, $w_i 2^{-t / h_i}$, for $h_1$ one hour and $h_4$ 1000 hours (42 days), and $w_i$s chosen so the overall halflife is a hundred hours, i.e., $p(100) = 0.5$ when $q=4$, as well as the final resulting probability of recall $p(t)$:
 
 ![Recall probability for each leaky integrator, with max](leaky-integrators-precall.png)
 
 At the left-most part of the plot, the first leaky integrator with the shortest time constant (blue solid line) dominates but also very quickly fades away due to the crush of its fast exponential. But as it decays, the second leaky integrator (orange dotted line), with a strictly lower starting value/weight, steps up to keep the recall probability from collapsing. And so on till the last leaky integrator.
 
-Switching the above plot’s x and y scales to log-log gives and zooming out to see more time gives us this:
+This march of weighted exponentials ensures the overall probability of recall decays slowly. Switching the above plot’s x and y scales to log-log gives and zooming out to see more time gives us this—recall that in a log-log plot, a true power law is a straight line:
 
 ![Recall probability, as above, on log-log plot](leaky-integrators-precall-loglog.png)
 
-By taking the *max* of the output of each leaky integrator, we get this *sequence* of bumps, which describe a bumpy power law for times ranging between minutes to 1+ year. A *true* power law would, in a log-log plot such as this, be a straight line for all time—not only is ours bumpy, it’s also flat at either end (horizontal on the left, vertical on the right). At very short intervals, this makes sense—we can’t have probability of recall exceed 1—but for times beyond a year, after we’ve run out of leaky integrators, the probability of recall collapses quickly to zero under the crush of the exponential (Einstein’s most powerful force in the universe and all that).
-
-Nevertheless, this is very encouraging. Instead of probability of recall $p(t) = 2^{-t/h}$ for a *single* unknown halflife which we discussed previously, we can consider 
-$$p(t) = \max_{i=1}^{n} \left\lbrace w_i ⋅ 2^{-t/h_i} \right\rbrace$$
-for $h_i ∼ \mathrm{Gamma}(α_i, β_i)$. That is, we have $n$ Gamma-distributed random variables with known parameters $(α_i, β_i)$ whose means $μ_i = \frac{α_i}{β_i}$ are logarithmically-spaced between a low and high of our choice (e.g., one hour to `1e4` hours in the plot above).
-
-We also assume that $n$ weights, $w_i$, are known and deterministic—this is a modeling choice to keep Ebisu’s posterior inference lightweight in a manner that seems psychologically plausible. So while we need $w_i ∈ [0, 1]$, we are otherwise quite free in choosing these weights. Mozer et al. (2009, see [bibliography](#bibliography)) propose exponentially-spaced weights, which we also use, giving us
-$$w_i = (w_n)^{\frac{i-1}{n-1}}$$
-for some fixed final weight $w_n$, thereby setting the first weight on our shortest/fastest leaky integrator $w_1 = 1$.
-
-> Note that I have assiduously avoided calling our model a mixture model, because I don’t want the weights to sum to one and we don’t want the overall recall probability to be a weighted mean (something like $``∑_{i=1}^n \tilde w_i 2^{-t/h_i}"$ where $\tilde w_i = w_i / ∑_{i=1}^n w_i$). While such a mixture model would also yield a power law, and has a more convenient expression for the expected value of recall probability, we have a gentle preference for the `max` operator (and weights starting with $w_1=1$ and decreasing) because it lets the weight-update step (below) be simpler and more robust. (It's plausible that in the future we will switch to a mixture model.)
+On a log-log scale, we see our four colorful exponentials collapse very quickly at times beyond their halflives (1 hour to 1000 hours), but their weighted power $q$-norm (thick gray dotted line) describes a straight-if-wobbly line that approximates a power law over several orders of magnitude. It does collapse to zero beyond the last leaky integrator of course, and the wobble is due to the norm moving from exponential-to-exponential, but this is a promising way to extend the work we’ve done on the single-exponential case to a power law.
 
 ### Leaky integrators: recall probability
 
 So let us take stock.
-- We have $n$ different Gamma-distributed halflives, $h_i ∼ \mathrm{Gamma}(α_i, β_i)$, and
-- $n$ corresponding weights $w_i = (w_n)^\frac{i-1}{n-1}$, for $i$ running from 1 to $n$.
-- We assume $n$, all $α_i$ and $β_i$ and $w_i$ are known deterministic quantities.
-- And we have the probability of recall $p(t) = \max_i  \lbrace w_i ⋅ 2^{-t/h_i} \rbrace$.
+- We have $N$ different Gamma-distributed halflives, $h_i ∼ \mathrm{Gamma}(α_i, β_i)$ with known parameters, and whose means are logarithmically-spaced, and
+- $N$ corresponding weights $w_i = (w_n)^\frac{i-1}{N-1}$, for $i$ running from 1 to $N$, also known.
+- And we have the probability of recall $p(t) = \left( ∑_{i=1}^N \tilde w_i 2^{-q t/h_i}  \right)^{1/q}$ for some fixed and known $q$.
 
 Let us answer the two questions at the heart of Ebisu—what’s the recall probability at time $t$ and what does a quiz do?
 
-So. What is $E[p(t) = \max_i  \lbrace w_i ⋅ 2^{-t/h_i} \rbrace]$, the expected value of recall probability $t$ hours after last seeing this flashcard? The $\max$ makes this impossible to compute this analytically (it would be easier with a mixture model admittedly). 😭. 
+The expected recall $E[p(t)]$ is hard to compute exactly: via the law of the unconscious statistician ([LOTUS](https://en.wikipedia.org/wiki/Law_of_the_unconscious_statistician)), we have
+$$
+\begin{split}
+E[p(t)] 
+&= ∫_0^∞ ∫_0^∞ \cdots ∫_0^∞ p(t) P(h_1, h_2, \cdots, h_N) \, \mathrm{d}h_1 \mathrm{d}h_2 \cdots \mathrm{d}h_N
+\\
+&= ∫_{\mathbb{R}^{N+}} 
+  \left[ ∑_{i=1}^N w_i 2^{-q t / h_i} \right]^{1/q} f_1(h_1) \cdots f_N(h_N)
+\, \mathrm{d}h_1 \cdots \mathrm{d}h_N,
+\end{split}
+$$
+where we’ve taken some notational liberties with how we represent the $N$-dimensional integral and where $f_i(h_i)$ is the $i$th Gamma distribution’s probability density function (PDF). Because each of the random variables are indpendent, the joint density has simplified: $P(h_1, h_2, \cdots, h_N) = P(h_1) P(h_2) \cdots P(h_N)$. But the exponent $1/q$ makes this impossible to evaluate further, because we’d like to handle $q ≠ 1$.
 
-<details>
-<summary>(Why this expectation is hard)</summary>
+We know via [Jensen’s inequality](https://mathworld.wolfram.com/JensensInequality.html) that for random variable $X$ and some nonlinear function $f$, in general $E[f(X)] ≠ f(E[X])$. You can’t just move the expectation inside a nonlinear expression—my mnemonic for this is, for $X ∼ \mathrm{Normal}(0, 1)$ the unit normal/Gaussian, $E[X^2]$ is *something*, but, whatever it is, it’s not $(E[X])^2 = 0$!
 
-> To see why this is hard, consider that in general, if you have $n$ random variables $X_i$ for $i$ running from 1 to $n$, and take $X = \max_{i=1}^n X_i$, the probability density function (PDF) of the max $X$ can be found by first noticing that its cumulative distribution function (CDF) is
-> $$F_X(x) = P[X \leq x] = P[X_1\leq x,...,X_n\leq x] = ∏_{i=1}^n P[X_i\leq x] = ∏_{i=1}^n F_{X_i}(x).$$
-> Differentiating the distribution (CDF) via [product rule](https://en.wikipedia.org/w/index.php?title=Product_rule&oldid=1119757448#Product_of_more_than_two_factors) and some massaging gives us the density (PDF),
-> $$f_X(x) = ∑_{i=1}^n \left( f_{X_i}(x) \prod_{j\neq i} F_{X_j}(x) \right).$$
-> Unhappily, because our $X_i = w_i 2^{-t/h_i}$, for Gamma-distributed $h_i$, the distribution of $w_i 2^{-t/h_i}$ is 🤷, so we can’t get the expectation this way.
-> 
-> There’s another expression for this expectation, via [user76284](https://math.stackexchange.com/q/3679707) on the Mathematics Stack Exchange, but it’s just as hard:
-> $$E[X] = 1 - ∫_{-∞}^∞ ∏_{i=1}^n F_{X_i}(x) \,\mathrm{d}x.$$
+However, we have no choice but to approximate the expectation—
+- $E\left[ \left( ∑_{i=1}^N \tilde w_i 2^{-q t/h_i}  \right)^{1/q} \right]$ seems impossible to evaluate analytically 😵. But
+- $E\left[  ∑_{i=1}^N \tilde w_i 2^{-q t/h_i} \right]^{1/q} = \left( ∑_{i=1}^N \tilde w_i E\left[ 2^{-q t/h_i}\right]\right)^{1/q}$ is doable! We evaluated the inner expectation [above](#expectation-p-recall), and it needs Bessel and Gamma functions but it’s doable—call this the “semi-Bayes” approximation. We can even consider a more aggressive approximation:
+- $\left( ∑_{i=1}^N \tilde w_i 2^{-q t/E[h_i]} \right)^{1/q}$. Here we’ve pulled the expectation *all* the way in, but this is… trivial! We could do this in [SQL](#predict-recall-sql).
 
-</details>
+How bad are these approximations? Not too bad! The three choices are shown below for a notional model (the first leaky integrator has mean halflife of $E[h_1]=1$ hour and the last has $E[h_5]$ is 10,000 hours, or 1.1 years, the overall halflife of 100 hours, and $q=4$). The exact expectation computed via Monte Carlo overlaps tightly with the “semi-Bayes” approximation and the full approximation. We also show a plot comparing the ratios of these two approximations over the ideal (Monte Carlo).
 
-But we have good approximations for this expectation $E[p(t)]$!
 
-We know via [Jensen’s inequality](https://mathworld.wolfram.com/JensensInequality.html) that for random variable $X$ and some nonlinear function $f$, in general $E[f(X)] ≠ f(E[X])$. You can’t just move the expectation inside a nonlinear expression—my mnemonic for this is, for $X ∼ \mathrm{Normal}(0, 1)$ the unit normal/Gaussian, $E[X^2]$ is *something*, but whatever it is, it’s not $(E[X])^2 = 0$!
-
-But just consider how much computationally straightforward these successive approximations are!
-- Exact: $E[\max_i \lbrace w_i ⋅ 2^{-t/h_i} \rbrace]$, unknown 😵.
-- Semi-Bayesian: $\max_i \lbrace w_i ⋅ E[2^{-t/h_i}] \rbrace$, doable! We calculated this inner expectation [above](#expectation-p-recall), and it needs Bessel and Gamma functions but doable!
-- Full approximation: $\max_i \lbrace w_i ⋅ 2^{-t/ E[h_i]} \rbrace$, trivial! We could do this in SQL (see [below](#predict-recall-sql))!
-
-How bad are these approximations? Not too bad! The three choices are shown below for a notional model. The exact expectation computed via Monte Carlo (thick dotted blue) and describes a nice power law—the random overlap between adjacent Gamma random variables smooths out the bumps we saw before. The two successive approximations wobble around the exact expectation, describing the bumps. Notice the semi-Bayesian approximation (thin solid orange line) matches the Monte Carlo curve at the very left and very right of the curve, when a single Gamma-distributed halflife dominates. 
 
 ![Monte Carlo vs semi-Bayesian vs full approximation of recall probability expectation](./predictRecall-approx.png)
 
-Because of the immense computational attractiveness of the fully-approximated expectation (solid thick green line), where the expectation operator is moved all the way inside, i.e., $E[\max_i \lbrace w_i ⋅ 2^{-t/h_i} \rbrace] → \max_i \lbrace w_i ⋅ 2^{-t/ E[h_i]} \rbrace$, and the fact that the approximation follows the overall shape of the exact expectation (apparently achievable only via Monte Carlo), Ebisu’s `predictRecall` function uses it.
+The semi-Bayes approximation deviates from the Monte Carlo by max 2 percent, and tightly agrees with it on either end of the x-axis, which can be understood by realizing at very low and very high $t$, a single leaky integrator dominates with little interference from adjacent leaky integrators.
+
+The full approximation, using just $E[h_i]$s, is very close to the Monte Carlo solution, varying from it by at most 2 percent, for $t<1000$ hours, but exceeds 10% for $t ≈ E[h_5]$ of 10,000 hours.
+
+From this, we conclude that the fully-approximated expectation, where the expectation operator is moved all the way inside, is an acceptable approximation, especially in light of its immense computational attractiveness. Ebisu’s `predictRecall` function uses it.
 
 ### Recall probability in SQL
 As promised, this can be done in SQL! Assuming you have a SQLite table `mytable` with a column `json_column` contaiing your JSON-encoded Ebisu models, the following returns row IDs, the JSON, and a third value called `logPredictRecall` below computing `predictRecall`.

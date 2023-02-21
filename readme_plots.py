@@ -33,21 +33,29 @@ for w, h, style in zip(ws, hs, styles):
   plt.plot(ts[0], w, marker='o', color=ret.get_color())
 
 pRecalls = [ebisu.predictRecall(m, now=3600e3 * t, logDomain=False) for t in ts]
-plt.plot(ts, pRecalls, 'k:', alpha=0.6, linewidth=4, label='pRecall')
+plt.plot(ts, pRecalls, 'k:', alpha=0.6, linewidth=4, label=f'Prob. Recall, q={power}')
 
 plt.grid()
 plt.legend()
-plt.gca().set_xscale("log")
 
 plt.xlabel('hours since last review')
 plt.ylabel('recall probability')
 plt.title('Power law recall probability from ensemble of exponentials')
 
-ax = plt.gca()
-fixup = lambda vec: [re.sub(r'.0$', '', f'{x:,}') for x in vec]
-ax.set_xticklabels(fixup(ax.get_xticks()))
-
+plt.xlim([-10, 210])
 plt.tight_layout()
 
 plt.savefig('leaky-integrators-precall.png', dpi=300)
 plt.savefig('leaky-integrators-precall.svg')
+
+plt.gca().set_xscale("log")
+plt.gca().set_yscale("log")
+plt.xlim([1e-2 * .5, 2 * 1e4])
+plt.ylim([.008, 1.33])
+ax = plt.gca()
+fixup = lambda vec: [re.sub(r'.0$', '', f'{x:,}') for x in vec]
+ax.set_xticklabels(fixup(ax.get_xticks()))
+ax.set_yticklabels(fixup(ax.get_yticks()))
+
+plt.savefig('leaky-integrators-precall-loglog.png', dpi=300)
+plt.savefig('leaky-integrators-precall-loglog.svg')

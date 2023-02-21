@@ -10,7 +10,7 @@ plt.ion()
 norm = lambda v: np.array(v) / np.sum(v)
 
 hs = np.logspace(0, 4, 5)
-hl = 20
+hl = 100
 power = 4
 ws = ebisu.ebisu._halflifeToFinalWeight(hl, hs, power)
 ws = norm(ws)
@@ -40,52 +40,48 @@ mcErr: list[float] = []
 
 extra = dict()
 for h in t:
-  res = ebisu.predictRecallMonteCarlo(m, now=3600e3 * h, size=10_000, logDomain=False, extra=extra)
+  res = ebisu.predictRecallMonteCarlo(m, now=3600e3 * h, size=100_000, logDomain=False, extra=extra)
   mc.append(res)
   mcErr.append(extra['std'])
 
 semibayes = [ebisu.predictRecallSemiBayesian(m, now=3600e3 * h, logDomain=False) for h in t]
 approx = [ebisu.predictRecall(m, now=3600e3 * h, logDomain=False) for h in t]
 
-plt.figure()
-plt.plot(t, mc, label='Monte Carlo', linewidth=5, linestyle=':')
-plt.plot(t, semibayes, label='Semi Bayes', alpha=.9)
-plt.plot(t, approx, label='Full Approx', alpha=0.6, linewidth=3)
-
-plt.gca().set_xscale("log")
-plt.gca().set_yscale("linear")
-
-plt.xlabel('hours since last review')
-plt.ylabel('recall probability')
-plt.title('Overall recall probability')
-plt.legend()
-plt.grid()
-
-if not True:
-  plt.ylim([.09, 1.2])
-  plt.xlim([.05, 10e3])
-
-  ax = plt.gca()
-  fixupx = lambda vec: [re.sub(r'.0$', '', f'{x:,}') for x in vec]
-  ax.set_xticklabels(fixupx(ax.get_xticks()))
-
-  fixupy = lambda vec: [re.sub(r'.0$', '', f'{x:.1f}') for x in vec]
-  ys = np.linspace(.1, 1, 10)
-  ax.set_yticks(ys)
-  ax.set_yticklabels(fixupy(ys))
-
-  plt.tight_layout()
-  plt.savefig('predictRecall-approx.png', dpi=300)
-  plt.savefig('predictRecall-approx.svg')
-
 fig, axs = plt.subplots(2, 1)
-axs[0].semilogx(t, np.array(semibayes) / np.array(mc), label='SemiBayes vs MC')
-axs[0].semilogx(t, np.array(approx) / np.array(mc), label='FullApprox vs MC')
-axs[0].legend()
-axs[0].grid()
+axs[0].semilogx(t, mc, label='Monte Carlo', linewidth=5, linestyle=':')
+l1 = axs[0].semilogx(t, semibayes, label='Semi Bayes', alpha=.9)
+l2 = axs[0].semilogx(t, approx, label='Full Approx', alpha=0.6, linewidth=3)
 
-relerr = lambda act, exp: np.abs((np.array(act) - np.array(exp)) / np.array(exp))
-axs[1].loglog(t, relerr(semibayes, mc), label='SemiBayes vs MC')
-axs[1].loglog(t, relerr(approx, mc), label='FullApprox vs MC')
-axs[1].legend()
-axs[1].grid()
+axs[1].hlines(1, *axs[0].get_xlim(), linewidth=4, alpha=0.25, color='black')
+
+axs[1].semilogx(
+    t,
+    np.array(semibayes) / np.array(mc),
+    alpha=.9,
+    color=l1[0].get_color(),
+    label='Semi Bayes / Monte Carlo')
+axs[1].semilogx(
+    t,
+    np.array(approx) / np.array(mc),
+    alpha=0.6,
+    linewidth=3,
+    color=l2[0].get_color(),
+    label='Full Approx / Monte Carlo')
+axs[1].set_xlim(axs[0].get_xlim())
+
+for a in axs:
+  a.legend()
+  a.grid(True)
+axs[0].set_ylabel('recall probability')
+axs[1].set_ylabel('ratio')
+axs[1].set_xlabel('hours since last review')
+axs[1].set_ylim(.95, 1.13)
+fig.suptitle('Overall recall probability')
+
+fixupx = lambda vec: [re.sub(r'.0$', '', f'{x:,}') for x in vec]
+axs[0].set_xticklabels(fixupx(axs[0].get_xticks()))
+axs[1].set_xticklabels(fixupx(axs[1].get_xticks()))
+
+plt.tight_layout()
+plt.savefig('predictRecall-approx.png', dpi=300)
+plt.savefig('predictRecall-approx.svg')

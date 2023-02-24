@@ -382,19 +382,14 @@ We know via [Jensen’s inequality](https://mathworld.wolfram.com/JensensInequal
 However, we have no choice but to approximate the expectation—
 - $E\left[ \left( ∑_{i=1}^N \tilde w_i 2^{-q t/h_i}  \right)^{1/q} \right]$ seems impossible to evaluate analytically 😵. But
 - $E\left[  ∑_{i=1}^N \tilde w_i 2^{-q t/h_i} \right]^{1/q} = \left( ∑_{i=1}^N \tilde w_i E\left[ 2^{-q t/h_i}\right]\right)^{1/q}$ is doable! We evaluated the inner expectation [above](#expectation-p-recall), and it needs Bessel and Gamma functions but it’s doable—call this the “semi-Bayes” approximation. We can even consider a more aggressive approximation:
+  - $\left( ∑_{i=1}^N \tilde w_i E\left[ 2^{-t/h_i}\right]^q \right)^{1/q}$ is a further approximation of the above.
 - $\left( ∑_{i=1}^N \tilde w_i 2^{-q t/E[h_i]} \right)^{1/q}$. Here we’ve pulled the expectation *all* the way in, but this is… trivial! We could do this in [SQL](#predict-recall-sql).
 
-How bad are these approximations? Not too bad! The three choices are shown below for a notional model (the first leaky integrator has mean halflife of $E[h_1]=1$ hour and the last has $E[h_5]$ is 10,000 hours, or 1.1 years, the overall halflife of 100 hours, and $q=4$). The exact expectation computed via Monte Carlo overlaps tightly with the “semi-Bayes” approximation and the full approximation. We also show a plot comparing the ratios of these two approximations over the ideal (Monte Carlo).
+How bad are these approximations? Not too bad! All choices are shown below for a notional model (the first leaky integrator has mean halflife of $E[h_1]=1$ hour and the last has $E[h_5]$ is 10,000 hours, or 1.1 years, the overall halflife of 100 hours, and $q=4$). The exact expectation computed via Monte Carlo overlaps tightly with the two “semi-Bayes” approximations and the full approximation. We also show a plot comparing the ratios of these two approximations over the ideal (Monte Carlo).
 
+![Monte Carlo vs semi-Bayesian (two) vs full approximation of recall probability expectation](./predictRecall-approx.png)
 
-
-![Monte Carlo vs semi-Bayesian vs full approximation of recall probability expectation](./predictRecall-approx.png)
-
-The semi-Bayes approximation deviates from the Monte Carlo by max 2 percent, and tightly agrees with it on either end of the x-axis, which can be understood by realizing at very low and very high $t$, a single leaky integrator dominates with little interference from adjacent leaky integrators.
-
-The full approximation, using just $E[h_i]$s, is very close to the Monte Carlo solution, varying from it by at most 2 percent, for $t<1000$ hours, but exceeds 10% for $t ≈ E[h_5]$ of 10,000 hours.
-
-From this, we conclude that the fully-approximated expectation, where the expectation operator is moved all the way inside, is an acceptable approximation, especially in light of its immense computational attractiveness. Ebisu’s `predictRecall` function uses it.
+While the semi-Bayes approximations are quite good (over different parts of the x axis), the full approximation, using just $E[h_i]$s, is acceptable, varying from the Monte Carlo ideal by at most 2 percent, for $t<1000$ hours. Because of the immense computational simplicity of this fully-approximated expectations, where the expectation operator is moved all the way inside, Ebisu’s `predictRecall` function uses it.
 
 ### Recall probability in SQL
 As promised, this can be done in SQL! Assuming you have a SQLite table `mytable` with a column `json_column` contaiing your JSON-encoded Ebisu models, the following returns row IDs, the JSON, and a third value called `logPredictRecall` below computing `predictRecall`.
@@ -414,7 +409,7 @@ FROM
   json_each(json_extract(t.json_column, '$.pred.forSql'))
 GROUP BY t.id
 ```
-Check the bundled script [`sql-example.py`](./sql-example.py) for a fully-worked example.
+This matches the output of `ebisu.predictRecall` (with `logDomain=False`) up to a constant power—if your app needs to know if the recall probability is less than some fixed threshold, you can either apply the final power in SQL or better yet, apply the inverse power to your threshold. Check the bundled script [`sql-example.py`](./sql-example.py) for a fully-worked example.
 
 ### Leaky integrators: update recall
 In this section, we describe our simple way to extend the *single*  Gamma-distributed halflife situation (the [binomial](#exponential-decay) and [noisy-binary](#noisy-binary-quizzes) cases above) to a *series* of $n$ leaky integrators, i.e., $n$ weighted Gamma random variables governing halflife. The approach is not probabilistically motivated and therefore is ad hoc, but it has some attractive properties to commend it.

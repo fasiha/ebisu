@@ -45,17 +45,17 @@ for h in t:
   mcErr.append(extra['std'])
 
 semibayes = [
-    ebisu.predictRecallSemiBayesian(m, now=3600e3 * h, innerPower=False, logDomain=False) for h in t
+    ebisu.predictRecallSemiBayesian(m, now=3600e3 * h, innerPower=True, logDomain=False) for h in t
 ]
 semibayes2 = [
-    ebisu.predictRecallSemiBayesian(m, now=3600e3 * h, innerPower=True, logDomain=False) for h in t
+    ebisu.predictRecallSemiBayesian(m, now=3600e3 * h, innerPower=False, logDomain=False) for h in t
 ]
 approx = [ebisu.predictRecall(m, now=3600e3 * h, logDomain=False) for h in t]
 
 fig, axs = plt.subplots(2, 1)
 axs[0].semilogx(t, mc, label='Monte Carlo', linewidth=5, linestyle=':')
-l1 = axs[0].semilogx(t, semibayes, label='Semi Bayes 1', alpha=.9)
-l2 = axs[0].semilogx(t, semibayes2, label='Semi Bayes 2', linestyle='--')
+l1 = axs[0].semilogx(t, semibayes, label='Semi Bayes 1', linestyle='--', alpha=.9)
+l2 = axs[0].semilogx(t, semibayes2, label='Semi Bayes 2')
 l3 = axs[0].semilogx(t, approx, label='Full Approx', alpha=0.4, linewidth=3)
 
 axs[1].hlines(1, *axs[0].get_xlim(), linewidth=4, alpha=0.25, color='black')
@@ -64,13 +64,12 @@ axs[1].semilogx(
     t,
     np.array(semibayes) / np.array(mc),
     alpha=.9,
+    linestyle='--',
     color=l1[0].get_color(),
     label='Semi Bayes 1 / Monte Carlo')
 axs[1].semilogx(
     t,
     np.array(semibayes2) / np.array(mc),
-    # alpha=.9,
-    linestyle='--',
     color=l2[0].get_color(),
     label='Semi Bayes 2 / Monte Carlo')
 axs[1].semilogx(

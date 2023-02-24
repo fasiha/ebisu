@@ -163,7 +163,6 @@ def predictRecall(
     model: Model,
     now: Optional[float] = None,
     logDomain=True,
-    extra: Optional[dict] = None,
 ) -> float:
   from .logsumexp import logsumexp
 
@@ -176,8 +175,6 @@ def predictRecall(
       for lw, (alpha, beta) in zip(model.pred.log2weights, model.pred.halflifeGammas)
   ]
   logExpect = logsumexp(logs) / (LN2 * model.pred.power)
-  if extra is not None:
-    extra['indiv'] = logs
 
   assert np.isfinite(logExpect) and logExpect <= 0
   return logExpect if logDomain else np.exp2(logExpect)
@@ -241,9 +238,7 @@ def predictRecallMonteCarlo(
   return np.log(expectation) if logDomain else expectation
 
 
-def _halflifeToFinalWeight(halflife: float,
-                           hs: list[float] | np.ndarray,
-                           pow: Optional[int] = None) -> list[float]:
+def _halflifeToFinalWeight(halflife: float, hs: list[float] | np.ndarray, pow: int) -> list[float]:
   """
   Complement to `hoursForRecallDecay`, which is $halflife(percentile, wmaxMean)$.
 
@@ -251,29 +246,20 @@ def _halflifeToFinalWeight(halflife: float,
   """
   n = len(hs)
 
-  if pow is not None:
-    logv = (-halflife * np.log(2)) / np.array(hs)
-    lp = np.log(0.5)
-    n = len(hs)
-    ivec = (np.arange(n) / (n - 1))
+  logv = (-halflife * np.log(2)) / np.array(hs)
+  lp = np.log(0.5)
+  n = len(hs)
+  ivec = (np.arange(n) / (n - 1))
 
-    # ivec = np.arange(n + 1)[1:] / (n)
+  # ivec = np.arange(n + 1)[1:] / (n)
 
-    def opt(wfinal):
-      ws = wfinal**ivec
-      return abs(lp - _powerMeanLogW(logv, pow, ws))
+  def opt(wfinal):
+    ws = wfinal**ivec
+    return abs(lp - _powerMeanLogW(logv, pow, ws))
 
-    res = minimize_scalar(opt, bounds=[1e-4, 1 - 1e-4])
-    assert res.success
-    return (res.x**ivec).tolist()
-
-  if n == 1:
-    return _makeWs(n, 1.0).tolist()
-  i = np.arange(0, n)
-  hs = np.array(hs)
-  # Avoid divide-by-0 below by skipping first `i` and `hs`
-  res = 2**(min((halflife / hs[1:] + log2(0.5)) * (n - 1) / i[1:]))
-  return _makeWs(n, res).tolist()
+  res = minimize_scalar(opt, bounds=[1e-4, 1 - 1e-4])
+  assert res.success
+  return (res.x**ivec).tolist()
 
 
 def hoursForRecallDecay(model: Model, percentile=0.5) -> float:

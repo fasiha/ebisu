@@ -20,7 +20,7 @@ import csv
 import io
 
 from ebisu.ebisuHelpers import GammaUpdate, gammaUpdateBinomial, gammaUpdateNoisy
-from ebisu.gammaDistribution import gammaToMean, meanVarToGamma, _weightedMeanVarLogw, gammaToStats, gammaToStd
+from ebisu.gammaDistribution import gammaToMean, meanVarToGamma, gammaToStats, gammaToStd
 
 results: dict[Union[str, tuple], Any] = dict()
 testStartTime = datetime.utcnow().isoformat()
@@ -29,8 +29,18 @@ seed = np.random.randint(1, 1_000_000_000)
 print(f'{seed=}')
 
 MILLISECONDS_PER_HOUR = 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec
-weightedMeanVarLogw = _weightedMeanVarLogw
 logsumexp: Callable = logsumexp
+
+
+def weightedMeanVarLogw(logw: np.ndarray, x: np.ndarray) -> tuple[float, float, float, float]:
+  # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
+  # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
+  logsumexpw, sgn = logsumexp(logw, return_sign=True)
+  assert sgn > 0, 'positive'
+  mean = np.exp(logsumexp(logw, b=x) - logsumexpw)
+  m2 = np.exp(logsumexp(logw, b=x**2) - logsumexpw)
+  var = m2 - mean**2
+  return (mean, var, m2, np.sqrt(m2))
 
 
 def fourQuiz(fraction: float, result: int, lastNoisy: bool):

@@ -3,7 +3,7 @@ import numpy as np
 import ebisu
 import pylab as plt
 
-from ebisu.ebisu import _meanVarToGamma
+from ebisu.gammaDistribution import meanVarToGamma
 
 plt.ion()
 norm = lambda v: np.array(v) / np.sum(v)
@@ -16,7 +16,7 @@ ws = ebisu.ebisu._halflifeToFinalWeight(hl, hs, power)
 
 m = ebisu.initModel(
     power=power,
-    weightsHalflifeGammas=[(w, _meanVarToGamma(h, (h * .5)**2)) for w, h in zip(ws, hs)],
+    weightsHalflifeGammas=[(w, meanVarToGamma(h, (h * .5)**2)) for w, h in zip(ws, hs)],
     now=0)
 
 ts = np.logspace(-2, 4, 501)

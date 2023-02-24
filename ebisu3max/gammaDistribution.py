@@ -27,6 +27,16 @@ def logmeanlogVarToGamma(logmean, logvar) -> tuple[float, float]:
   return np.exp(loga), np.exp(logb)
 
 
+def _weightedMeanVarLogw(logw: np.ndarray, x: np.ndarray) -> tuple[float, float, float, float]:
+  # [weightedMean] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Mathematical_definition
+  # [weightedVar] https://en.wikipedia.org/w/index.php?title=Weighted_arithmetic_mean&oldid=770608018#Weighted_sample_variance
+  logsumexpw: np.ndarray = logsumexp(logw)
+  mean = np.exp(logsumexp(logw, b=x) - logsumexpw)
+  m2 = np.exp(logsumexp(logw, b=x**2) - logsumexpw)
+  var = m2 - mean**2
+  return (mean, var, m2, np.sqrt(m2))
+
+
 def _weightedGammaEstimate(h, w, biasCorrected=True):
   """
   See https://en.wikipedia.org/w/index.php?title=Gamma_distribution&oldid=1067698046#Closed-form_estimators
@@ -65,6 +75,11 @@ def _weightedGammaEstimateMaxLik(x, w):
   k = res.x[0]
   b = k / meanX  # b = 1/theta, theta = meanX / k
   return (k, b)
+
+
+def _weightedGammaEstimateMom(h, logw):
+  mean, var, *rest = _weightedMeanVarLogw(logw, h)
+  return (mean**2 / var, mean / var)
 
 
 def gammaToStd(a, b):

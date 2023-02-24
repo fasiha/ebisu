@@ -47,7 +47,6 @@ HalflifeGamma = tuple[float, float]  # α, β
 class Predict(DataClassJsonMixin):
   version: int
   lastEncounterMs: float  # milliseconds since unix epoch
-  power: int
   log2weights: list[float]
   halflifeGammas: list[HalflifeGamma]  # same length as log2weights
   weightsReached: list[bool]  # same length as log2weights
@@ -56,6 +55,7 @@ class Predict(DataClassJsonMixin):
   # recall probability is proportional to:
   # `MAX(log2weights - ((NOW_MS - lastEncounterMs) * HOURS_PER_MILLISECONDS / halflives)`
   # where NOW_MS is milliseconds since Unix epoch.
+  power: Optional[int]
 
 
 @dataclass

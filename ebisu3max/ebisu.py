@@ -1,20 +1,14 @@
-from math import fsum, log10, log2
+from math import log10, log2
 from time import time_ns
 import numpy as np
 from copy import deepcopy
-from typing import Union, Optional
+from typing import Callable, Union, Optional
 from itertools import takewhile
 from scipy.optimize import minimize_scalar
-
 from scipy.special import logsumexp
-
-from ebisu.gammaDistribution import meanVarToGamma
 
 from .models import BinomialResult, HalflifeGamma, Model, NoisyBinaryResult, Predict, Quiz, Result
 from .ebisuHelpers import gammaPredictRecall, gammaUpdateBinomial, gammaUpdateNoisy
-
-HOURS_PER_MILLISECONDS = 1 / 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec
-LN2 = np.log(2)
 
 
 def initModel(
@@ -23,7 +17,7 @@ def initModel(
     n: int = 10,
     # above: lazy inputs, below: exact inputs
     weightsHalflifeGammas: Optional[list[tuple[float, HalflifeGamma]]] = None,
-    power: int = 4,
+    power: Optional[int] = None,
     now: Optional[float] = None,
 ) -> Model:
   """
@@ -46,11 +40,9 @@ def initModel(
     assert halflife, "halflife or weightsHalflifeGammas needed"
     halflives = np.logspace(log10(halflife * .1), log10(finalHalflife), n).tolist()
     # pick standard deviation to be half of the mean
-    halflifeGammas = [meanVarToGamma(t, (t * .5)**2) for t in halflives]
+    halflifeGammas = [_meanVarToGamma(t, (t * .5)**2) for t in halflives]
     weights = _halflifeToFinalWeight(halflife, halflives, power)
 
-  wsum = fsum(weights)
-  weights = [w / wsum for w in weights]
   log2weights = np.log2(weights).tolist()
 
   return Model(
@@ -62,14 +54,14 @@ def initModel(
           log2weights=log2weights,
           halflifeGammas=halflifeGammas,
           weightsReached=[x == 0 for x in range(n)],
-          forSql=_genForSql(log2weights, halflives, power),
+          forSql=_genForSql(log2weights, halflives),
           power=power,
       ),
   )
 
 
-def _genForSql(log2ws: list[float], hs: list[float], power: int) -> list[tuple[float, float]]:
-  return [(lw, power / (h * 3600e3)) for lw, h in zip(log2ws, hs)]
+def _genForSql(log2ws: list[float], hs: list[float]) -> list[tuple[float, float]]:
+  return [(lw, h * 3600e3) for lw, h in zip(log2ws, hs)]
 
 
 def updateRecall(
@@ -114,9 +106,27 @@ def updateRecall(
     scal = updated.mean / _gammaToMean(*m)
     scales.append(scal)
 
+    if model.pred.power is not None:
+      if reached:
+        newModels.append((updated.a, updated.b))
+        newWeights.append(1)
+        newReached.append(True)
+      else:
+        if (scal < 1 and scal < SCALE_THRESH) or (scal > 1 and scal < 1.01):
+          # early failure or success
+          newModels.append(m)
+          newWeights.append(weight)
+          newReached.append(False)
+        else:
+          newModels.append((updated.a, updated.b))
+          newWeights.append(1)
+          newReached.append(True)
+
+      continue
+
     if reached:
       newModels.append((updated.a, updated.b))
-      newWeights.append(1)
+      newWeights.append(min(weight * scal if scal > 1 else weight, 1))
       newReached.append(True)
     else:
       if (scal < 1 and scal < SCALE_THRESH) or (scal > 1 and scal < 1.01):
@@ -126,19 +136,20 @@ def updateRecall(
         newReached.append(False)
       else:
         newModels.append((updated.a, updated.b))
-        newWeights.append(1)
+        newWeights.append(min(_powerMean([weight, scal], 2), 1))
         newReached.append(True)
 
   if extra is not None:
     extra['scales'] = scales
 
-  leadingReached = sum(takewhile(lambda x: x, newReached))
-  MAX = 4
-  if leadingReached > MAX:
-    toDrop = leadingReached - MAX
-    newModels = newModels[toDrop:]
-    newWeights = newWeights[toDrop:]
-    newReached = newReached[toDrop:]
+  if model.pred.power is not None:
+    leadingReached = sum(takewhile(lambda x: x, newReached))
+    MAX = 4
+    if leadingReached > MAX:
+      toDrop = leadingReached - MAX
+      newModels = newModels[toDrop:]
+      newWeights = newWeights[toDrop:]
+      newReached = newReached[toDrop:]
 
   ret.pred.lastEncounterMs = now
 
@@ -146,8 +157,7 @@ def updateRecall(
   ret.pred.log2weights = np.log2(newWeights).tolist()
   ret.pred.weightsReached = newReached
   ret.pred.forSql = _genForSql(ret.pred.log2weights,
-                               [_gammaToMean(*x) for x in ret.pred.halflifeGammas],
-                               model.pred.power)
+                               [_gammaToMean(*x) for x in ret.pred.halflifeGammas])
 
   return ret
 
@@ -159,55 +169,64 @@ def _appendQuizImpure(model: Model, result: Result) -> None:
     model.quiz.results[-1].append(result)
 
 
+HOURS_PER_MILLISECONDS = 1 / 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec
+
+
 def predictRecall(
     model: Model,
     now: Optional[float] = None,
     logDomain=True,
     extra: Optional[dict] = None,
 ) -> float:
-  from .logsumexp import logsumexp
-
   now = now if now is not None else timeMs()
   elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   assert elapsedHours >= 0, "cannot go back in time"
-
-  logs = [
-      LN2 * (lw - model.pred.power * elapsedHours * beta / alpha)
-      for lw, (alpha, beta) in zip(model.pred.log2weights, model.pred.halflifeGammas)
-  ]
-  logExpect = logsumexp(logs) / (LN2 * model.pred.power)
+  if model.pred.power:
+    l = [-elapsedHours / (alpha / beta) for (alpha, beta) in model.pred.halflifeGammas]
+    log2Precall = (
+        _powerMeanLogW(np.array(l) * np.log(2), model.pred.power, np.exp2(model.pred.log2weights)) /
+        np.log(2))
+  else:
+    l = [
+        log2w + -elapsedHours / (alpha / beta)
+        for (alpha, beta), log2w in zip(model.pred.halflifeGammas, model.pred.log2weights)
+    ]
+    log2Precall = max(l)
   if extra is not None:
-    extra['indiv'] = logs
+    extra['indiv'] = l
 
-  assert np.isfinite(logExpect) and logExpect <= 0
-  return logExpect if logDomain else np.exp2(logExpect)
+  assert np.isfinite(log2Precall) and log2Precall <= 0
+  return log2Precall if logDomain else np.exp2(log2Precall)
+
+
+LN2 = np.log(2)
 
 
 def predictRecallSemiBayesian(
     model: Model,
     now: Optional[float] = None,
     logDomain=True,
-    innerPower=False,
+    extra: Optional[dict] = None,
 ) -> float:
-  from .logsumexp import logsumexp
-
   now = now if now is not None else timeMs()
   elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   assert elapsedHours >= 0, "cannot go back in time"
-  if innerPower:
+  if model.pred.power is not None:
     l = [
-        log2w * LN2 + gammaPredictRecall(alpha, beta, model.pred.power * elapsedHours, True)
-        for log2w, (alpha, beta) in zip(model.pred.log2weights, model.pred.halflifeGammas)
+        gammaPredictRecall(alpha, beta, elapsedHours, True)
+        for (alpha, beta) in model.pred.halflifeGammas
     ]
+    logPrecall = _powerMeanLogW(l, model.pred.power, np.exp2(model.pred.log2weights))
   else:
     l = [
-        log2w * LN2 + gammaPredictRecall(alpha, beta, elapsedHours, True) * model.pred.power
-        for log2w, (alpha, beta) in zip(model.pred.log2weights, model.pred.halflifeGammas)
+        log2w * LN2 + gammaPredictRecall(alpha, beta, elapsedHours, True)
+        for (alpha, beta), log2w in zip(model.pred.halflifeGammas, model.pred.log2weights)
     ]
-
-  logExpect = logsumexp(l) / model.pred.power
-  assert np.isfinite(logExpect) and logExpect <= 0
-  return logExpect if logDomain else np.exp(logExpect)
+    logPrecall = max(l)
+  if extra is not None:
+    extra['indiv'] = l
+  assert np.isfinite(logPrecall) and logPrecall <= 0
+  return logPrecall if logDomain else np.exp(logPrecall)
 
 
 def predictRecallMonteCarlo(
@@ -298,6 +317,12 @@ def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
 
 def _gammaToMean(alpha: float, beta: float) -> float:
   return alpha / beta
+
+
+def _meanVarToGamma(mean, var) -> tuple[float, float]:
+  a = mean**2 / var
+  b = mean / var
+  return a, b
 
 
 def _makeWs(n: int, finalWeight: float) -> np.ndarray:

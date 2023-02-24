@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from scipy.special import kv, kve, gammaln, gamma, betaln, logsumexp  #type: ignore
 from functools import cache
 from math import log, exp
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 import numpy as np
 from .gammaDistribution import logmeanlogVarToGamma
 
@@ -140,14 +140,3 @@ def gammaPredictRecall(alpha: float, beta: float, hoursElapsed: float, logDomain
   if logDomain:
     return res + alpha * log(beta) - gammaln(alpha)
   return res * (beta**alpha) / gamma(alpha)
-
-
-def powerMeanLogW(logv: list[float] | np.ndarray,
-                  p: int | float,
-                  ws: Optional[list[float] | np.ndarray] = None) -> float:
-  "same as _powerMean but pass in log (base e) of `v`"
-  logv = np.array(logv)
-  ws = np.array(ws) / np.sum(ws) if ws is not None else [1 / logv.size] * logv.size
-  res, sgn = logsumexp(p * logv, b=ws, return_sign=True)
-  assert sgn > 0
-  return float(res / p)

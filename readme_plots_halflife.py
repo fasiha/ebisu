@@ -3,7 +3,7 @@ import ebisu
 import numpy as np
 import pylab as plt
 
-from ebisu.ebisu import _meanVarToGamma
+from ebisu.gammaDistribution import meanVarToGamma
 
 plt.ion()
 
@@ -17,7 +17,7 @@ ws = norm(ws)
 
 m = ebisu.initModel(
     power=power,
-    weightsHalflifeGammas=[(w, _meanVarToGamma(h, (h * .5)**2)) for w, h in zip(ws, hs)],
+    weightsHalflifeGammas=[(w, meanVarToGamma(h, (h * .5)**2)) for w, h in zip(ws, hs)],
     now=0)
 
 if not True:
@@ -44,13 +44,19 @@ for h in t:
   mc.append(res)
   mcErr.append(extra['std'])
 
-semibayes = [ebisu.predictRecallSemiBayesian(m, now=3600e3 * h, logDomain=False) for h in t]
+semibayes = [
+    ebisu.predictRecallSemiBayesian(m, now=3600e3 * h, innerPower=False, logDomain=False) for h in t
+]
+semibayes2 = [
+    ebisu.predictRecallSemiBayesian(m, now=3600e3 * h, innerPower=True, logDomain=False) for h in t
+]
 approx = [ebisu.predictRecall(m, now=3600e3 * h, logDomain=False) for h in t]
 
 fig, axs = plt.subplots(2, 1)
 axs[0].semilogx(t, mc, label='Monte Carlo', linewidth=5, linestyle=':')
-l1 = axs[0].semilogx(t, semibayes, label='Semi Bayes', alpha=.9)
-l2 = axs[0].semilogx(t, approx, label='Full Approx', alpha=0.6, linewidth=3)
+l1 = axs[0].semilogx(t, semibayes, label='Semi Bayes 1', alpha=.9)
+l2 = axs[0].semilogx(t, semibayes2, label='Semi Bayes 2', linestyle='--')
+l3 = axs[0].semilogx(t, approx, label='Full Approx', alpha=0.4, linewidth=3)
 
 axs[1].hlines(1, *axs[0].get_xlim(), linewidth=4, alpha=0.25, color='black')
 
@@ -59,13 +65,20 @@ axs[1].semilogx(
     np.array(semibayes) / np.array(mc),
     alpha=.9,
     color=l1[0].get_color(),
-    label='Semi Bayes / Monte Carlo')
+    label='Semi Bayes 1 / Monte Carlo')
+axs[1].semilogx(
+    t,
+    np.array(semibayes2) / np.array(mc),
+    # alpha=.9,
+    linestyle='--',
+    color=l2[0].get_color(),
+    label='Semi Bayes 2 / Monte Carlo')
 axs[1].semilogx(
     t,
     np.array(approx) / np.array(mc),
-    alpha=0.6,
+    alpha=0.4,
     linewidth=3,
-    color=l2[0].get_color(),
+    color=l3[0].get_color(),
     label='Full Approx / Monte Carlo')
 axs[1].set_xlim(axs[0].get_xlim())
 

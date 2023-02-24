@@ -31,11 +31,11 @@ query = """
 SELECT
   t.id,
   t.json_column,
-  MAX(
-    (
+  SUM(
+    pow(2,
       json_extract(value, '$[0]') - (
         (?) - json_extract(json_column, '$.pred.lastEncounterMs')
-      ) / json_extract(value, '$[1]')
+      ) * json_extract(value, '$[1]')
     )
   ) AS logPredictRecall
 FROM
@@ -50,7 +50,8 @@ results = cursor.fetchall()
 
 for r in results:
   m = ebisu.Model.from_json(r[1])
-  sql, py = r[2], ebisu.predictRecall(m, now=quizTime)
+  sql = r[2]**(1 / m.pred.power)
+  py = ebisu.predictRecall(m, now=quizTime, logDomain=False)
   print(sql, py, (sql - py) / py)
 
 # Close the connection

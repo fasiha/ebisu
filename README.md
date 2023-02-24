@@ -402,11 +402,11 @@ As promised, this can be done in SQL! Assuming you have a SQLite table `mytable`
 SELECT
   t.id,
   t.json_column,
-  MAX(
-    (
+  SUM(
+    pow(2,
       json_extract(value, '$[0]') - (
         (?) - json_extract(json_column, '$.pred.lastEncounterMs')
-      ) / json_extract(value, '$[1]')
+      ) * json_extract(value, '$[1]')
     )
   ) AS logPredictRecall
 FROM

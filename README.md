@@ -398,7 +398,7 @@ SELECT
   t.id,
   t.json_column,
   SUM(
-    pow(2,
+    POW(2,
       json_extract(value, '$[0]') - (
         (?) - json_extract(json_column, '$.pred.lastEncounterMs')
       ) * json_extract(value, '$[1]')

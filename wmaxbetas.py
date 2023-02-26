@@ -8,6 +8,7 @@ import ebisu
 import ebisu3wmax
 import ebisu3boost
 import ebisu2beta
+import ebisu3max
 import utils
 
 plt.ion()
@@ -75,6 +76,11 @@ if __name__ == '__main__':
   gammaUpdator = lambda model, s, t, now: ebisu3wmax.updateRecallGammas(
       model, successes=s, total=t, now=now)
 
+  gamma3MaxPredictor = lambda model, elapsedTime: ebisu3max.predictRecall(
+      model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
+  gamma3MaxUpdator = lambda model, s, t, now: ebisu3max.updateRecall(
+      model, successes=s, total=t, now=now)
+
   gamma3Predictor = lambda model, elapsedTime: ebisu.predictRecall(
       model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
   gamma3Updator = lambda model, s, t, now: ebisu.updateRecall(model, successes=s, total=t, now=now)
@@ -107,16 +113,16 @@ if __name__ == '__main__':
             now=now),
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
-        ebisu.initModel(halflife=10, now=now),
+        ebisu3max.initModel(halflife=10, now=now),
         ebisu.initModel(halflife=10, now=now, power=4),
     ]
     modelsInit = models
     modelsPerIter = [modelsInit]
 
     predictors = [
-        ePredictor, v3Predictor, betasPredictor, gammaPredictor, gamma3Predictor, gamma3Predictor
+        ePredictor, v3Predictor, betasPredictor, gammaPredictor, gamma3MaxPredictor, gamma3Predictor
     ]
-    updators = [eUpdator, v3Updator, betasUpdator, gammaUpdator, gamma3Updator, gamma3Updator]
+    updators = [eUpdator, v3Updator, betasUpdator, gammaUpdator, gamma3MaxUpdator, gamma3Updator]
 
     logliks = []
     for ankiResult, elapsedTime in zip(card.results, card.dts_hours):

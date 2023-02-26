@@ -1,13 +1,15 @@
 from copy import deepcopy
 import pylab as plt
 import numpy as np
-from typing import Any
+from typing import Any, Optional
 from pprint import pprint
+import pandas as pd
 
 import ebisu
 import ebisu3wmax
 import ebisu2beta
 import ebisu3boost
+import ebisu3max
 import utils
 
 plt.ion()
@@ -15,14 +17,29 @@ plt.ion()
 np.set_printoptions(precision=4, suppress=True)
 
 
-def vizRank(d: dict[str, list[int]]):
+def vizRank(d: dict[str, list[int]], mainKey: Optional[str] = None):
   keyToId: None | dict[int, int] = None
+  if mainKey and mainKey in d:
+    keyToId = {k: i for i, k in enumerate(d[mainKey])}
+
   ret = dict()
   for key in d:
     if keyToId is None:
+      # same as above
       keyToId = {k: i for i, k in enumerate(d[key])}
     ret[key] = [keyToId[k] for k in d[key]]
   return ret
+
+
+def dictToTable(d: dict[str, list[tuple[int, float]]]):
+  d2 = dict()
+  for algo in d:
+    for (cardId, p) in d[algo]:
+      if algo not in d2:
+        d2[algo] = {cardId: p}
+      else:
+        d2[algo][cardId] = p
+  return d2
 
 
 if __name__ == "__main__":
@@ -38,6 +55,7 @@ if __name__ == "__main__":
       'v3boost': dict(),
       'v3betas': dict(),
       'v3gammas': dict(),
+      'v3power': dict(),
   }
 
   # Unix millis, elapsed hours, key, Anki result (1-4) or "first learned" (-1)
@@ -60,7 +78,8 @@ if __name__ == "__main__":
       models['v2beta'][key] = ebisu2beta.defaultModel(12., 2.0)
       models['v3boost'][key] = ebisu3boost.initModel(12.0, 3.0, now=unixMillis)
       models['v3betas'][key] = ebisu3wmax.initModel(0.02, now=unixMillis)
-      models['v3gammas'][key] = ebisu.initModel(halflife=10, now=unixMillis)
+      models['v3gammas'][key] = ebisu3max.initModel(halflife=10, now=unixMillis)
+      models['v3power'][key] = ebisu.initModel(halflife=10, now=unixMillis)
     else:
       n += 1
       ranked = dict()
@@ -75,17 +94,21 @@ if __name__ == "__main__":
                            for k, model in models['v3boost'].items()]
       ranked['v3betas'] = [(k, ebisu3wmax.predictRecallBetas(model, now=unixMillis))
                            for k, model in models['v3betas'].items()]
-      ranked['v3gammas'] = [(k, ebisu.predictRecall(model, now=unixMillis))
+      ranked['v3gammas'] = [(k, ebisu3max.predictRecall(model, now=unixMillis))
                             for k, model in models['v3gammas'].items()]
+      ranked['v3power'] = [
+          (k, ebisu.predictRecall(model, now=unixMillis)) for k, model in models['v3power'].items()
+      ]
 
       if len(ranked['v3wmax']) >= 3:
         for algo in ranked:
           ranked[algo].sort(key=lambda v: v[1])
         print(f'{unixMillis=}')
-        pprint(ranked)
+        sortKey = 'v3power'
+        pprint(pd.DataFrame(dictToTable(ranked)).sort_values(sortKey))
         viz = {
             k: " ".join(map(str, v))
-            for k, v in vizRank({k: [x[0] for x in v] for k, v in ranked.items()}).items()
+            for k, v in vizRank({k: [x[0] for x in v] for k, v in ranked.items()}, sortKey).items()
         }
         pprint(viz)
 
@@ -100,8 +123,9 @@ if __name__ == "__main__":
           models['v3boost'][key], successes, now=unixMillis)
       models['v3betas'][key] = ebisu3wmax.updateRecallBetas(
           models['v3betas'][key], successes, now=unixMillis)
-      models['v3gammas'][key] = ebisu.updateRecall(
+      models['v3gammas'][key] = ebisu3max.updateRecall(
           models['v3gammas'][key], successes, now=unixMillis)
+      models['v3power'][key] = ebisu.updateRecall(models['v3power'][key], successes, now=unixMillis)
 
     lastSeenMillis[key] = unixMillis
 

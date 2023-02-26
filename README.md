@@ -412,11 +412,11 @@ GROUP BY t.id
 This matches the output of `ebisu.predictRecall` (with `logDomain=False`) up to a constant power—if your app needs to know if the recall probability is less than some fixed threshold, you can either apply the final power in SQL or better yet, apply the inverse power to your threshold. Check the bundled script [`sql-example.py`](./sql-example.py) for a fully-worked example.
 
 ### Leaky integrators: update recall
-In this section, we describe our simple way to extend the *single*  Gamma-distributed halflife situation (the [binomial](#exponential-decay) and [noisy-binary](#noisy-binary-quizzes) cases above) to a *series* of $n$ leaky integrators, i.e., $n$ weighted Gamma random variables governing halflife. The approach is not probabilistically motivated and therefore is ad hoc, but it has some attractive properties to commend it.
+Now let’s complete our description of Ebisu by describing our simple way to extend the *single*  Gamma-distributed halflife situation (the [binomial](#exponential-decay) and [noisy-binary](#noisy-binary-quizzes) cases above) to a *series* of $n$ leaky integrators, i.e., $n$ weighted Gamma random variables governing halflife. The approach is not probabilistically motivated and therefore is ad hoc, but it has some attractive properties to commend it.
 
 Here’s how it works.
 1. We start with $n$ leaky integrators, i.e., $h_i ∼ \mathrm{Gamma}(α_i, β_i)$ for $i$ from 1 to $n$ with all parameters known, as well as corresponding weights $w_i$, also known.
-2. At time $t$ we get a [binomial](#exponential-decay) or [noisy-binary](#noisy-binary-quizzes) quiz result with underlying probability $p(t) = \max_i \lbrace w_i ⋅ 2^{-t/h_i} \rbrace$.
+2. At time $t$ we get a [binomial](#exponential-decay) or [noisy-binary](#noisy-binary-quizzes) quiz result.
 3. We update each leaky integrator with the quiz result, i.e., find $\mathrm{Gamma}(α_i', β_i')$ that best approximate each posterior $h_i | \mathrm{quiz}$.
     - This gives us a scalar $Δ_i = μ_i' / μ_i$ where $μ_i = α_i / β_i$ and its primed version $μ_i' = α_i' / β_i'$ are the mean of the $i$th prior and posterior, respectively.
 4. This is the magic (i.e., ad hoc) part: update the weights, $w_i'=\max(Δ_i w_i, 1)$.

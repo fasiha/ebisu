@@ -143,7 +143,7 @@ def updateRecall(
   ret.pred.lastEncounterMs = now
 
   ret.pred.halflifeGammas = newModels
-  ret.pred.log2weights = np.log2(newWeights).tolist()
+  ret.pred.log2weights = np.log2(newWeights / np.sum(newWeights)).tolist()
   ret.pred.weightsReached = newReached
   ret.pred.forSql = _genForSql(ret.pred.log2weights,
                                [_gammaToMean(*x) for x in ret.pred.halflifeGammas],

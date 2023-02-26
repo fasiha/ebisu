@@ -419,33 +419,22 @@ Here’s how it works.
 2. At time $t$ we get a [binomial](#exponential-decay) or [noisy-binary](#noisy-binary-quizzes) quiz result.
 3. We update each leaky integrator with the quiz result, i.e., find $\mathrm{Gamma}(α_i', β_i')$ that best approximate each posterior $h_i | \mathrm{quiz}$.
     - This gives us a scalar $Δ_i = μ_i' / μ_i$ where $μ_i = α_i / β_i$ and its primed version $μ_i' = α_i' / β_i'$ are the mean of the $i$th prior and posterior, respectively.
-4. This is the magic (i.e., ad hoc) part: update the weights, $w_i'=\max(Δ_i w_i, 1)$.
+4. This is the magic (i.e., ad hoc) part: accept the posterior only if $Δ_i$ is big enough, and permanently set the weight $w_i'=1$. If $Δ_i$ isn’t high enough, ignore this quiz result for the $i$th leaky integrator.
     - (¡Small print applies, see below!)
 
+The scale factor $Δ_i > 0$ represents the strengthening or weakening ($Δ_i > 1$ or $Δ_i < 1$, respectively) of the posterior over the prior due to the quiz. More specifically, it is the change in our belief about the $i$th halflife as a *purely static quantity*: in the basic Bayesian analysis above ([§ binomial](#exponential-decay) and [§ noisy-binary](#noisy-binary-quizzes)), the random variable $h_i$ is unknown but *fixed*.
 
-The scale factor $Δ_i > 0$ represents the strengthening or weakening ($Δ_i > 1$ or $Δ_i < 1$, respectively) of the posterior over the prior due to the quiz. More specifically, it is the change in our belief about the $i$th halflife as a *purely static quantity*: in the basic Bayesian analysis above ([§ binomial](#exponential-decay) and [§ noisy-binary](#noisy-binary-quizzes)), the random variable $h_i$ is unknown but *fixed*. However, we know that memory is actually strengthened through the act of recall, which the posterior update represented by $Δ_i$ fails to capture. 
+However, we know that memory is actually strengthened through the act of recall, so we attempt to recapture the psychological reality by carefully updating each leaky integrator’s weight and parameters only when it makes sense.
 
-By scaling the $i$th leaky integrator’s weight $w_i$ with $Δ_i$, we attempt to recapture this psychological reality. There is nothing Bayesian about this, and we use it because it’s an inexpensive way to quantitatively boost the leaky integrator to capture the dynamicity of the problem, and one that seems to work well for a variety of quiz histories and simulations.
+Recall that we initialize each $w_i = (w_N)^\frac{i-1}{N-1}$ for some final $0 < w_N < 1$ (picked so that the overall halflife matches the input to `initModel`). This implies that $w_1 = 1$ and that subsequent weights are monotonically decreasing. This props up the recall probability at long durations, giving us the power law on recall. However, when a student begins learning a fact, their performance on quizzes should probably not impact leaky integrators for much longer halflives than the student has reached. In fact, we want leaky integrators to begin receiving quiz updates only when those quiz times (times since last review) approach or exceed each leaky integrator’s initialized halflife.
 
-However, we need some small print because the above simple weight update doesn’t work well as is (given that it’s totally ad hoc, that isn’t surprising). To see why, note that we don’t want to *always* scale the weights—consider when a student first learns a flaschard, their memory is weak and they are likely to fail some initial quizzes. However, a long-halflife leaky integrator would find such failures very surprising and drastically reduce it’s posterior halflife (refer again to the [binary updates plot](#binom-updates-plot)). We don’t want this. We don’t want long-duration leaky integrators to be responding to very early quizzes. We want them to be there to prop up the probability of recall at long timescales (power law!), which is defeated by them becoming low-weight, short-timescale leaky integrators.
+This rule is an ad hoc way to capture this dynamic. The first leaky integrator (with shortest halflife) has $w_1=1$ so it is guaranteed to always contain a model that updates after each quiz. Subsequent leaky integrators’ weights are reset to 1 when a quiz’s scale factor $Δ_i$ indicates that this quiz has materially impacted this leaky integrator’s model, and from then on, that leaky integrator will be updated following each quiz.
 
-Similarly recall that a successful quiz with a very short amount of time elapsed since last review can result in a posterior mean that’s slightly higher than the prior. We would also prefer early *successes* to avoid “polluting” long-duration leaky integrators.
+Here’s the small print.
+- When $w_l ≤ Δ_i ≤ 1$ or when $1 ≤ w_r ≤ Δ_i$, $w_i$ is reset to 1. The first condition captures the case when a quiz reduces the halflife by not too much—this is designed to prevent early failures from adversely impacting long-halflife leaky integrators. The second condition ensures that early successes don’t impact those long-halflife leaky integrators. In practice $w_l$ is something like 0.95 and $w_r$ something like 1.01. (The subscripts denote “left” and “right” respectively.)
+- Only keep $0<N_{keep}≤N$ of the longest-halflife leaky integrators. As the student makes progress learning this fact, the very earliest leaky integrators (initialized with the shortest halflives) might not keep up with the pace of learning, and might drag down the probability of recall’s power $q$-norm. Therefore we discard short-halflife leaky integrators when more than $N_{keep}$ of them are fully-activated and with weight of 1. $N_{keep}$ in Ebisu is 4.
 
-In short, we want a leaky integrator to smoothly kick in and begin updating itself with quizzes when quiz delays have reached and exceeded its halflife.
-
-In practice, Ebisu keeps a boolean representing “weight reached” for each leaky integrator. If the boolean is `True`, this leaky integrator has been reached and its weight should be updating per $w_i'=\max(Δ_i w_i, 1)$. Otherwise its $Δ_i$ is ignored and its weight *and* model $(α_i, β_i)$ are left untouched. Initially only the first shortest-duration leaky integrator has its “wegiths reached” flag set to `True`.
-
-A leaky integrator’s “weight reached” flag is set from `False` to `True` when
-- $w_l ≤ Δ_i ≤ 1$ or
-- $1 ≤ w_r ≤ Δ_i$.
-
-Currently $w_l = 0.95$ (the “left” bound) and $w_r = 1.01$ (the “right” bound). Assuming the $i$th leaky integrator’s “weight reached” flag is `False`, consider
-- $Δ_i = 0.5$: this is likely an early failed quiz that this leaky integrator shouldn’t respond to.
-- $Δ_i = 0.99$: this is likely a genuine failed quiz that this leaky integrator *should* respond to. It will respond to all future quizzes too, by applying the weight update: it’s “weight reached” is now `True`.
-- $Δ_i = 1.001$: this is likely an early success and the leaky integrator doesn’t need to bother with.
-- $Δ_i = 1.5$: this quiz exceeded the halflife of this leaky integrator. It should definitely incorporate this quiz and future ones by setting its “weight reached” to `True`.
-
-Once the “weights reached” flag is set `True`, it is never unset.
+Again I emphasize that the above small print is needed because our update scheme is ad hoc. We like many of the features of a sequence of leaky integrators and the power $q$-norm: we get a model exhibiting power law forgetting that’s relatively easy to calculate, allowing us to readily rank models according to the risk they’ve been forgotten. We also have a rigorous, fully-Bayesian approach of integrating a rich set of quiz types into a *single* leaky integrator. However, in order to combine the two—a chain of $N>1$ leaky integrators and the Gamma random variable Bayesian updates—we seem to need such an ad hoc process to give us the behavior we desire in an update rule.
 
 ## Source code
 

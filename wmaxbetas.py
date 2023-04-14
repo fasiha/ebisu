@@ -114,7 +114,7 @@ if __name__ == '__main__':
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
         ebisu3max.initModel(halflife=10, now=now),
-        ebisu.initModel(halflife=10, now=now, power=4),
+        ebisu.initModel(halflife=10, now=now, power=14, n=14),  # 4 4 
     ]
     modelsInit = models
     modelsPerIter = [modelsInit]
@@ -146,9 +146,11 @@ if __name__ == '__main__':
     print(f'loglikFinal={[round(p,3) for p in loglikFinal]}, {card.key=}')
     np.set_printoptions(precision=2, suppress=True)
 
-    weightsEvolution = np.array(
-        [[t + (w,)
-          for t, w in zip(v[-1].pred.halflifeGammas, v[-1].pred.log2weights)]
-         for v in modelsPerIter])
-    # print(weightsEvolution)
+    norm = lambda log2s: np.exp2(log2s)
+    weightsEvolution = np.array([[
+        (t[0] / t[1],) + (w,)
+        for t, w in zip(v[-1].pred.halflifeGammas, norm(v[-1].pred.log2weights))
+    ]
+                                 for v in modelsPerIter])
+    # print(np.array2string(weightsEvolution, edgeitems=100000))
 norm = lambda v: np.array(v) / np.sum(v)

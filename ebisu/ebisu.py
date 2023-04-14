@@ -108,37 +108,26 @@ def updateRecall(
   newWeights: list[float] = []
   newReached: list[bool] = []
   scales: list[float] = []
-  for m, updated, log2weight, reached in zip(model.pred.halflifeGammas, updateds,
-                                             model.pred.log2weights, model.pred.weightsReached):
-    weight = np.exp2(log2weight)
-    scal = updated.mean / _gammaToMean(*m)
+  ws = np.exp2(np.array(model.pred.log2weights))
+  for m, updated, weight, reached in zip(model.pred.halflifeGammas, updateds, ws,
+                                         model.pred.weightsReached):
+    oldHl = _gammaToMean(*m)
+    scal = updated.mean / oldHl
     scales.append(scal)
+    p = 2**(-t / oldHl)
+    # print(f'{scal=:g}, {p=:g}, {oldHl=:g}')
+    # compute new weight using surprise so short halflives get deweighted
 
-    if reached:
+    newReached.append(True)
+    if scal > .9:
       newModels.append((updated.a, updated.b))
-      newWeights.append(1)
-      newReached.append(True)
+      newWeights.append(0.5 * (weight + _entropyBits(p)))
     else:
-      if (scal < 1 and scal < SCALE_THRESH) or (scal > 1 and scal < 1.01):
-        # early failure or success
-        newModels.append(m)
-        newWeights.append(weight)
-        newReached.append(False)
-      else:
-        newModels.append((updated.a, updated.b))
-        newWeights.append(1)
-        newReached.append(True)
+      newModels.append(m)
+      newWeights.append(weight)
 
   if extra is not None:
     extra['scales'] = scales
-
-  leadingReached = sum(takewhile(lambda x: x, newReached))
-  MAX = 4
-  if leadingReached > MAX:
-    toDrop = leadingReached - MAX
-    newModels = newModels[toDrop:]
-    newWeights = newWeights[toDrop:]
-    newReached = newReached[toDrop:]
 
   ret.pred.lastEncounterMs = now
 
@@ -148,8 +137,11 @@ def updateRecall(
   ret.pred.forSql = _genForSql(ret.pred.log2weights,
                                [_gammaToMean(*x) for x in ret.pred.halflifeGammas],
                                model.pred.power)
-
   return ret
+
+
+def _entropyBits(p: float):
+  return -p * log2(p) - (1 - p) * log2(1 - p)
 
 
 def _appendQuizImpure(model: Model, result: Result) -> None:

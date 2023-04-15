@@ -245,15 +245,13 @@ def _halflifeToFinalWeight(halflife: float, hs: list[float] | np.ndarray, pow: i
   n = len(hs)
   ivec = (np.arange(n) / (n - 1))
 
-  # ivec = np.arange(n + 1)[1:] / (n)
-
-  def opt(wfinal):
-    ws = wfinal**ivec
+  def optlog(logwfinal):
+    ws = np.exp(logwfinal)**ivec
     return abs(lp - _powerMeanLogW(logv, pow, ws))
 
-  res = minimize_scalar(opt, bounds=[1e-4, 1 - 1e-4])
+  res = minimize_scalar(optlog, bounds=[np.log(1e-13), 0])
   assert res.success
-  return (res.x**ivec).tolist()
+  return (np.exp(res.x)**ivec).tolist()
 
 
 def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
@@ -265,7 +263,7 @@ def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
     from scipy.optimize import minimize_scalar
     res = minimize_scalar(
         lambda h: abs(lp - predictRecall(model, now=model.pred.lastEncounterMs + 3600e3 * h)),
-        bounds=[.01, 1e3],
+        bounds=[.01, 100e3],
         tol=1e-12)
     assert res.success
     # print(res)

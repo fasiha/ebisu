@@ -83,7 +83,10 @@ if __name__ == '__main__':
 
   gamma3Predictor = lambda model, elapsedTime: ebisu.predictRecall(
       model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
-  gamma3Updator = lambda model, s, t, now: ebisu.updateRecall(model, successes=s, total=t, now=now)
+  gamma3Updator = lambda model, s, t, now: ebisu.updateRecall(
+      model, successes=s, total=t, now=now, exactEnt=True)
+  gamma3Updator2 = lambda model, s, t, now: ebisu.updateRecall(
+      model, successes=s, total=t, now=now, exactEnt=False)
 
   # np.seterr(all='raise')
   # np.seterr(under='warn')
@@ -91,9 +94,9 @@ if __name__ == '__main__':
   fracs = [0.8]
   # fracs = [1.0]
   fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
-  # fracs = [0.75]
-  for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
-    # for card in train:
+  fracs = [0.75]
+  # for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
+  for card in train:
     hlMeanStd = (24., 24 * .7)
     boostMeanStd = (3, 3 * .7)
     convertMode: ConvertAnkiMode = 'binary'
@@ -114,15 +117,20 @@ if __name__ == '__main__':
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
         ebisu3max.initModel(halflife=10, now=now),
-        ebisu.initModel(halflife=10, now=now, power=14, n=14),  # 4 4 
+        ebisu.initModel(halflife=10, now=now, power=14, n=4),  # 4 4 
+        ebisu.initModel(halflife=10, now=now, power=14, n=4),  # 4 4
     ]
     modelsInit = models
     modelsPerIter = [modelsInit]
 
     predictors = [
-        ePredictor, v3Predictor, betasPredictor, gammaPredictor, gamma3MaxPredictor, gamma3Predictor
+        ePredictor, v3Predictor, betasPredictor, gammaPredictor, gamma3MaxPredictor,
+        gamma3Predictor, gamma3Predictor
     ]
-    updators = [eUpdator, v3Updator, betasUpdator, gammaUpdator, gamma3MaxUpdator, gamma3Updator]
+    updators = [
+        eUpdator, v3Updator, betasUpdator, gammaUpdator, gamma3MaxUpdator, gamma3Updator,
+        gamma3Updator2
+    ]
 
     logliks = []
     for ankiResult, elapsedTime in zip(card.results, card.dts_hours):

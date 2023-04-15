@@ -79,6 +79,7 @@ def updateRecall(
     q0: Optional[float] = None,
     now: Optional[float] = None,
     extra: Optional[dict] = None,
+    exactEnt=True,
 ) -> Model:
   now = now or timeMs()
   t = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
@@ -103,7 +104,6 @@ def updateRecall(
   ret = deepcopy(model)  # clone
   _appendQuizImpure(ret, resultObj)
 
-  SCALE_THRESH = 0.95
   newModels: list[tuple[float, float]] = []
   newWeights: list[float] = []
   newReached: list[bool] = []
@@ -115,13 +115,13 @@ def updateRecall(
     scal = updated.mean / oldHl
     scales.append(scal)
     p = 2**(-t / oldHl)
-    # print(f'{scal=:g}, {p=:g}, {oldHl=:g}')
+    # print(f'{scal=:f}, {p=:f}, {weight=:f}, {oldHl=:g}')
     # compute new weight using surprise so short halflives get deweighted
 
     newReached.append(True)
     if scal > .9:
       newModels.append((updated.a, updated.b))
-      newWeights.append(0.5 * (weight + _entropyBits(p)))
+      newWeights.append(0.5 * (weight + _entropyBits(p, exactEnt)))
     else:
       newModels.append(m)
       newWeights.append(weight)
@@ -140,8 +140,10 @@ def updateRecall(
   return ret
 
 
-def _entropyBits(p: float):
-  return -p * log2(p) - (1 - p) * log2(1 - p)
+def _entropyBits(p: float, exact=False):
+  if exact:
+    return -p * log2(p) - (1 - p) * log2(1 - p)
+  return 1 - 4 * (p - .5)**2
 
 
 def _appendQuizImpure(model: Model, result: Result) -> None:

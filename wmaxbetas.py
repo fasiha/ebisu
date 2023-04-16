@@ -94,7 +94,7 @@ if __name__ == '__main__':
   fracs = [0.8]
   # fracs = [1.0]
   fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
-  # fracs = [0.75]
+  fracs = [0.75]
   for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
     # for card in train:
     hlMeanStd = (24., 24 * .7)
@@ -117,8 +117,8 @@ if __name__ == '__main__':
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
         ebisu3max.initModel(halflife=10, now=now),
-        ebisu.initModel(halflife=10, now=now, power=8, n=14),  # 4 4 
-        ebisu.initModel(halflife=10, now=now, power=14, n=4),  # 4 4
+        ebisu.initModel(halflife=10, now=now, power=14, n=4),  # 4 4 
+        ebisu.initModel(halflife=10 * 10, now=now, power=14, n=4, firstHalflife=7.5),  # 4 4
     ]
     modelsInit = models
     modelsPerIter = [modelsInit]
@@ -143,12 +143,10 @@ if __name__ == '__main__':
       ll = tuple(np.log(p) if success else np.log(1 - p) for p in pRecallForModels)
       logliks.append(ll)
       if intermediate:
-        print(
-            f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}, ll={[round(l,3) for l in ll]}'
-        )
+        print(f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}')
 
       models = [update(model, s, t, now) for model, update in zip(models, updators)]
-      print(f'    hl={ebisu.hoursForRecallDecay(models[-1])}')
+      print(f'    hl={ebisu.hoursForRecallDecay(models[-1], .7):f}')
       modelsPerIter.append(models)
 
     loglikFinal = np.sum(np.array(logliks), axis=0).tolist()
@@ -163,3 +161,25 @@ if __name__ == '__main__':
                                  for v in modelsPerIter])
     # print(np.array2string(weightsEvolution, edgeitems=100000))
 norm = lambda v: np.array(v) / np.sum(v)
+
+if True:
+  ts = np.logspace(0, 5, 1001)
+  plt.figure()
+  for i, v in enumerate(modelsPerIter):
+    m = v[-1]
+    plt.loglog(
+        ts, [
+            ebisu.predictRecall(m, now=m.pred.lastEncounterMs + t * 3600e3, logDomain=False)
+            for t in ts
+        ],
+        label=f'{i}')
+  plt.legend()
+
+  hls, ws = zip(*[[12.97, 0.59], [188.15, 0.37], [4228.49, 0.04], [100011.38, 0.]])
+  weightsHalflifemusHls = [(np.exp2(v[-1].pred.log2weights),
+                            [a / b for a, b in v[-1].pred.halflifeGammas],
+                            ebisu.hoursForRecallDecay(v[-1])) for v in modelsPerIter]
+  [
+      ebisu.ebisu._powerMeanW(2**(-np.array(hls) / mu), 14, ws)
+      for ws, mu, hls in weightsHalflifemusHls
+  ]

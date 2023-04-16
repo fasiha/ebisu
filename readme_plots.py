@@ -9,8 +9,8 @@ plt.ion()
 norm = lambda v: np.array(v) / np.sum(v)
 
 hs = np.logspace(0, 3, 4)
-hl = 100
-power = 4
+hl = 10
+power = 14
 ws = ebisu.ebisu._halflifeToFinalWeight(hl, hs, power)
 # ws = norm(ws)
 
@@ -45,8 +45,8 @@ plt.title('Power law recall probability from ensemble of exponentials')
 plt.xlim([-10, 210])
 plt.tight_layout()
 
-plt.savefig('leaky-integrators-precall.png', dpi=300)
-plt.savefig('leaky-integrators-precall.svg')
+# plt.savefig('leaky-integrators-precall.png', dpi=300)
+# plt.savefig('leaky-integrators-precall.svg')
 
 plt.gca().set_xscale("log")
 plt.gca().set_yscale("log")
@@ -57,5 +57,5 @@ fixup = lambda vec: [re.sub(r'.0$', '', f'{x:,}') for x in vec]
 ax.set_xticklabels(fixup(ax.get_xticks()))
 ax.set_yticklabels(fixup(ax.get_yticks()))
 
-plt.savefig('leaky-integrators-precall-loglog.png', dpi=300)
-plt.savefig('leaky-integrators-precall-loglog.svg')
+# plt.savefig('leaky-integrators-precall-loglog.png', dpi=300)
+# plt.savefig('leaky-integrators-precall-loglog.svg')

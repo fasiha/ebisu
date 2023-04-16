@@ -21,6 +21,7 @@ def initModel(
     halflife: Optional[float] = None,  # hours
     finalHalflife=1e5,  # hours
     n: int = 10,
+    firstHalflife: Optional[float] = None,
     # above: lazy inputs, below: exact inputs
     weightsHalflifeGammas: Optional[list[tuple[float, HalflifeGamma]]] = None,
     power: int = 4,
@@ -44,7 +45,8 @@ def initModel(
       halflives.append(_gammaToMean(*g))
   else:
     assert halflife, "halflife or weightsHalflifeGammas needed"
-    halflives = np.logspace(log10(halflife * .1), log10(finalHalflife), n).tolist()
+    halflives = np.logspace(log10(firstHalflife or (halflife * .1)), log10(finalHalflife),
+                            n).tolist()
     # pick standard deviation to be half of the mean
     halflifeGammas = [meanVarToGamma(t, (t * .5)**2) for t in halflives]
     weights = _halflifeToFinalWeight(halflife, halflives, power)
@@ -263,8 +265,7 @@ def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
     from scipy.optimize import minimize_scalar
     res = minimize_scalar(
         lambda h: abs(lp - predictRecall(model, now=model.pred.lastEncounterMs + 3600e3 * h)),
-        bounds=[.01, 100e3],
-        tol=1e-12)
+        bounds=[.01, 100e3])
     assert res.success
     # print(res)
     return res.x

@@ -49,8 +49,11 @@ size = 1_000_000
 a, b = 2.0, 2.0  # looser
 a, b = 4.0, 4.0  # tighter
 logHlSamples = gammarv.rvs(a, scale=1 / b, size=size)
+hlSamples = 10**(logHlSamples)
+
 logWeights = np.zeros(size)
 logWeightsPlaw = np.zeros(size)
+pow = 2
 
 fig, axs = plotter(logHlSamples, a, b)
 
@@ -58,25 +61,43 @@ linA, linB = 1. * .1, .1 * .1
 linHlSamples = gammarv.rvs(linA, scale=1 / linB, size=size)
 linWeights = np.ones(size)
 
-ws = 1 / size
 
-for correct, total, hoursElapsed in data:
-  logps = (-hoursElapsed / 10**(logHlSamples)) * np.log(2)
+def normLogW(logWeights):
+  ws = np.exp(logWeights)
+  return ws / sum(ws)
 
+
+for idx, (correct, total, hoursElapsed) in enumerate(data):
+  logps = (-hoursElapsed / hlSamples) * np.log(2)
+  ws = normLogW(logWeights)
   expectedP = np.exp(sum(ws * logps))
-
   logWeights += logps if correct else np.expm1(-np.expm1(logps))
 
-  ws = np.exp(logWeights)
-  ws /= sum(ws)
+  ws = normLogW(logWeights)
   res = minimize_scalar(
-      lambda h: abs(0.5 - np.sum(ws * np.exp2(-h / 10**(logHlSamples)))),
+      lambda h: abs(0.5 - np.sum(ws * np.exp2(-h / hlSamples))),
       bracket=[1, 1000],
       method='golden',
       tol=.1,
       options=dict(maxiter=50))
+
   correctStr = f'{"" if correct else Fore.RED}{correct=}{Style.RESET_ALL}'
-  print(f'log, {hoursElapsed=:6.1f}, {expectedP=:.2f}, {correctStr}/{total=}, hl={res.x:.2f}')
+  print(f'{idx=}, {hoursElapsed=:6.1f}, p={expectedP:.2f}, {correctStr}/{total=}, hl={res.x:.2f}')
+
+  ps = (hoursElapsed / hlSamples + 1)**-pow
+  ws = normLogW(logWeightsPlaw)
+  expectedPPlaw = sum(ws * ps)
+  logWeightsPlaw += np.log(ps) if correct else np.log(1 - ps)
+
+  ws = normLogW(logWeightsPlaw)
+  res = minimize_scalar(
+      lambda h: abs(0.5 - np.sum(ws * (h / hlSamples + 1)**-pow)),
+      bracket=[2, 200],
+      method='golden',
+      tol=.01,
+      options=dict(maxiter=50))
+  print(f'                            p={expectedPPlaw:.2f}, hl={res.x:.2f}')
+  continue
 
   ps = 1 / (hoursElapsed / linHlSamples + 1)
   expectedPLin = sum(linWeights * ps) / sum(linWeights)

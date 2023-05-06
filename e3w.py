@@ -1,7 +1,9 @@
+from dataclasses import dataclass
+from typing import Any
 from colorama import Fore, Style
 from scipy.optimize import minimize_scalar
 import numpy as np
-from scipy.stats import gamma as gammarv, lognorm
+from scipy.stats import gamma as gammarv, lognorm, weibull_min
 import pylab as plt
 
 plt.ion()
@@ -34,33 +36,26 @@ data = [
 ]
 
 
-def plotter(samples, a, b, range=None):
-  fig, axs = plt.subplots(2, 1)
-  axs[0].hist(10**(samples), bins=100, range=range, density=True)
-  axs[1].hist((samples), bins=100, density=True)
-  fig.suptitle(f'{a=}, {b=}')
-  axs[0].set_xscale('log')
-  axs[0].set_yscale('log')
-  return fig, axs
+@dataclass
+class Model():
+  logWeights: Any
+  samples: Any
 
 
 size = 1_000_000
 # a,b = 1.0, 1.0 # loosest, probably will be unstable
 a, b = 2.0, 2.0  # looser
 a, b = 4.0, 4.0  # tighter
-logHlSamples = gammarv.rvs(a, scale=1 / b, size=size)
-hlSamples = 10**(logHlSamples)
-logWeights = np.zeros(size)
-
-fig, axs = plotter(logHlSamples, a, b)
+hlSamples = 10**(gammarv.rvs(a, scale=1 / b, size=size))
+expGamma = Model(logWeights=np.zeros(size), samples=hlSamples)
 
 mu, s2 = np.log(10), 2
 hlSamplesLnorm = lognorm.rvs(np.sqrt(s2), scale=np.exp(mu), size=size)
-logWeightsLnorm = np.zeros(size)
+logNorm = Model(logWeights=np.zeros(size), samples=hlSamplesLnorm)
 
 plt.figure()
-plt.hist(hlSamplesLnorm, bins=100, density=True, alpha=0.5, range=[1, 1000], label='logNormal')
-plt.hist(hlSamples, bins=100, density=True, alpha=0.5, range=[1, 1000], label='logGamma')
+plt.hist(hlSamplesLnorm, bins=100, density=True, alpha=0.5, range=(1, 1000), label='logNormal')
+plt.hist(hlSamples, bins=100, density=True, alpha=0.5, range=(1, 1000), label='logGamma')
 plt.gca().set_xscale('log')
 plt.gca().set_yscale('log')
 plt.legend()
@@ -71,34 +66,41 @@ def normLogW(logWeights):
   return ws / sum(ws)
 
 
-for idx, (correct, total, hoursElapsed) in enumerate(data):
-  logps = (-hoursElapsed / hlSamples) * np.log(2)
-  ws = normLogW(logWeights)
-  expectedP = np.exp(sum(ws * logps))
-  logWeights += logps if correct else np.expm1(-np.expm1(logps))
+def predict(model: Model, hoursElapsed: float) -> float:
+  logps = (-hoursElapsed / model.samples) * np.log(2)
+  ws = normLogW(model.logWeights)
+  return np.exp(sum(ws * logps))
 
-  ws = normLogW(logWeights)
+
+def update(model: Model, hoursElapsed: float, correct: int | bool) -> Model:
+  logps = (-hoursElapsed / model.samples) * np.log(2)
+  model.logWeights += logps if correct else np.expm1(-np.expm1(logps))
+  return model
+
+
+def halflife(model: Model) -> float:
+  ws = normLogW(model.logWeights)
   res = minimize_scalar(
-      lambda h: abs(0.5 - np.sum(ws * np.exp2(-h / hlSamples))),
+      lambda h: abs(0.5 - np.sum(ws * np.exp2(-h / model.samples))),
       bracket=[1, 1000],
       method='golden',
       tol=.1,
       options=dict(maxiter=50))
+  return res.x
+
+
+for idx, (correct, total, hoursElapsed) in enumerate(data):
+  assert total == 1 and (correct == 0 or correct == 1)  # only handle Bernoulli case
+
+  expectedP = predict(expGamma, hoursElapsed)
+  expGamma = update(expGamma, hoursElapsed, correct)
+  newHl = halflife(expGamma)
 
   correctStr = f'{"" if correct else Fore.RED}{correct=}{Style.RESET_ALL}'
   print(
-      f'{idx=:2d}, {hoursElapsed=:6.1f}, p={expectedP:.2f}, {correctStr}/{total=}, hl={res.x:.2f}')
+      f'{idx=:2d}, {hoursElapsed=:6.1f}, p={expectedP:.2f}, {correctStr}/{total=}, hl={newHl:.2f}')
 
-  logps = (-hoursElapsed / hlSamplesLnorm) * np.log(2)
-  ws = normLogW(logWeightsLnorm)
-  expectedP = np.exp(sum(ws * logps))
-  logWeightsLnorm += logps if correct else np.expm1(-np.expm1(logps))
-
-  ws = normLogW(logWeightsLnorm)
-  res = minimize_scalar(
-      lambda h: abs(0.5 - np.sum(ws * np.exp2(-h / hlSamplesLnorm))),
-      bracket=[1, 1000],
-      method='golden',
-      tol=.1,
-      options=dict(maxiter=50))
-  print(f'                             p={expectedP:.2f}, hl={res.x:.2f}')
+  expectedP = predict(logNorm, hoursElapsed)
+  logNorm = update(logNorm, hoursElapsed, correct)
+  newHl = halflife(logNorm)
+  print(f'                             p={expectedP:.2f}, hl={newHl:.2f}')

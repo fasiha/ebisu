@@ -69,7 +69,7 @@ def normLogW(logWeights):
 def predict(model: Model, hoursElapsed: float) -> float:
   logps = (-hoursElapsed / model.samples) * np.log(2)
   ws = normLogW(model.logWeights)
-  return np.exp(sum(ws * logps))
+  return sum(ws * np.exp(logps))
 
 
 def update(model: Model, hoursElapsed: float, correct: int | bool) -> Model:

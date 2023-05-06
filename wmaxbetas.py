@@ -9,6 +9,7 @@ import ebisu3wmax
 import ebisu3boost
 import ebisu2beta
 import ebisu3max
+import ebisu.ebisu3weightedmean as ebisu3w
 import utils
 
 plt.ion()
@@ -88,13 +89,18 @@ if __name__ == '__main__':
   gamma3Updator2 = lambda model, s, t, now: ebisu.updateRecall(
       model, successes=s, total=t, now=now, exactEnt=False)
 
+  ebisu3wPredictor = lambda model, elapsedTime: ebisu3w.predictRecall(
+      model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
+  ebisu3wUpdator = lambda model, s, t, now: ebisu3w.updateRecall(
+      model, successes=s, total=t, now=now, exactEnt=True, verbose=False)
+
   # np.seterr(all='raise')
   # np.seterr(under='warn')
 
   fracs = [0.8]
   # fracs = [1.0]
   fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
-  fracs = [0.75]
+  #   fracs = [0.75]
   for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
     # for card in train:
     hlMeanStd = (24., 24 * .7)
@@ -119,17 +125,19 @@ if __name__ == '__main__':
         ebisu3max.initModel(halflife=10, now=now),
         ebisu.initModel(halflife=10, now=now, power=14, n=4),  # 4 4 
         ebisu.initModel(halflife=10 * 10, now=now, power=14, n=4, firstHalflife=7.5),  # 4 4
+        ebisu.initModel(halflife=10 * 10, now=now, power=14, n=4, firstHalflife=7.5),  # 4 4
+        ebisu3w.initModel(halflife=10 * 10, now=now, n=4, firstHalflife=7.5),  # 4 4
     ]
     modelsInit = models
     modelsPerIter = [modelsInit]
 
     predictors = [
         ePredictor, v3Predictor, betasPredictor, gammaPredictor, gamma3MaxPredictor,
-        gamma3Predictor, gamma3Predictor
+        gamma3Predictor, gamma3Predictor, ebisu3wPredictor
     ]
     updators = [
         eUpdator, v3Updator, betasUpdator, gammaUpdator, gamma3MaxUpdator, gamma3Updator,
-        gamma3Updator
+        gamma3Updator, ebisu3wUpdator
     ]
 
     logliks = []
@@ -143,10 +151,10 @@ if __name__ == '__main__':
       ll = tuple(np.log(p) if success else np.log(1 - p) for p in pRecallForModels)
       logliks.append(ll)
       if intermediate:
-        print(f'  {s}/{t}, {elapsedTime:.1f}: ps={[round(p,4) for p in pRecallForModels]}')
+        print(f'  {s}/{t}, {elapsedTime:.1f}h: ps={[round(p,4) for p in pRecallForModels]}')
 
       models = [update(model, s, t, now) for model, update in zip(models, updators)]
-      print(f'    hl={ebisu.hoursForRecallDecay(models[-1], .7):f}')
+      #   print(f'    hl={[round(ebisu.hoursForRecallDecay(models[-1], p), 4) for p in [ .5, .8, .9]]}')
       modelsPerIter.append(models)
 
     loglikFinal = np.sum(np.array(logliks), axis=0).tolist()

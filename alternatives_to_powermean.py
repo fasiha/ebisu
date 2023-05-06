@@ -23,6 +23,17 @@ powerlaw = np.sum(ws * ps**pow)**(1 / pow)
 from scipy.optimize import minimize_scalar
 
 
+def hoursForRecallDecay(hls, ws, f):
+  hls = np.array(hls)
+
+  def opt(t):
+    return abs(f(np.exp2(-t / hls), ws) - 0.5)
+
+  res = minimize_scalar(opt, bounds=[1e-3, 1e5])
+  assert res.success
+  return res.x
+
+
 def _halflifeToFinalWeight(halflife, hs, f):
   n = len(hs)
 
@@ -37,7 +48,7 @@ def _halflifeToFinalWeight(halflife, hs, f):
     ws = xToWs(logwfinal)
     return abs(target - f(v, ws))
 
-  res = minimize_scalar(optlog, bounds=[np.log(1e-13), 0])
+  res = minimize_scalar(optlog, bounds=[np.log(1e-15), 0])
   assert res.success
   return (xToWs(res.x)).tolist()
 
@@ -98,3 +109,36 @@ for firstHalflife in [1, 5, 7.5, 8.5]:
       label=f'{firstHalflife=}')
 plt.legend()
 plt.grid()
+
+m = ebisu.initModel(halflife=10, now=0, n=20, power=14)
+
+m2hls = lambda m: [a / b for a, b in m.pred.halflifeGammas]
+mh = m2hls(m)
+w1 = _halflifeToFinalWeight(initHl, mh, lambda vec, ws: plaw(ws * vec, 14))
+w2 = _halflifeToFinalWeight(initHl, mh, lambda vec, ws: wplaw(vec, ws, 14))
+w3 = _halflifeToFinalWeight(initHl, mh, lambda vec, ws: egreedy(vec * ws, .01))
+
+[
+    hoursForRecallDecay(mh, w1, lambda v, w: plaw(v * w, 14)),
+    hoursForRecallDecay(mh, w2, lambda v, w: wplaw(v, w, 14)),
+    hoursForRecallDecay(mh, w3, lambda v, w: egreedy(v * w, .01)),
+]
+
+# m.pred.log2weights = np.log2((w3)).tolist()
+mu = ebisu.updateRecall(m, 1, 1, now=3600e3 * 1)
+
+norm = lambda x: x / np.sum(x)
+m2w = lambda model: norm(np.exp2(model.pred.log2weights))
+
+mw = np.exp2(m.pred.log2weights)
+muw = np.exp2(mu.pred.log2weights)
+
+[
+    hoursForRecallDecay(mh, w1, lambda v, w: plaw(v * w, 14)),
+    hoursForRecallDecay(mh, w2, lambda v, w: wplaw(v, w, 14)),
+    hoursForRecallDecay(m2hls(mu), muw, lambda v, w: egreedy(v * w, .01)),
+]
+
+plt.figure()
+plt.loglog(t, [egreedy(mw * 2**(-x / np.array(m2hls(m))), .01) for x in t], label="orig")
+plt.loglog(t, [egreedy(muw * 2**(-x / np.array(m2hls(mu))), .01) for x in t], label="upda")

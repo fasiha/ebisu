@@ -1,3 +1,6 @@
+from pprint import pprint
+from scipy.special import gammaln
+from ebisu import logsumexp
 from dataclasses import dataclass
 from typing import Any, Optional
 from colorama import Fore, Style
@@ -56,7 +59,8 @@ hlSamplesLnorm = lognorm.rvs(np.sqrt(s2), scale=np.exp(mu), size=size)
 logNorm = Model(logWeights=np.zeros(size), samples=hlSamplesLnorm)
 
 k, l = .25, 1
-hlSamplesWeibull = weibull_min.rvs(k, scale=l, size=size)
+wrv = weibull_min(k, scale=l)
+hlSamplesWeibull = wrv.rvs(size)
 weibully = Model(logWeights=np.zeros(size), samples=hlSamplesWeibull)
 
 
@@ -71,14 +75,15 @@ plt.figure()
 plt.loglog(h, lognorm.pdf(h, np.sqrt(s2), scale=np.exp(mu)), label='logNorm')
 plt.loglog(h, expGammaPdf(h, a, 1 / b), label='expGamma')
 plt.loglog(h, weibull_min.pdf(h, k, scale=l), label='Weibull')
+plt.loglog(h, weibull_min.pdf(h, k, scale=l * 3), label='Weibull3')
 plt.xlabel('hours')
 plt.legend()
 
 plt.figure()
-range = (1, 10000)
-plt.hist(hlSamplesLnorm, bins=100, density=True, alpha=0.25, range=range, label='logNormal')
-plt.hist(hlSamplesExpGamma, bins=100, density=True, alpha=0.25, range=range, label='exp10Gamma')
-plt.hist(hlSamplesWeibull, bins=100, density=True, alpha=0.25, range=range, label='Weibull')
+r = (1, 10000)
+plt.hist(hlSamplesLnorm, bins=100, density=True, alpha=0.25, range=r, label='logNormal')
+plt.hist(hlSamplesExpGamma, bins=100, density=True, alpha=0.25, range=r, label='exp10Gamma')
+plt.hist(hlSamplesWeibull, bins=100, density=True, alpha=0.25, range=r, label='Weibull')
 plt.gca().set_xscale('log')
 plt.gca().set_yscale('log')
 plt.xlabel('hours')
@@ -94,6 +99,18 @@ def predict(model: Model, hoursElapsed: float) -> float:
   logps = (-hoursElapsed / model.samples) * np.log(2)
   ws = model.weights if model.weights is not None else 1 / len(model.logWeights)
   return sum(ws * np.exp(logps))
+
+
+def fitWeibull(model: Model):
+  m1 = sum(model.weights * model.samples)
+  m2 = sum(model.weights * model.samples**2)
+  from scipy.special import gamma
+  resK = minimize_scalar(
+      lambda k: abs(m2 - (m1 / gamma(1 + 1 / k))**2 * gamma(1 + 2 / k)),
+      bracket=[.1, 1],
+      method='golden')
+  resLambda = m1 / gamma(1 + 1 / resK.x)
+  return (resK.x, resLambda, weibull_min(resK.x, scale=resLambda))
 
 
 def update(model: Model, hoursElapsed: float, correct: int | bool) -> Model:
@@ -133,4 +150,7 @@ for idx, (correct, total, hoursElapsed) in enumerate(data):
   expectedP = predict(weibully, hoursElapsed)
   weibully = update(weibully, hoursElapsed, correct)
   newHl = halflife(weibully)
-  print(f'                    Weibull, p={expectedP:.2f}, hl={newHl:.2f}')
+  fit = fitWeibull(weibully)
+  print(
+      f'                    Weibull, p={expectedP:.2f}, hl={newHl:.2f}, (k,l)={fit[0]:.2f},{fit[1]:.2f}'
+  )

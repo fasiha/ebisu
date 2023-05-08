@@ -64,6 +64,20 @@ hlSamplesWeibull = wrv.rvs(size)
 weibully = Model(logWeights=np.zeros(size), samples=hlSamplesWeibull)
 
 
+def sampleBoundedPareto(lo: float, hi: float, a: float, size: int):
+  u = np.random.rand(size)
+  return (-(u * (hi**a - lo**a) - hi**a) / ((hi * lo)**a))**(-1 / a)
+
+
+def pdfBoundedPareto(lo: float, hi: float, a: float, x: np.ndarray):
+  return a * lo**a / (1 - (lo / hi)**a) * x**(-a - 1)
+
+
+lo, hi, a = .1, 1e4, 0.25
+hlPareto = sampleBoundedPareto(lo, hi, a, size)
+par = Model(logWeights=np.zeros(size), samples=hlPareto)
+
+
 def expGammaPdf(z: np.ndarray, k: float, theta: float):
   from scipy.special import gamma
   return (np.log(z) / np.log(10))**(k - 1) * np.exp(-np.log(z) / (theta * np.log(10))) / (
@@ -75,7 +89,7 @@ plt.figure()
 plt.loglog(h, lognorm.pdf(h, np.sqrt(s2), scale=np.exp(mu)), label='logNorm')
 plt.loglog(h, expGammaPdf(h, a, 1 / b), label='expGamma')
 plt.loglog(h, weibull_min.pdf(h, k, scale=l), label='Weibull')
-plt.loglog(h, weibull_min.pdf(h, k, scale=l * 3), label='Weibull3')
+plt.loglog(h, pdfBoundedPareto(lo, hi, a, h), label='BoundPareto')
 plt.xlabel('hours')
 plt.legend()
 
@@ -84,6 +98,7 @@ r = (1, 10000)
 plt.hist(hlSamplesLnorm, bins=100, density=True, alpha=0.25, range=r, label='logNormal')
 plt.hist(hlSamplesExpGamma, bins=100, density=True, alpha=0.25, range=r, label='exp10Gamma')
 plt.hist(hlSamplesWeibull, bins=100, density=True, alpha=0.25, range=r, label='Weibull')
+plt.hist(hlPareto, bins=100, density=True, alpha=0.25, range=r, label='BoundPareto')
 plt.gca().set_xscale('log')
 plt.gca().set_yscale('log')
 plt.xlabel('hours')
@@ -154,3 +169,22 @@ for idx, (correct, total, hoursElapsed) in enumerate(data):
   print(
       f'                    Weibull, p={expectedP:.2f}, hl={newHl:.2f}, (k,l)={fit[0]:.2f},{fit[1]:.2f}'
   )
+
+  expectedP = predict(par, hoursElapsed)
+  par = update(par, hoursElapsed, correct)
+  newHl = halflife(par)
+  print(f'                       BPar, p={expectedP:.2f}, hl={newHl:.2f}')
+
+plt.figure()
+r = (1, hi * 1.1)
+# plt.hist(hlPareto, bins=100, density=True, alpha=0.25, range=r, label='init')
+plt.hist(
+    weibully.samples, weights=weibully.weights, bins=100, density=True, alpha=0.25, label='weib')
+plt.hist(par.samples, weights=par.weights, bins=100, density=True, alpha=0.25, label='bpar')
+h = np.logspace(-1, 6, 10001)
+plt.plot(h, fit[2].pdf(h))
+
+plt.gca().set_xscale('linear')
+plt.gca().set_yscale('linear')
+plt.xlabel('hours')
+plt.legend()

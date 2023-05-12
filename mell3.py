@@ -13,9 +13,10 @@ def makeIntegrand3(n, k, l, t):
 
 k, l, x, t, n, v = s.symbols('k l x t n nu', real=True, positive=True)
 f = s.exp(-t / x) * x**(k - 1) * s.exp(-l * (x)**k)
-extraSub = {n: 0, l: 1, t: 10}
 
-n = 0
+# n = 2
+
+extraSub = {n: 2, l: 1, t: 10}
 
 p, q = S(2), S(4)
 
@@ -32,19 +33,15 @@ for pp in range(1, q):
   res3 = s.integrate(f3.subs({k: p / q}), (x, 0, s.oo)).simplify()
   s.pprint(res3)
 
-  meijerList = [(n - k).subs({k: p / q}) / p - (0 if n < p else 1) for n in range(1, 1 + p)
+  meijerList = [(x - k).subs({k: p / q}) / p - n / p - (0 if x < p else 1) for x in range(1, 1 + p)
                ] + [n / q for n in range(int(q))]
-  print(meijerList)
+  recon = 1 / l**(p / q) * (t / p)**(p / q + n) * s.sqrt(p / q) / s.sqrt(
+      2 * s.pi)**(p + q - 2) * s.meijerg(((), ()), (meijerList, ()), 1 / p**p / q**q / l**p * t**p)
+  s.pprint(recon)
 
-  qres2 = mp.quad(makeIntegrand2(0, float(pp / q), 1.0, 10), [0, mp.inf])
-  qres3 = mp.quad(makeIntegrand3(0, float(pp / q), 1.0, 10), [0, mp.inf])
-  print([qres2, res2.subs(extraSub).evalf()])
-  print([qres3, res3.subs(extraSub).evalf()])
-
-  # expected = s.meijerg(
-  #     ((), ()),
-  #     ((S(11) / 20, S(3) / 10, S(1) / 20, -S(1) / 5, 0, S(1) / 5, S(2) / 5, S(3) / 5, S(4) / 5),
-  #      ()),
-  #     S(1) / 80).evalf()
-  # actual = s.meijerg(((), ()), (tuple(meijerList), ()), S(1) / 80).evalf()
-  # s.pprint([expected, actual])
+  # qres2 = mp.quad(
+  #     makeIntegrand2(n=extraSub[n], k=float(pp / q), l=extraSub[l], t=extraSub[t]), [0, mp.inf])
+  # print([qres2, res2.subs(extraSub).evalf()])
+  qres3 = mp.quad(
+      makeIntegrand3(n=extraSub[n], k=float(pp / q), l=extraSub[l], t=extraSub[t]), [0, mp.inf])
+  print([qres3, res3.subs(extraSub).evalf(), recon.subs(extraSub).evalf()])

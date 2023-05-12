@@ -33,8 +33,8 @@ for pp in range(1, q):
   res3 = s.integrate(f3.subs({k: p / q}), (x, 0, s.oo)).simplify()
   s.pprint(res3)
 
-  meijerList = [(x - k).subs({k: p / q}) / p - n / p - (0 if x < p else 1) for x in range(1, 1 + p)
-               ] + [n / q for n in range(int(q))]
+  meijerList = [(x - (p / q) - n) / p for x in range(1, p)] + [-1 / q - n / p
+                                                              ] + [x / q for x in range(int(q))]
   recon = 1 / l**(p / q) * (t / p)**(p / q + n) * s.sqrt(p / q) / s.sqrt(
       2 * s.pi)**(p + q - 2) * s.meijerg(((), ()), (meijerList, ()), 1 / p**p / q**q / l**p * t**p)
   s.pprint(recon)

@@ -20,7 +20,7 @@ f = s.exp(-t / x) * x**(k - 1) * s.exp(-l * (x)**k)
 f2 = x**(n - 1) * s.exp(-x - l * x**k)
 s.pprint(s.integrate(f.subs({k: S(1) / S(3)}), (x, 0, s.oo)).simplify())
 
-den = s.sympify(3)
+den = s.sympify(4)
 z = 100
 
 for num in range(1, den):

@@ -123,18 +123,17 @@ def updateRecall(
 
     newReached.append(True)
     e = _entropyBits(p + np.spacing(1), exactEnt)
-    nw = 0.5 * (weight + e)
-    if e > .9:
+    nw = weight * (p if scal > 1 else 1 - p)
+    if scal > .9:
       newModels.append((updated.a, updated.b))
-      if verbose:
-        print(f'{weight=:.2f}, {nw=:.2f}, {p=:g}, {e=:g}, {scal=:.2f} {oldHl=:.2f}, {idx=}')
+      # if verbose:
+      #   print(f'{weight=:.2f}, {nw=:.2f}, {p=:g}, {e=:g}, {scal=:.2f} {oldHl=:.2f}, {idx=}')
       newWeights.append(nw)
       # newWeights.append(0.5 * (weight + e) if scal > 1 else weight)
     else:
       # nw = weight
-      if verbose:
-        print(f'x {weight=:.2f}, {nw=:.2f}, {p=:g}, {e=:g}, {scal=:.2f} {oldHl=:.2f}, {idx=}')
-
+      # if verbose:
+      #   print(f'x {weight=:.2f}, {nw=:.2f}, {p=:g}, {e=:g}, {scal=:.2f} {oldHl=:.2f}, {idx=}')
       newModels.append(m)
       newWeights.append(nw)
 

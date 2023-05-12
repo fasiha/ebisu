@@ -8,6 +8,7 @@ from scipy.optimize import minimize_scalar
 import numpy as np
 from scipy.stats import gamma as gammarv, lognorm, weibull_min
 import pylab as plt
+import ebisu
 
 plt.ion()
 
@@ -146,6 +147,9 @@ def halflife(model: Model) -> float:
   return res.x
 
 
+now = 0
+eb = ebisu.initModel(halflife=10 * 10, now=now, power=14, n=8, firstHalflife=7.5)
+
 for idx, (correct, total, hoursElapsed) in enumerate(data):
   assert total == 1 and (correct == 0 or correct == 1)  # only handle Bernoulli case
 
@@ -157,10 +161,10 @@ for idx, (correct, total, hoursElapsed) in enumerate(data):
   print(
       f'{idx=:2d}, {hoursElapsed=:6.1f}, p={expectedP:.2f}, {correctStr}/{total=}, hl={newHl:.2f}')
 
-  expectedP = predict(logNorm, hoursElapsed)
-  logNorm = update(logNorm, hoursElapsed, correct)
-  newHl = halflife(logNorm)
-  print(f'                       logN, p={expectedP:.2f}, hl={newHl:.2f}')
+  # expectedP = predict(logNorm, hoursElapsed)
+  # logNorm = update(logNorm, hoursElapsed, correct)
+  # newHl = halflife(logNorm)
+  # print(f'                       logN, p={expectedP:.2f}, hl={newHl:.2f}')
 
   expectedP = predict(weibully, hoursElapsed)
   weibully = update(weibully, hoursElapsed, correct)
@@ -170,10 +174,20 @@ for idx, (correct, total, hoursElapsed) in enumerate(data):
       f'                    Weibull, p={expectedP:.2f}, hl={newHl:.2f}, (k,l)={fit[0]:.2f},{fit[1]:.2f}'
   )
 
-  expectedP = predict(par, hoursElapsed)
-  par = update(par, hoursElapsed, correct)
-  newHl = halflife(par)
-  print(f'                       BPar, p={expectedP:.2f}, hl={newHl:.2f}')
+  # expectedP = predict(par, hoursElapsed)
+  # par = update(par, hoursElapsed, correct)
+  # newHl = halflife(par)
+  # print(f'                       BPar, p={expectedP:.2f}, hl={newHl:.2f}')
+
+  now += hoursElapsed * 3600e3
+  expectedP = ebisu.predictRecall(eb, now=now, logDomain=False)
+  eb = ebisu.updateRecall(eb, correct, now=now)
+  newHl = ebisu.hoursForRecallDecay(eb)
+  particles = ', '.join([
+      f'(w={2**l2w:.2g}, hl={a/b:.2f})'
+      for l2w, (a, b) in zip(eb.pred.log2weights, eb.pred.halflifeGammas)
+  ])
+  print(f'                      EBISU, p={expectedP:.2f}, hl={newHl:.2f}; {particles}')
 
 plt.figure()
 r = (1, hi * 1.1)

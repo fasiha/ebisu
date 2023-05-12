@@ -123,21 +123,18 @@ def updateRecall(
 
     newReached.append(True)
     e = _entropyBits(p + np.spacing(1), exactEnt)
-    # nw = 0.5 * (weight + e)
-    nw = weight
+    nw = weight * (p if scal > 1 else 1 - p)
     if scal > .9:
       newModels.append((updated.a, updated.b))
       if verbose:
         print(f'{weight=:.2f}, {nw=:.2f}, {p=:g}, {e=:g}, {scal=:.2f} {oldHl=:.2f}, {idx=}')
-      newWeights.append(nw)
       # newWeights.append(0.5 * (weight + e) if scal > 1 else weight)
     else:
       # nw = weight
       if verbose:
         print(f'x {weight=:.2f}, {nw=:.2f}, {p=:g}, {e=:g}, {scal=:.2f} {oldHl=:.2f}, {idx=}')
-
       newModels.append(m)
-      newWeights.append(nw)
+    newWeights.append(nw)
 
   if extra is not None:
     extra['scales'] = scales
@@ -180,9 +177,32 @@ def predictRecall(
   elapsedHours = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   assert elapsedHours >= 0, "cannot go back in time"
 
-  meanHalflives = np.array([a / b for a, b in model.pred.halflifeGammas])
-  p = logsumexp((-elapsedHours / meanHalflives + model.pred.log2weights) * LN2)
+  meanHalflives = ([a / b for a, b in model.pred.halflifeGammas])
+
+  z = [(h, l2w) for h, l2w in zip(meanHalflives, model.pred.log2weights)]
+  relevant = [(left, right) for left, right in zip(z, z[1:]) if left[0] <= elapsedHours < right[0]]
+  if len(relevant) == 0:
+    # very early or very late
+    if elapsedHours < meanHalflives[0]:
+      # far left of everything, very early:
+      p = (-elapsedHours / meanHalflives[0]) * LN2
+    else:
+      # far right of everything
+      p = (model.pred.log2weights[-1] - elapsedHours / meanHalflives[-1]) * LN2
+  else:
+    h1, lw1 = relevant[0][0]
+    h2, lw2 = relevant[0][1]
+    lp1, lp2 = (lw1 - elapsedHours / h1) * LN2, (lw2 - elapsedHours / h2) * LN2
+    # good idea? linearly interpolate in the log domain?
+    p = interpolate(h1, h2, lp1, lp2, elapsedHours)
+
   return p if logDomain else np.exp(p)
+
+
+def interpolate(x1: float, x2: float, y1: float, y2: float, x: float):
+  """Perform linear interpolation for x between (x1,y1) and (x2,y2) """
+
+  return ((y2 - y1) * x + x2 * y1 - x1 * y2) / (x2 - x1)
 
 
 def _halflifeToFinalWeight(halflife: float, hs: list[float] | np.ndarray) -> list[float]:

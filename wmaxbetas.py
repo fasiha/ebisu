@@ -124,20 +124,19 @@ if __name__ == '__main__':
         ebisu3wmax.initModel(wmaxMean=.02, now=now),
         ebisu3max.initModel(halflife=10, now=now),
         ebisu.initModel(halflife=10, now=now, power=14, n=4),  # 4 4 
-        ebisu.initModel(halflife=10 * 10, now=now, power=14, n=4, firstHalflife=7.5),  # 4 4
-        ebisu.initModel(halflife=10 * 10, now=now, power=14, n=4, firstHalflife=7.5),  # 4 4
-        ebisu3w.initModel(halflife=10 * 10, now=now, n=4, firstHalflife=7.5),  # 4 4
+        ebisu.initModel(halflife=10 * 10, now=now, power=20, n=4, firstHalflife=7.5),  # 4 4
+        ebisu.initModel(halflife=10 * 10, now=now, power=20, n=8, firstHalflife=7.5),  # 4 4
     ]
     modelsInit = models
     modelsPerIter = [modelsInit]
 
     predictors = [
         ePredictor, v3Predictor, betasPredictor, gammaPredictor, gamma3MaxPredictor,
-        gamma3Predictor, gamma3Predictor, ebisu3wPredictor
+        gamma3Predictor, gamma3Predictor, gamma3Predictor
     ]
     updators = [
         eUpdator, v3Updator, betasUpdator, gammaUpdator, gamma3MaxUpdator, gamma3Updator,
-        gamma3Updator, ebisu3wUpdator
+        gamma3Updator, gamma3Updator
     ]
 
     logliks = []

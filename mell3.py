@@ -1,3 +1,4 @@
+from meijerGm00m import meijerGm00m
 import pdb
 import itertools as it
 import mpmath as mp
@@ -110,7 +111,9 @@ for pp in range(1, q):
       seenPoles.add(thisPole)
   # print('FINAL meijerG residue sum:', resSum2, expected)
   mathExchange = resSum2 * float(prefix.subs(extraSub))
-  print('comparison',
-        [qres3,
-         res3.subs(extraSub).evalf(),
-         recon.subs(extraSub).evalf(), mpdirect, mathExchange])
+  me2 = meijerGm00m(bs, zsym) * float(prefix.subs(extraSub))
+  print('comparison', [
+      qres3,
+      res3.subs(extraSub).evalf(),
+      recon.subs(extraSub).evalf(), mpdirect, mathExchange, me2
+  ])

@@ -1,3 +1,5 @@
+import pdb
+import itertools as it
 import mpmath as mp
 import sympy as s
 from sympy import S
@@ -45,6 +47,7 @@ for pp in [2]:
                                                               ] + [x / q for x in range(int(q))]
   prefix = (t / p)**(p / q + n) * s.sqrt(p / q) / l**(p / q) / s.sqrt(2 * s.pi)**(p + q - 2)
   arg = (t / l / p)**p / q**q
+
   recon = prefix * s.meijerg(((), ()), (meijerList, ()), arg)
   s.pprint(recon)
 
@@ -80,7 +83,7 @@ def f(s):
     return 20
 
 
-xaxis = np.linspace(-10, 10, 10001)
+xaxis = np.linspace(-10, 10, 1001)
 yaxis = np.array([float(f(x).real) for x in xaxis])
 
 plt.figure()
@@ -89,7 +92,8 @@ plt.grid()
 
 expected = mp.meijerg([[], []], [[float(x.subs(extraSub)) for x in meijerList], []],
                       float(arg.subs(extraSub)))
-z = float(arg.subs(extraSub))
+zsym = arg.subs(extraSub)
+z = float(zsym)
 ds, dz, dp, dq = s.symbols('s z p q')
 f = s.prod([s.gamma(x.subs(extraSub) - ds) for x in meijerList]) * dz**ds
 
@@ -105,19 +109,49 @@ if pp == 1:
     floatRes = [float(r.subs({dz: z})) for r in residues]
     print('expected', expected, 'actual', sum(floatRes), floatRes)
 
-residues = []
-resSum = S(0)
-seenPoles = set()
-for i in range(0, -5, -1):
-  for b in [x.subs(extraSub) for x in meijerList]:
-    pole = S(b) - S(i)
-    if pole in seenPoles:
-      continue
-    seenPoles.add(pole)
-    res = s.residue(f, ds, pole).subs({dz: z})
-    resSum += res.evalf()
-    residues.append(res)
-    print(f'{expected=}')
-    print(dict(b=b, pole=pole, res=res.evalf(), actual=resSum))
+isInt = lambda x: x == int(x)
+isZeroNegInt = lambda x: x <= 0 and isInt(x)
+bs = [x.subs(extraSub) for x in meijerList]
 
-# fsimple = s.gamma(-ds) * s.gamma(-ds - 1)
+resSum2 = S(0)
+seenPoles = set()
+for i in range(0, 6):
+  for b in bs:
+    thisPole = b + i  # we know that f(thisPole) -> infinity
+    if thisPole in seenPoles:
+      continue
+
+    # both these lists are arguments to Gamma
+    poleBs = []  # these args to f to blow up
+    nonpoleBs = []  # these dont
+    for b2 in bs:
+      other = b2 - thisPole
+      if isZeroNegInt(other):
+        poleBs.append(b2)
+      else:
+        nonpoleBs.append(b2)
+    if len(poleBs) == 1:
+      # simple pole!
+      negN = -(poleBs[0] - thisPole)
+      laurentMinus1 = (-1)**negN / s.gamma(negN + 1)
+      rest = s.prod([s.gamma(nonpole - thisPole) for nonpole in nonpoleBs]) * zsym**thisPole
+      res = laurentMinus1 * rest
+      # print('simple pole calculated', res.evalf())
+      # print('simple pole residue', s.simplify(s.residue(f, ds, thisPole)).subs({dz: zsym}).evalf())
+      # res should be `s.simplify(s.residue(f, ds, thisPole))`
+    else:
+      # See https://math.stackexchange.com/a/4700880/
+      # pdb.set_trace()
+      assert len(poleBs) == 2, "unimplemented: >2 coincident poles"
+      l1 = s.prod(s.gamma(b - thisPole) for b in nonpoleBs) * zsym**thisPole * s.prod(
+          (-1)**(1 + b - thisPole) / s.gamma(-(b - thisPole) + 1) for b in poleBs)
+      l2 = s.log(zsym) - sum(s.polygamma(0, b - thisPole) for b in nonpoleBs) - sum(
+          s.polygamma(0, thisPole - b + 1) for b in poleBs)
+      res = -l1 * l2
+      # res should be `s.simplify(s.residue(f, ds, thisPole).subs({dz: zsym}))`
+      # print('DOUBLE pole calculated', res.evalf())
+      # print('DOUBLE pole residue', s.simplify(s.residue(f, ds, thisPole)).subs({dz: zsym}).evalf())
+    resSum2 += float(res)
+    print(f'{i=}, {resSum2=}=?{expected}, {thisPole=}, {poleBs=}')
+    seenPoles.add(thisPole)
+print('FINAL meijerG residue sum:', resSum2, expected)

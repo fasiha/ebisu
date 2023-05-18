@@ -59,8 +59,8 @@ for pp in range(1, q):
 
   expected = mp.meijerg([[], []], [[float(x.subs(extraSub)) for x in meijerList], []],
                         float(arg.subs(extraSub)))
-  zsym = arg.subs(extraSub)
-  z = float(zsym)
+  z = arg.subs(extraSub)
+  z = float(z)
   ds, dz, dp, dq = s.symbols('s z p q')
   f = s.prod([s.gamma(x.subs(extraSub) - ds) for x in meijerList]) * dz**ds
 
@@ -89,7 +89,7 @@ for pp in range(1, q):
         # simple pole!
         negN = -(poleBs[0] - thisPole)
         laurentMinus1 = (-1)**negN / s.gamma(negN + 1)
-        rest = s.prod([s.gamma(nonpole - thisPole) for nonpole in nonpoleBs]) * zsym**thisPole
+        rest = s.prod([s.gamma(nonpole - thisPole) for nonpole in nonpoleBs]) * z**thisPole
         res = laurentMinus1 * rest
         # print('simple pole calculated', res.evalf())
         # print('simple pole residue', s.simplify(s.residue(f, ds, thisPole)).subs({dz: zsym}).evalf())
@@ -98,9 +98,9 @@ for pp in range(1, q):
         # See https://math.stackexchange.com/a/4700880/
         # pdb.set_trace()
         assert len(poleBs) == 2, "unimplemented: >2 coincident poles"
-        l1 = s.prod(s.gamma(b - thisPole) for b in nonpoleBs) * zsym**thisPole * s.prod(
+        l1 = s.prod(s.gamma(b - thisPole) for b in nonpoleBs) * z**thisPole * s.prod(
             (-1)**(1 + b - thisPole) / s.gamma(-(b - thisPole) + 1) for b in poleBs)
-        l2 = s.log(zsym) - sum(s.polygamma(0, b - thisPole) for b in nonpoleBs) - sum(
+        l2 = s.log(z) - sum(s.polygamma(0, b - thisPole) for b in nonpoleBs) - sum(
             s.polygamma(0, thisPole - b + 1) for b in poleBs)
         res = -l1 * l2
         # res should be `s.simplify(s.residue(f, ds, thisPole).subs({dz: zsym}))`
@@ -111,7 +111,7 @@ for pp in range(1, q):
       seenPoles.add(thisPole)
   # print('FINAL meijerG residue sum:', resSum2, expected)
   mathExchange = resSum2 * float(prefix.subs(extraSub))
-  me2 = meijerGm00m(bs, zsym) * float(prefix.subs(extraSub))
+  me2 = meijerGm00m(bs, z) * float(prefix.subs(extraSub))
   print('comparison', [
       qres3,
       res3.subs(extraSub).evalf(),

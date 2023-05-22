@@ -50,6 +50,12 @@ class Model():
   weights: Optional[Any] = None
 
 
+def kishLog(logweights) -> float:
+  "kish effective sample fraction, given log-weights"
+  from scipy.special import logsumexp
+  return np.exp(2 * logsumexp(logweights) - logsumexp(2 * logweights)) / logweights.size
+
+
 def normLogW(logWeights):
   ws = np.exp(logWeights)
   return ws / sum(ws)
@@ -224,10 +230,10 @@ plt.legend()
 
 plt.figure()
 r = (1, 10000)
-plt.hist(hlSamplesLnorm, bins=100, density=True, alpha=0.25, range=r, label='logNormal')
-plt.hist(hlSamplesExpGamma, bins=100, density=True, alpha=0.25, range=r, label='exp10Gamma')
-plt.hist(hlSamplesWeibull, bins=100, density=True, alpha=0.25, range=r, label='Weibull')
-plt.hist(hlPareto, bins=100, density=True, alpha=0.25, range=r, label='BoundPareto')
+plt.hist(hlPareto, bins=100, density=True, alpha=0.75, range=r, label='BoundPareto')
+plt.hist(hlSamplesWeibull, bins=100, density=True, alpha=0.75, range=r, label='Weibull')
+plt.hist(hlSamplesExpGamma, bins=100, density=True, alpha=0.75, range=r, label='exp10Gamma')
+plt.hist(hlSamplesLnorm, bins=100, density=True, alpha=0.75, range=r, label='logNormal')
 plt.gca().set_xscale('log')
 plt.gca().set_yscale('log')
 plt.xlabel('hours')
@@ -247,10 +253,10 @@ for idx, (correct, total, hoursElapsed) in enumerate(data):
   print(
       f'{idx=:2d}, {hoursElapsed=:6.1f}, p={expectedP:.2f}, {correctStr}/{total=}, hl={newHl:.2f}')
 
-  # expectedP = predict(logNorm, hoursElapsed)
-  # logNorm = update(logNorm, hoursElapsed, correct)
-  # newHl = halflife(logNorm)
-  # print(f'                       logN, p={expectedP:.2f}, hl={newHl:.2f}')
+  expectedP = predict(logNorm, hoursElapsed)
+  logNorm = update(logNorm, hoursElapsed, correct)
+  newHl = halflife(logNorm)
+  print(f'                       logN, p={expectedP:.2f}, hl={newHl:.2f}')
 
   expectedP = predict(weibully, hoursElapsed)
   weibully = update(weibully, hoursElapsed, correct)
@@ -260,10 +266,10 @@ for idx, (correct, total, hoursElapsed) in enumerate(data):
       f'                    Weibull, p={expectedP:.2f}, hl={newHl:.2f}, (k,l)={fit[0]:.2f},{fit[1]:.2f}'
   )
 
-  # expectedP = predict(par, hoursElapsed)
-  # par = update(par, hoursElapsed, correct)
-  # newHl = halflife(par)
-  # print(f'                       BPar, p={expectedP:.2f}, hl={newHl:.2f}')
+  expectedP = predict(par, hoursElapsed)
+  par = update(par, hoursElapsed, correct)
+  newHl = halflife(par)
+  print(f'                       BPar, p={expectedP:.2f}, hl={newHl:.2f}')
 
   now += hoursElapsed * 3600e3
   expectedP = ebisu.predictRecall(eb, now=now, logDomain=False)
@@ -277,7 +283,7 @@ for idx, (correct, total, hoursElapsed) in enumerate(data):
 
 plt.figure()
 r = (1, hi * 1.1)
-# plt.hist(hlPareto, bins=100, density=True, alpha=0.25, range=r, label='init')
+plt.hist(hlPareto, bins=100, density=True, alpha=0.25, range=r, label='init')
 plt.hist(
     weibully.samples, weights=weibully.weights, bins=100, density=True, alpha=0.25, label='weib')
 plt.hist(par.samples, weights=par.weights, bins=100, density=True, alpha=0.25, label='bpar')

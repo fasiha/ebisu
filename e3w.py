@@ -1,3 +1,4 @@
+from math import gcd
 import mpmath as mp
 import sympy as sp
 from sympy import S
@@ -67,9 +68,7 @@ def predict(model: Model, hoursElapsed: float) -> float:
   return sum(ws * np.exp(logps))
 
 
-def fitWeibull(model: Model):
-  m1 = sum(model.weights * model.samples)
-  m2 = sum(model.weights * model.samples**2)
+def momentsToWeibull(m1: float, m2: float):
   from scipy.special import gamma
   resK = minimize_scalar(
       lambda k: abs(m2 - (m1 / gamma(1 + 1 / k))**2 * gamma(1 + 2 / k)),
@@ -77,6 +76,12 @@ def fitWeibull(model: Model):
       method='golden')
   resLambda = m1 / gamma(1 + 1 / resK.x)
   return (resK.x, resLambda, weibull_min(resK.x, scale=resLambda))
+
+
+def fitWeibull(model: Model):
+  m1 = sum(model.weights * model.samples)
+  m2 = sum(model.weights * model.samples**2)
+  return momentsToWeibull(m1, m2)
 
 
 def update(model: Model, hoursElapsed: float, correct: int | bool) -> Model:
@@ -114,7 +119,7 @@ class WeibullRational():
   def predict(self, hoursElapsed: float):
     return self.evalExpectation(t=hoursElapsed * np.log(2), n=0)
 
-  def update(self, hoursElapsed: float, correct: int | bool):
+  def update(self, hoursElapsed: float, correct: int | bool, denominator=5):
     """
     success:
 
@@ -151,16 +156,30 @@ class WeibullRational():
       den = self.evalExpectation(t=t, n=0)
       m1 = self.evalExpectation(t=t, n=1) / den
       m2 = self.evalExpectation(t=t, n=2) / den
-      return (m1, m2)
+    else:
+      den = 1 - self.evalExpectation(t=t, n=0)
+      wrv = weibull_min(self.p / self.q, scale=self.l)
+      wm1 = wrv.mean()  # prior mean
+      wm2 = wrv.moment(2)  # prior 2nd moment
 
-    den = 1 - self.evalExpectation(t=t, n=0)
-    wrv = weibull_min(self.p / self.q, scale=self.l)
-    wm1 = wrv.mean()  # prior mean
-    wm2 = wrv.moment(2)  # prior 2nd moment
+      m1 = (wm1 - self.evalExpectation(t=t, n=1)) / den
+      m2 = (wm2 - self.evalExpectation(t=t, n=2)) / den
 
-    m1 = (wm1 - self.evalExpectation(t=t, n=1)) / den
-    m2 = (wm2 - self.evalExpectation(t=t, n=2)) / den
-    return (m1, m2)
+    # find the best k
+    bestFit = momentsToWeibull(m1, m2)
+    nextP = int(np.round(bestFit[0] * denominator))
+    gcdFix = gcd(nextP, denominator)
+    nextP, nextQ = int(nextP / gcdFix), int(denominator / gcdFix)
+    nextK = nextP / nextQ
+    nextL = minimize_scalar(
+        lambda l: (m1 - weibull_min.mean(nextK, scale=l))**2,
+        bounds=[.01, 2000.0],
+    ).x
+    return WeibullRational(nextP, nextQ, nextL)
+
+  def halflife(self) -> float:
+    res = minimize_scalar(lambda h: abs(0.5 - self.predict(h)), bounds=[1, 10_000])
+    return res.x
 
 
 size = 1_000_000
@@ -176,7 +195,7 @@ hlSamplesLnorm = lognorm.rvs(np.sqrt(s2), scale=np.exp(mu), size=size)
 logNorm = Model(logWeights=np.zeros(size), samples=hlSamplesLnorm)
 
 kp, kq = 1, 4
-k, l = kp / kq, 1
+k, l = kp / kq, 100
 wrv = weibull_min(k, scale=l)
 hlSamplesWeibull = wrv.rvs(size)
 weibully = Model(logWeights=np.zeros(size), samples=hlSamplesWeibull)
@@ -187,6 +206,7 @@ if confirmMeijer:
   print('PRED: actual', weibullModel.predict(10.), 'expected', predict(weibully, 10.))
   act0 = weibullModel.update(10, 0)
   u0 = update(weibully, 10, 0)
+  fit0 = fitWeibull(u0)
   exp0 = (np.sum(weibully.weights * weibully.samples),
           np.sum(weibully.weights * weibully.samples**2))
   print(act0, exp0)
@@ -194,6 +214,7 @@ if confirmMeijer:
   weibully = Model(logWeights=np.zeros(size), samples=hlSamplesWeibull)
   act1 = weibullModel.update(10, 1)
   u1 = update(weibully, 10, 1)
+  fit1 = fitWeibull(u1)
   exp1 = (np.sum(weibully.weights * weibully.samples),
           np.sum(weibully.weights * weibully.samples**2))
   print(act1, exp1)
@@ -265,6 +286,11 @@ for idx, (correct, total, hoursElapsed) in enumerate(data):
   print(
       f'                    Weibull, p={expectedP:.2f}, hl={newHl:.2f}, (k,l)={fit[0]:.2f},{fit[1]:.2f}'
   )
+
+  expectedP = weibullModel.predict(hoursElapsed)
+  weibullModel = weibullModel.update(hoursElapsed, correct)
+  newHl = weibullModel.halflife()
+  print(f'          WeibullAnalytical, p={expectedP:.2f}, hl={newHl:.2f}, {weibullModel=}')
 
   expectedP = predict(par, hoursElapsed)
   par = update(par, hoursElapsed, correct)

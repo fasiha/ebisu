@@ -109,6 +109,20 @@ class WeibullRational():
   l: Any
 
   def evalExpectation(self, t: float, n: int) -> float:
+    """
+    Returns $∫_0^∞ h^n exp(-t/h) PWeibull(h; k, l) dh$
+
+    Where `n` and `t` are input, and the Weibull's `k = self.p / self.q` and `l
+    = self.l`
+
+    If `t=0`, then this simplifies to the `n`th moment of the Weibull
+    distribution.
+    """
+    if t == 0:
+      # Weibull!
+      wrv = weibull_min(self.p / self.q, scale=self.l)
+      return wrv.moment(n)
+
     p, q, l = self.p, self.q, self.l
     prefix = (t / p)**(p / q + n) * np.sqrt(p / q) / l**(p / q) / np.sqrt(2 * np.pi)**(p + q - 2)
     arg = (t / l / p)**p / q**q
@@ -119,7 +133,42 @@ class WeibullRational():
   def predict(self, hoursElapsed: float):
     return self.evalExpectation(t=hoursElapsed * np.log(2), n=0)
 
-  def update(self, hoursElapsed: float, correct: int | bool, denominator=5):
+  def updateHistory(self,
+                    hours: list[float],
+                    results: list[int | bool],
+                    denominator=5,
+                    verbose=False):
+    assert len(hours) == len(results)
+    if len(hours) == 0:
+      return WeibullRational(self.p, self.q, self.l)
+    LN2 = np.log(2)
+    rightTs = [t * LN2 for x, t in zip(results, hours) if x]
+    rightTSum = sum(rightTs)
+    wrongTs = [t * LN2 for x, t in zip(results, hours) if not x]
+
+    import binomialExpansion
+    expandedCoefs, expandedSigns = binomialExpansion.expandLog([t for t in wrongTs])
+    mn = lambda n: sum(sign * self.evalExpectation(t + rightTSum, n)
+                       for t, sign in zip(expandedCoefs, expandedSigns))
+
+    m0 = mn(0)
+    m1 = mn(1) / m0  # mean
+    m2 = mn(2) / m0  # second non-central moment
+    if verbose:
+      print(f'History update: {m1=}, {m2=}')
+
+    bestFit = momentsToWeibull(m1, m2)
+    nextP = int(np.round(bestFit[0] * denominator))
+    gcdFix = gcd(nextP, denominator)
+    nextP, nextQ = int(nextP / gcdFix), int(denominator / gcdFix)
+    nextK = nextP / nextQ
+    nextL = minimize_scalar(
+        lambda l: (m1 - weibull_min.mean(nextK, scale=l))**2,
+        bounds=[.01, 2000.0],
+    ).x
+    return WeibullRational(nextP, nextQ, nextL)
+
+  def update(self, hoursElapsed: float, correct: int | bool, denominator=5, verbose=False):
     """
     success:
 
@@ -165,6 +214,8 @@ class WeibullRational():
       m1 = (wm1 - self.evalExpectation(t=t, n=1)) / den
       m2 = (wm2 - self.evalExpectation(t=t, n=2)) / den
 
+    if verbose:
+      print(f'Single update: {m1=}, {m2=}')
     # find the best k
     bestFit = momentsToWeibull(m1, m2)
     nextP = int(np.round(bestFit[0] * denominator))
@@ -200,11 +251,12 @@ wrv = weibull_min(k, scale=l)
 hlSamplesWeibull = wrv.rvs(size)
 weibully = Model(logWeights=np.zeros(size), samples=hlSamplesWeibull)
 weibullModel = WeibullRational(kp, kq, l)
+wAll = WeibullRational(kp, kq, l)
 
-confirmMeijer = False
+confirmMeijer = True
 if confirmMeijer:
   print('PRED: actual', weibullModel.predict(10.), 'expected', predict(weibully, 10.))
-  act0 = weibullModel.update(10, 0)
+  act0 = weibullModel.update(10, 0, verbose=True)
   u0 = update(weibully, 10, 0)
   fit0 = fitWeibull(u0)
   exp0 = (np.sum(weibully.weights * weibully.samples),
@@ -212,12 +264,22 @@ if confirmMeijer:
   print(act0, exp0)
 
   weibully = Model(logWeights=np.zeros(size), samples=hlSamplesWeibull)
-  act1 = weibullModel.update(10, 1)
+  act1 = weibullModel.update(10, 1, verbose=True)
   u1 = update(weibully, 10, 1)
   fit1 = fitWeibull(u1)
   exp1 = (np.sum(weibully.weights * weibully.samples),
           np.sum(weibully.weights * weibully.samples**2))
   print(act1, exp1)
+
+  weibully = Model(logWeights=np.zeros(size), samples=hlSamplesWeibull)
+  ts = [10.0, 20.0, 5., 8.]
+  xs = [1, 0, 1, 0]
+  act = weibullModel.updateHistory(ts, xs)
+  for t, x in zip(ts, xs):
+    update(weibully, t, x)
+  exp = (np.sum(weibully.weights * weibully.samples),
+         np.sum(weibully.weights * weibully.samples**2))
+  print('monte carlo', exp)
 
 
 def sampleBoundedPareto(lo: float, hi: float, a: float, size: int):
@@ -229,7 +291,7 @@ def pdfBoundedPareto(lo: float, hi: float, a: float, x: np.ndarray):
   return a * lo**a / (1 - (lo / hi)**a) * x**(-a - 1)
 
 
-lo, hi, a = .1, 1e4, 0.25
+lo, hi, a = .1, 1e5, 0.25
 hlPareto = sampleBoundedPareto(lo, hi, a, size)
 par = Model(logWeights=np.zeros(size), samples=hlPareto)
 
@@ -287,10 +349,16 @@ for idx, (correct, total, hoursElapsed) in enumerate(data):
       f'                    Weibull, p={expectedP:.2f}, hl={newHl:.2f}, (k,l)={fit[0]:.2f},{fit[1]:.2f}'
   )
 
-  expectedP = weibullModel.predict(hoursElapsed)
-  weibullModel = weibullModel.update(hoursElapsed, correct)
-  newHl = weibullModel.halflife()
-  print(f'          WeibullAnalytical, p={expectedP:.2f}, hl={newHl:.2f}, {weibullModel=}')
+  # expectedP = weibullModel.predict(hoursElapsed)
+  # weibullModel = weibullModel.update(hoursElapsed, correct)
+  # newHl = weibullModel.halflife()
+  # print(f'          WeibullAnalytical, p={expectedP:.2f}, hl={newHl:.2f}, {weibullModel=}')
+
+  wup = wAll.updateHistory([t for _, _2, t in data[:idx]], [x for x, _, _2 in data[:idx]])
+  expectedP = wup.predict(hoursElapsed)
+  wup = wAll.updateHistory([t for _, _2, t in data[:idx + 1]], [x for x, _, _2 in data[:idx + 1]])
+  newHl = wup.halflife()
+  print(f'          WeibullHistorical, p={expectedP:.2f}, hl={newHl:.2f}, {wup=}')
 
   expectedP = predict(par, hoursElapsed)
   par = update(par, hoursElapsed, correct)

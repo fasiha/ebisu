@@ -170,6 +170,16 @@ if __name__ == '__main__':
     # print(np.array2string(weightsEvolution, edgeitems=100000))
 norm = lambda v: np.array(v) / np.sum(v)
 
+
+def _powerMean(v: list[float] | np.ndarray, p: int | float) -> float:
+  return float(np.mean(np.array(v)**p)**(1 / p))
+
+
+def _powerMeanW(v: list[float] | np.ndarray, p: int | float, ws: list[float] | np.ndarray) -> float:
+  ws = np.array(ws) / np.sum(ws)
+  return float(sum(np.array(v)**p * ws))**(1 / p)
+
+
 if True:
   ts = np.logspace(0, 5, 1001)
   plt.figure()
@@ -187,7 +197,4 @@ if True:
   weightsHalflifemusHls = [(np.exp2(v[-1].pred.log2weights),
                             [a / b for a, b in v[-1].pred.halflifeGammas],
                             ebisu.hoursForRecallDecay(v[-1])) for v in modelsPerIter]
-  [
-      ebisu.ebisu._powerMeanW(2**(-np.array(hls) / mu), 14, ws)
-      for ws, mu, hls in weightsHalflifemusHls
-  ]
+  [_powerMeanW(2**(-np.array(hls) / mu), 14, ws) for ws, mu, hls in weightsHalflifemusHls]

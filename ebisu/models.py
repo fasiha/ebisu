@@ -50,7 +50,6 @@ class Predict(DataClassJsonMixin):
   power: int
   log2weights: list[float]
   halflifeGammas: list[HalflifeGamma]  # same length as log2weights
-  weightsReached: list[bool]  # same length as log2weights
 
   forSql: list[tuple[float, float]]  # `(log2weight, halflifeInMillisecond)`
   # recall probability is proportional to:

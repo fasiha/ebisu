@@ -3,11 +3,9 @@ from time import time_ns
 import numpy as np
 from copy import deepcopy
 from typing import Union, Optional
-from itertools import takewhile
 from scipy.optimize import minimize_scalar
-
 from scipy.special import logsumexp
-
+from scipy.stats import binom
 from ebisu.gammaDistribution import meanVarToGamma
 
 from .models import BinomialResult, HalflifeGamma, Model, NoisyBinaryResult, Predict, Quiz, Result
@@ -64,7 +62,6 @@ def initModel(
           lastEncounterMs=now,
           log2weights=log2weights,
           halflifeGammas=halflifeGammas,
-          weightsReached=[x == 0 for x in range(n)],
           forSql=_genForSql(log2weights, halflives, power),
           power=power,
       ),
@@ -89,6 +86,8 @@ def updateRecall(
   t = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   resultObj: Union[NoisyBinaryResult, BinomialResult]
 
+  individualProbabilities: list[float]
+
   if total == 1:
     assert (0 <= successes <= 1), "`total=1` implies successes in [0, 1]"
     q1 = max(successes, 1 - successes)  # between 0.5 and 1
@@ -96,6 +95,9 @@ def updateRecall(
     z = successes >= 0.5
     updateds = [gammaUpdateNoisy(a, b, t, q1, q0, z) for a, b in model.pred.halflifeGammas]
     resultObj = NoisyBinaryResult(result=successes, q1=q1, q0=q0, hoursElapsed=t)
+    individualProbabilities = [((q1 - q0) * 2**(-t / h) + q0) if z else
+                               (q0 - q1) * 2**(-t / h) + (1 - q0)
+                               for h in map(lambda x: _gammaToMean(*x), model.pred.halflifeGammas)]
   else:
     assert successes == np.floor(successes), "float `successes` must have `total=1`"
     assert successes >= 0, "negative `successes` meaningless"
@@ -104,39 +106,32 @@ def updateRecall(
     n = total
     updateds = [gammaUpdateBinomial(a, b, t, k, n) for a, b in model.pred.halflifeGammas]
     resultObj = BinomialResult(successes=int(successes), total=total, hoursElapsed=t)
+    individualProbabilities = [
+        float(binom.pmf(k, n, 2**(-t / h)))
+        for h in map(lambda x: _gammaToMean(*x), model.pred.halflifeGammas)
+    ]
 
   ret = deepcopy(model)  # clone
   _appendQuizImpure(ret, resultObj)
 
   newModels: list[tuple[float, float]] = []
   newWeights: list[float] = []
-  newReached: list[bool] = []
   scales: list[float] = []
-  ws = np.exp2(np.array(model.pred.log2weights))
-  for idx, (m, updated, weight, reached) in enumerate(
-      zip(model.pred.halflifeGammas, updateds, ws, model.pred.weightsReached)):
+  ws = np.exp2(model.pred.log2weights)
+  for idx, (m, updated, weight,
+            p) in enumerate(zip(model.pred.halflifeGammas, updateds, ws, individualProbabilities)):
     oldHl = _gammaToMean(*m)
     scal = updated.mean / oldHl
     scales.append(scal)
-    p = 2**(-t / oldHl)
-    # print(f'{scal=:f}, {p=:f}, {weight=:f}, {oldHl=:g}')
-    # compute new weight using surprise so short halflives get deweighted
 
-    newReached.append(True)
-    e = _entropyBits(p + np.spacing(1), exactEnt)
-    nw = weight * (p if scal > 1 else 1 - p)
+    nw = weight * p  # particle filter update
     if scal > .9:
       newModels.append((updated.a, updated.b))
-      # if verbose:
-      #   print(f'{weight=:.2f}, {nw=:.2f}, {p=:g}, {e=:g}, {scal=:.2f} {oldHl=:.2f}, {idx=}')
-      newWeights.append(nw)
-      # newWeights.append(0.5 * (weight + e) if scal > 1 else weight)
     else:
-      # nw = weight
-      # if verbose:
-      #   print(f'x {weight=:.2f}, {nw=:.2f}, {p=:g}, {e=:g}, {scal=:.2f} {oldHl=:.2f}, {idx=}')
       newModels.append(m)
-      newWeights.append(nw)
+    newWeights.append(nw)
+    if verbose:
+      print(f'{weight=:.2f}, {nw=:.2f}, {p=:g}, {scal=:.2f} {oldHl=:.2f}, {idx=}')
 
   if extra is not None:
     extra['scales'] = scales
@@ -147,18 +142,10 @@ def updateRecall(
 
   ret.pred.halflifeGammas = newModels
   ret.pred.log2weights = np.log2(newWeights / np.sum(newWeights)).tolist()
-  # ret.pred.log2weights = np.log2(newWeights).tolist()
-  ret.pred.weightsReached = newReached
   ret.pred.forSql = _genForSql(ret.pred.log2weights,
                                [_gammaToMean(*x) for x in ret.pred.halflifeGammas],
                                model.pred.power)
   return ret
-
-
-def _entropyBits(p: float, exact=False):
-  if exact:
-    return -p * log2(p) - (1 - p) * log2(1 - p)
-  return 1 - 4 * (p - .5)**2
 
 
 def _appendQuizImpure(model: Model, result: Result) -> None:
@@ -274,28 +261,15 @@ def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
   assert (0 < percentile <= 1), "percentile must be in (0, 1]"
   lp = log2(percentile)
 
-  if model.pred.power:
-    from scipy.optimize import minimize_scalar
-    res = minimize_scalar(
-        lambda h: abs(lp - predictRecall(model, now=model.pred.lastEncounterMs + 3600e3 * h)),
-        bounds=[.01, 100e3])
-    assert res.success
-    # print(res)
-    return res.x
-
-  return max((lw - lp) * _gammaToMean(*alphaBeta)
-             for lw, alphaBeta in zip(model.pred.log2weights, model.pred.halflifeGammas))
-  # max above will ALWAYS get at least one result given percentile ∈ (0, 1]
+  res = minimize_scalar(
+      lambda h: abs(lp - predictRecall(model, now=model.pred.lastEncounterMs + 3600e3 * h)),
+      bounds=[.01, 100e3])
+  assert res.success
+  return res.x
 
 
 def _gammaToMean(alpha: float, beta: float) -> float:
   return alpha / beta
-
-
-def _makeWs(n: int, finalWeight: float) -> np.ndarray:
-  if n == 1:
-    return np.array([finalWeight])
-  return finalWeight**(np.arange(n) / (n - 1))
 
 
 def timeMs() -> float:
@@ -311,12 +285,3 @@ def _powerMeanLogW(logv: list[float] | np.ndarray,
   res, sgn = logsumexp(p * logv, b=ws, return_sign=True)
   assert sgn > 0
   return float(res / p)
-
-
-def _powerMean(v: list[float] | np.ndarray, p: int | float) -> float:
-  return float(np.mean(np.array(v)**p)**(1 / p))
-
-
-def _powerMeanW(v: list[float] | np.ndarray, p: int | float, ws: list[float] | np.ndarray) -> float:
-  ws = np.array(ws) / np.sum(ws)
-  return float(sum(np.array(v)**p * ws))**(1 / p)

@@ -125,7 +125,8 @@ if __name__ == '__main__':
         ebisu3max.initModel(halflife=10, now=now),
         ebisu.initModel(halflife=10, now=now, power=14, n=4),  # 4 4 
         ebisu.initModel(halflife=10 * 10, now=now, power=20, n=4, firstHalflife=7.5),  # 4 4
-        ebisu.initModel(halflife=10 * 10, now=now, power=20, n=8, firstHalflife=7.5),  # 4 4
+        ebisu.initModel(halflife=10 * 10, now=now, power=20, n=4, firstHalflife=7.5,
+                        stdScale=10),  # 4 4
     ]
     modelsInit = models
     modelsPerIter = [modelsInit]

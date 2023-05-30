@@ -25,6 +25,7 @@ def initModel(
     # above: lazy inputs, below: exact inputs
     weightsHalflifeGammas: Optional[list[tuple[float, HalflifeGamma]]] = None,
     power: int = 4,
+    stdScale: float = 0.5,
     now: Optional[float] = None,
 ) -> Model:
   """
@@ -48,7 +49,7 @@ def initModel(
     halflives = np.logspace(log10(firstHalflife or (halflife * .1)), log10(finalHalflife),
                             n).tolist()
     # pick standard deviation to be half of the mean
-    halflifeGammas = [meanVarToGamma(t, (t * .5)**2) for t in halflives]
+    halflifeGammas = [meanVarToGamma(t, (t * stdScale)**2) for t in halflives]
     weights = _halflifeToFinalWeight(halflife, halflives, power)
 
   wsum = fsum(weights)

@@ -53,8 +53,6 @@ if __name__ == '__main__':
   models = None
   modelsPerIter = None
 
-  e2pred = lambda model, elapsedTime: ebisu2beta.predictRecall(model, elapsedTime, True)
-  # e2upd = lambda model, s, t, now: ebisu2beta.updateRecall(model, s, t, )
   ePredictor, v3Predictor = [
       lambda model, elapsedTime: ebisu3wmax.predictRecall(
           model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False),
@@ -85,12 +83,6 @@ if __name__ == '__main__':
   gamma3Predictor = lambda model, elapsedTime: ebisu.predictRecall(
       model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
   gamma3Updator = lambda model, s, t, now: ebisu.updateRecall(model, successes=s, total=t, now=now)
-  gamma3Updator2 = lambda model, s, t, now: ebisu.updateRecall(model, successes=s, total=t, now=now)
-
-  ebisu3wPredictor = lambda model, elapsedTime: ebisu3w.predictRecall(
-      model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
-  ebisu3wUpdator = lambda model, s, t, now: ebisu3w.updateRecall(
-      model, successes=s, total=t, now=now, verbose=False)
 
   # np.seterr(all='raise')
   # np.seterr(under='warn')
@@ -110,40 +102,63 @@ if __name__ == '__main__':
     wmaxMean, initHlMean = None, 12.0
     intermediate = not False
 
-    models = [
-        ebisu3wmax.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now),
-        ebisu3boost.initModel(
-            initHlMean=hlMeanStd[0],
-            boostMean=boostMeanStd[0],
-            initHlStd=hlMeanStd[1],
-            boostStd=boostMeanStd[1],
-            now=now),
-        ebisu3wmax.initModel(wmaxMean=.02, now=now),
-        ebisu3wmax.initModel(wmaxMean=.02, now=now),
-        ebisu3max.initModel(halflife=10, now=now),
-        ebisu.initModel(halflife=10, now=now, power=14, n=4),  # 4 4 
-        ebisu.initModel(halflife=10 * 10, now=now, power=20, n=4, firstHalflife=7.5),  # 4 4
-        ebisu.initModel(halflife=10 * 10, now=now, power=20, n=4, firstHalflife=7.5,
-                        stdScale=10),  # 4 4
+    modelsPredictorsUpdators = [
+        (
+            ebisu3wmax.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now),
+            ePredictor,
+            eUpdator,
+        ),
+        (
+            ebisu3boost.initModel(
+                initHlMean=hlMeanStd[0],
+                boostMean=boostMeanStd[0],
+                initHlStd=hlMeanStd[1],
+                boostStd=boostMeanStd[1],
+                now=now),
+            v3Predictor,
+            v3Updator,
+        ),
+        (
+            ebisu3wmax.initModel(wmaxMean=.02, now=now),
+            betasPredictor,
+            betasUpdator,
+        ),
+        (
+            ebisu3wmax.initModel(wmaxMean=.02, now=now),
+            gammaPredictor,
+            gammaUpdator,
+        ),
+        (
+            ebisu3max.initModel(halflife=10, now=now),
+            gamma3MaxPredictor,
+            gamma3MaxUpdator,
+        ),
+        (
+            ebisu.initModel(halflife=10, now=now, power=14, n=4),
+            gamma3Predictor,
+            gamma3Updator,
+        ),
+        (
+            ebisu.initModel(halflife=10 * 10, now=now, power=20, n=4, firstHalflife=7.5),
+            gamma3Predictor,
+            gamma3Updator,
+        ),
+        (
+            ebisu.initModel(
+                halflife=10 * 10, now=now, power=20, n=4, firstHalflife=7.5, stdScale=10),
+            gamma3Predictor,
+            gamma3Updator,
+        ),
     ]
-    modelsInit = models
-    modelsPerIter = [modelsInit]
 
-    predictors = [
-        ePredictor, v3Predictor, betasPredictor, gammaPredictor, gamma3MaxPredictor,
-        gamma3Predictor, gamma3Predictor, gamma3Predictor
-    ]
-    updators = [
-        eUpdator, v3Updator, betasUpdator, gammaUpdator, gamma3MaxUpdator, gamma3Updator,
-        gamma3Updator, gamma3Updator
-    ]
+    modelsPerIter = [[m for m, _, __ in modelsPredictorsUpdators]]
 
     logliks = []
     for ankiResult, elapsedTime in zip(card.results, card.dts_hours):
       now += elapsedTime * MILLISECONDS_PER_HOUR
       s, t = convertAnkiResultToBinomial(ankiResult, convertMode)
 
-      pRecallForModels = [pred(model, elapsedTime) for model, pred in zip(models, predictors)]
+      pRecallForModels = [pred(model, elapsedTime) for model, pred, _ in modelsPredictorsUpdators]
 
       success = s * 2 > t
       ll = tuple(np.log(p) if success else np.log(1 - p) for p in pRecallForModels)
@@ -151,48 +166,13 @@ if __name__ == '__main__':
       if intermediate:
         print(f'  {s}/{t}, {elapsedTime:.1f}h: ps={[round(p,4) for p in pRecallForModels]}')
 
-      models = [update(model, s, t, now) for model, update in zip(models, updators)]
-      #   print(f'    hl={[round(ebisu.hoursForRecallDecay(models[-1], p), 4) for p in [ .5, .8, .9]]}')
+      models = [update(model, s, t, now) for model, _, update in modelsPredictorsUpdators]
+      for i, m in enumerate(models):
+        _oldModel, p, u = modelsPredictorsUpdators[i]
+        modelsPredictorsUpdators[i] = (m, p, u)
+      print(f'    hl={[round(ebisu.hoursForRecallDecay(models[-1], p), 4) for p in [ .5, .8, .9]]}')
       modelsPerIter.append(models)
 
     loglikFinal = np.sum(np.array(logliks), axis=0).tolist()
     print(f'loglikFinal={[round(p,3) for p in loglikFinal]}, {card.key=}')
     np.set_printoptions(precision=2, suppress=True)
-
-    norm = lambda log2s: np.exp2(log2s)
-    weightsEvolution = np.array([[
-        (t[0] / t[1],) + (w,)
-        for t, w in zip(v[-1].pred.halflifeGammas, norm(v[-1].pred.log2weights))
-    ]
-                                 for v in modelsPerIter])
-    # print(np.array2string(weightsEvolution, edgeitems=100000))
-norm = lambda v: np.array(v) / np.sum(v)
-
-
-def _powerMean(v: list[float] | np.ndarray, p: int | float) -> float:
-  return float(np.mean(np.array(v)**p)**(1 / p))
-
-
-def _powerMeanW(v: list[float] | np.ndarray, p: int | float, ws: list[float] | np.ndarray) -> float:
-  ws = np.array(ws) / np.sum(ws)
-  return float(sum(np.array(v)**p * ws))**(1 / p)
-
-
-if True:
-  ts = np.logspace(0, 5, 1001)
-  plt.figure()
-  for i, v in enumerate(modelsPerIter):
-    m = v[-1]
-    plt.loglog(
-        ts, [
-            ebisu.predictRecall(m, now=m.pred.lastEncounterMs + t * 3600e3, logDomain=False)
-            for t in ts
-        ],
-        label=f'{i}')
-  plt.legend()
-
-  hls, ws = zip(*[[12.97, 0.59], [188.15, 0.37], [4228.49, 0.04], [100011.38, 0.]])
-  weightsHalflifemusHls = [(np.exp2(v[-1].pred.log2weights),
-                            [a / b for a, b in v[-1].pred.halflifeGammas],
-                            ebisu.hoursForRecallDecay(v[-1])) for v in modelsPerIter]
-  [_powerMeanW(2**(-np.array(hls) / mu), 14, ws) for ws, mu, hls in weightsHalflifemusHls]

@@ -79,7 +79,6 @@ def updateRecall(
     q0: Optional[float] = None,
     now: Optional[float] = None,
     extra: Optional[dict] = None,
-    exactEnt=True,
     verbose=False,
 ) -> Model:
   now = now or timeMs()

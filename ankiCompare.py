@@ -89,7 +89,7 @@ if __name__ == '__main__':
   fracs = [0.8]
   # fracs = [1.0]
   fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
-  #   fracs = [0.75]
+  # fracs = [0.75]
   for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
     # for card in train:
     hlMeanStd = (24., 24 * .7)
@@ -143,7 +143,7 @@ if __name__ == '__main__':
             gamma3Updator,
         ),
         (
-            ebisu.initModel(halflife=10, now=now, power=20, n=4, firstHalflife=7.5, stdScale=1.0),
+            ebisu.initModel(halflife=10, now=now, power=20, n=6, firstHalflife=7.5, stdScale=1.0),
             gamma3Predictor,
             gamma3Updator,
         ),
@@ -170,7 +170,7 @@ if __name__ == '__main__':
         lastHl = round(ebisu.hoursForRecallDecay(models[-1]), 2)
         ps = [round(p, 4) for p in pRecallForModels]
         atoms = [
-            f'{round(a/b,2)} h/{2**l2w:0.2g}'
+            f'p={2**l2w:0.2g} @ {round(a/b,2)} h'
             for l2w, (a, b) in zip(models[-1].pred.log2weights, models[-1].pred.halflifeGammas)
         ]
         print(f'  {s}/{t}, {elapsedTime:.1f}h: {ps=}, {lastHl=} h, lastAtoms=[{"; ".join(atoms)}]')

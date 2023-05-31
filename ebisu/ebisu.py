@@ -79,13 +79,12 @@ def updateRecall(
     q0: Optional[float] = None,
     now: Optional[float] = None,
     extra: Optional[dict] = None,
-    verbose=False,
 ) -> Model:
   now = now or timeMs()
   t = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   resultObj: Union[NoisyBinaryResult, BinomialResult]
 
-  individualProbabilities: list[float]
+  individualLogProbabilities: list[float]
 
   if total == 1:
     assert (0 <= successes <= 1), "`total=1` implies successes in [0, 1]"
@@ -94,9 +93,10 @@ def updateRecall(
     z = successes >= 0.5
     updateds = [gammaUpdateNoisy(a, b, t, q1, q0, z) for a, b in model.pred.halflifeGammas]
     resultObj = NoisyBinaryResult(result=successes, q1=q1, q0=q0, hoursElapsed=t)
-    individualProbabilities = [((q1 - q0) * 2**(-t / h) + q0) if z else
-                               (q0 - q1) * 2**(-t / h) + (1 - q0)
-                               for h in map(lambda x: _gammaToMean(*x), model.pred.halflifeGammas)]
+    individualLogProbabilities = [
+        np.log(((q1 - q0) * 2**(-t / h) + q0) if z else (q0 - q1) * 2**(-t / h) + (1 - q0))
+        for h in map(lambda x: _gammaToMean(*x), model.pred.halflifeGammas)
+    ]
   else:
     assert successes == np.floor(successes), "float `successes` must have `total=1`"
     assert successes >= 0, "negative `successes` meaningless"
@@ -105,8 +105,8 @@ def updateRecall(
     n = total
     updateds = [gammaUpdateBinomial(a, b, t, k, n) for a, b in model.pred.halflifeGammas]
     resultObj = BinomialResult(successes=int(successes), total=total, hoursElapsed=t)
-    individualProbabilities = [
-        float(binom.pmf(k, n, 2**(-t / h)))
+    individualLogProbabilities = [
+        float(binom.logpmf(k, n, 2**(-t / h)))
         for h in map(lambda x: _gammaToMean(*x), model.pred.halflifeGammas)
     ]
 
@@ -114,33 +114,38 @@ def updateRecall(
   _appendQuizImpure(ret, resultObj)
 
   newModels: list[tuple[float, float]] = []
-  newWeights: list[float] = []
+  newLog2Weights: list[float] = []
   scales: list[float] = []
-  ws = np.exp2(model.pred.log2weights)
-  for idx, (m, updated, weight,
-            p) in enumerate(zip(model.pred.halflifeGammas, updateds, ws, individualProbabilities)):
+  # ws = np.exp2()
+  for idx, (
+      m,
+      updated,
+      l2w,
+      lp,
+  ) in enumerate(
+      zip(
+          model.pred.halflifeGammas,
+          updateds,
+          model.pred.log2weights,
+          individualLogProbabilities,
+      )):
     oldHl = _gammaToMean(*m)
     scal = updated.mean / oldHl
     scales.append(scal)
 
-    nw = weight * p  # particle filter update
+    newLog2Weights.append(l2w + lp / LN2)  # particle filter update
     if scal > .9:
       newModels.append((updated.a, updated.b))
     else:
       newModels.append(m)
-    newWeights.append(nw)
-    if verbose:
-      print(f'{weight=:.2f}, {nw=:.2f}, {p=:g}, {scal=:.2f} {oldHl=:.2f}, {idx=}')
 
   if extra is not None:
     extra['scales'] = scales
-  if verbose:
-    print(f'    newWeights={newWeights/np.sum(newWeights)}')
 
   ret.pred.lastEncounterMs = now
 
   ret.pred.halflifeGammas = newModels
-  ret.pred.log2weights = np.log2(newWeights / np.sum(newWeights)).tolist()
+  ret.pred.log2weights = (newLog2Weights - logsumexp(np.array(newLog2Weights) * LN2) / LN2).tolist()
   ret.pred.forSql = _genForSql(ret.pred.log2weights,
                                [_gammaToMean(*x) for x in ret.pred.halflifeGammas],
                                model.pred.power)

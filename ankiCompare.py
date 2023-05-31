@@ -7,7 +7,6 @@ import typing
 import ebisu
 import ebisu3wmax
 import ebisu3boost
-import ebisu2beta
 import ebisu3max
 import ebisu.ebisu3weightedmean as ebisu3w
 import utils
@@ -144,8 +143,7 @@ if __name__ == '__main__':
             gamma3Updator,
         ),
         (
-            ebisu.initModel(
-                halflife=10 * 10, now=now, power=20, n=4, firstHalflife=7.5, stdScale=10),
+            ebisu.initModel(halflife=10, now=now, power=20, n=4, firstHalflife=7.5, stdScale=1.0),
             gamma3Predictor,
             gamma3Updator,
         ),
@@ -163,14 +161,19 @@ if __name__ == '__main__':
       success = s * 2 > t
       ll = tuple(np.log(p) if success else np.log(1 - p) for p in pRecallForModels)
       logliks.append(ll)
-      if intermediate:
-        print(f'  {s}/{t}, {elapsedTime:.1f}h: ps={[round(p,4) for p in pRecallForModels]}')
 
       models = [update(model, s, t, now) for model, _, update in modelsPredictorsUpdators]
       for i, m in enumerate(models):
         _oldModel, p, u = modelsPredictorsUpdators[i]
         modelsPredictorsUpdators[i] = (m, p, u)
-      print(f'    hl={[round(ebisu.hoursForRecallDecay(models[-1], p), 4) for p in [ .5, .8, .9]]}')
+      if intermediate:
+        lastHl = round(ebisu.hoursForRecallDecay(models[-1]), 2)
+        ps = [round(p, 4) for p in pRecallForModels]
+        atoms = [
+            f'{round(a/b,2)} h/{2**l2w:0.2g}'
+            for l2w, (a, b) in zip(models[-1].pred.log2weights, models[-1].pred.halflifeGammas)
+        ]
+        print(f'  {s}/{t}, {elapsedTime:.1f}h: {ps=}, {lastHl=} h, lastAtoms=[{"; ".join(atoms)}]')
       modelsPerIter.append(models)
 
     loglikFinal = np.sum(np.array(logliks), axis=0).tolist()

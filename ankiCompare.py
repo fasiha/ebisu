@@ -1,10 +1,12 @@
 from copy import deepcopy
 from scipy.stats import gamma as gammarv  # type: ignore
+from scipy.stats import binom
 import numpy as np
 import pylab as plt  # type:ignore
 import typing
 
 import ebisu
+from ebisu.models import BinomialResult, NoisyBinaryResult, Result
 import ebisu3wmax
 import ebisu3boost
 import ebisu3max
@@ -21,22 +23,35 @@ n = 10
 hs = np.logspace(0, 4, n)
 
 
-def convertAnkiResultToBinomial(result: int, mode: ConvertAnkiMode) -> typing.Tuple[int, int]:
+def printableList(v: list[int | float]) -> str:
+  return ", ".join([f'{x:0.1f}' for x in v])
+
+
+def resultToProbability(r: Result, p: float) -> float:
+  if type(r) == NoisyBinaryResult:
+    z = r.result >= 0.5
+    return np.log(((r.q1 - r.q0) * p + r.q0) if z else (r.q0 - r.q1) * p + (1 - r.q0))
+  elif type(r) == BinomialResult:
+    return float(binom.logpmf(r.successes, r.total, p))
+  raise Exception("unknown quiz type")
+
+
+def convertAnkiResultToBinomial(result: int, mode: ConvertAnkiMode) -> dict:
   if mode == 'approx':
     # Try to approximate hard to easy with binomial: this is tricky and ad hoc
     if result == 1:  # fail
-      return (0, 1)
+      return dict(successes=0, total=1)
     elif result == 2:  # hard
-      return (1, 2)
+      return dict(successes=1, total=1, q0=0.1)
     elif result == 3:  # good
-      return (1, 1)
+      return dict(successes=1, total=1)
     elif result == 4:  # easy
-      return (2, 2)
+      return dict(successes=2, total=2)
     else:  # easy
       raise Exception('unknown Anki result')
   elif mode == 'binary':
     # hard or better is pass
-    return (int(result > 1), 1)
+    return dict(successes=int(result > 1), total=1)
 
 
 if __name__ == '__main__':
@@ -59,29 +74,14 @@ if __name__ == '__main__':
           model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False),
   ]
   eUpdator, v3Updator = [
-      lambda model, s, t, now: ebisu3wmax.updateRecall(model, successes=s, total=t, now=now),
-      lambda model, s, t, now: ebisu3boost.updateRecallHistory(
-          ebisu3boost.updateRecall(model, successes=s, total=t, now=now), size=1000),
+      lambda model, now, **kwargs: ebisu3wmax.updateRecall(model, now=now, **kwargs),
+      lambda model, now, **kwargs: ebisu3boost.updateRecallHistory(
+          ebisu3boost.updateRecall(model, now=now, **kwargs), size=1000),
   ]
-
-  betasPredictor = lambda model, elapsedTime: ebisu3wmax.predictRecallBetas(
-      model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
-  betasUpdator = lambda model, s, t, now: ebisu3wmax.updateRecallBetas(
-      model, successes=s, total=t, now=now)
-
-  gammaPredictor = lambda model, elapsedTime: ebisu3wmax.predictRecallGammas(
-      model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
-  gammaUpdator = lambda model, s, t, now: ebisu3wmax.updateRecallGammas(
-      model, successes=s, total=t, now=now)
-
-  gamma3MaxPredictor = lambda model, elapsedTime: ebisu3max.predictRecall(
-      model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
-  gamma3MaxUpdator = lambda model, s, t, now: ebisu3max.updateRecall(
-      model, successes=s, total=t, now=now)
 
   gamma3Predictor = lambda model, elapsedTime: ebisu.predictRecall(
       model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
-  gamma3Updator = lambda model, s, t, now: ebisu.updateRecall(model, successes=s, total=t, now=now)
+  gamma3Updator = lambda model, now, **kwargs: ebisu.updateRecall(model, now=now, **kwargs)
 
   # np.seterr(all='raise')
   # np.seterr(under='warn')
@@ -95,6 +95,7 @@ if __name__ == '__main__':
     hlMeanStd = (24., 24 * .7)
     boostMeanStd = (3, 3 * .7)
     convertMode: ConvertAnkiMode = 'binary'
+    convertMode: ConvertAnkiMode = 'approx'
     now = origNow
 
     wmaxMean, initHlMean = 0.5, None
@@ -102,11 +103,6 @@ if __name__ == '__main__':
     intermediate = not False
 
     modelsPredictorsUpdators = [
-        (
-            ebisu3wmax.initModel(wmaxMean=wmaxMean, initHlMean=initHlMean, now=now),
-            ePredictor,
-            eUpdator,
-        ),
         (
             ebisu3boost.initModel(
                 initHlMean=hlMeanStd[0],
@@ -116,64 +112,66 @@ if __name__ == '__main__':
                 now=now),
             v3Predictor,
             v3Updator,
+            None,
         ),
         (
-            ebisu3wmax.initModel(wmaxMean=.02, now=now),
-            betasPredictor,
-            betasUpdator,
-        ),
-        (
-            ebisu3wmax.initModel(wmaxMean=.02, now=now),
-            gammaPredictor,
-            gammaUpdator,
-        ),
-        (
-            ebisu3max.initModel(halflife=10, now=now),
-            gamma3MaxPredictor,
-            gamma3MaxUpdator,
-        ),
-        (
-            ebisu.initModel(halflife=10, now=now, power=14, n=4),
+            ebisu.initModel(halflife=100, now=now, power=5, n=5, firstHalflife=5, stdScale=1),
             gamma3Predictor,
             gamma3Updator,
+            ebisu.hoursForRecallDecay,
         ),
         (
-            ebisu.initModel(halflife=10 * 10, now=now, power=20, n=4, firstHalflife=7.5),
+            ebisu.initModel(halflife=100, now=now, power=5, n=5, firstHalflife=50, stdScale=1),
             gamma3Predictor,
             gamma3Updator,
-        ),
-        (
-            ebisu.initModel(halflife=10, now=now, power=20, n=6, firstHalflife=7.5, stdScale=1.0),
-            gamma3Predictor,
-            gamma3Updator,
+            ebisu.hoursForRecallDecay,
         ),
     ]
+    """
+    Why is there so much difference between firstHalfLife=5 vs 50? Because the former, when initial
+    halflife is 100, has much more mass given to the tail (rightmost atoms) than the latter.
+    """
 
-    modelsPerIter = [[m for m, _, __ in modelsPredictorsUpdators]]
+    modelsPerIter = [[v[0] for v in modelsPredictorsUpdators]]
 
     logliks = []
     for ankiResult, elapsedTime in zip(card.results, card.dts_hours):
       now += elapsedTime * MILLISECONDS_PER_HOUR
-      s, t = convertAnkiResultToBinomial(ankiResult, convertMode)
+      resultArgs = convertAnkiResultToBinomial(ankiResult, convertMode)
 
-      pRecallForModels = [pred(model, elapsedTime) for model, pred, _ in modelsPredictorsUpdators]
+      pRecallForModels = [
+          pred(model, elapsedTime) for model, pred, _, *r in modelsPredictorsUpdators
+      ]
 
-      success = s * 2 > t
-      ll = tuple(np.log(p) if success else np.log(1 - p) for p in pRecallForModels)
+      models = [
+          update(model, now, **resultArgs) for model, _, update, *r in modelsPredictorsUpdators
+      ]
+      for i, m in enumerate(models):
+        _oldModel, p, u, *r = modelsPredictorsUpdators[i]
+        modelsPredictorsUpdators[i] = (m, p, u, *r)
+
+      ll = tuple(resultToProbability(models[-1].quiz.results[-1][-1], p) for p in pRecallForModels)
       logliks.append(ll)
 
-      models = [update(model, s, t, now) for model, _, update in modelsPredictorsUpdators]
-      for i, m in enumerate(models):
-        _oldModel, p, u = modelsPredictorsUpdators[i]
-        modelsPredictorsUpdators[i] = (m, p, u)
       if intermediate:
-        lastHl = round(ebisu.hoursForRecallDecay(models[-1]), 2)
-        ps = [round(p, 4) for p in pRecallForModels]
-        atoms = [
-            f'p={2**l2w:0.2g} @ {round(a/b,2)} h'
-            for l2w, (a, b) in zip(models[-1].pred.log2weights, models[-1].pred.halflifeGammas)
+        hls = [
+            f(model) if f else -1 for model, (_, _, _, f) in zip(models, modelsPredictorsUpdators)
         ]
-        print(f'  {s}/{t}, {elapsedTime:.1f}h: {ps=}, {lastHl=} h, lastAtoms=[{"; ".join(atoms)}]')
+        hls80 = [
+            f(model, 0.8) if f else -1
+            for model, (_, _, _, f) in zip(models, modelsPredictorsUpdators)
+        ]
+        ps = [round(p, 4) for p in pRecallForModels]
+        modelToAtoms = lambda model: "; ".join([
+            f'p={2**l2w:0.2g} @ {round(a/b,2)} h (a={a:0.2g},b={b:0.2g})' for l2w,
+            (a, b) in zip(model.pred.log2weights, model.pred.halflifeGammas)
+        ])
+        printableResult = f'{resultArgs["successes"]}/{resultArgs["total"]}/{resultArgs.get("q0", 1)}'
+        print(
+            f'\n   {elapsedTime:.1f}h {printableResult}: {ps=}, hls=[{printableList(hls)}] h (80%=[{printableList(hls80)}])'
+        )
+        print(f'     {modelToAtoms(models[-2])}')
+        print(f'     {modelToAtoms(models[-1])}')
       modelsPerIter.append(models)
 
     loglikFinal = np.sum(np.array(logliks), axis=0).tolist()

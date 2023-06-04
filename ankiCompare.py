@@ -42,7 +42,7 @@ def convertAnkiResultToBinomial(result: int, mode: ConvertAnkiMode) -> dict:
     if result == 1:  # fail
       return dict(successes=0, total=1)
     elif result == 2:  # hard
-      return dict(successes=1, total=1, q0=0.1)
+      return dict(successes=1, total=1, q0=0.2)
     elif result == 3:  # good
       return dict(successes=1, total=1)
     elif result == 4:  # easy
@@ -90,8 +90,8 @@ if __name__ == '__main__':
   # fracs = [1.0]
   fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
   # fracs = [0.75]
-  for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
-    # for card in train:
+  # for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
+  for card in train:
     hlMeanStd = (24., 24 * .7)
     boostMeanStd = (3, 3 * .7)
     convertMode: ConvertAnkiMode = 'binary'
@@ -115,22 +115,57 @@ if __name__ == '__main__':
             None,
         ),
         (
-            ebisu.initModel(halflife=100, now=now, power=5, n=5, firstHalflife=5, stdScale=1),
+            ebisu.initModel(halflife=100, now=now, power=15, n=5, firstHalflife=10, stdScale=1),
             gamma3Predictor,
             gamma3Updator,
             ebisu.hoursForRecallDecay,
         ),
         (
-            ebisu.initModel(halflife=100, now=now, power=5, n=5, firstHalflife=50, stdScale=1),
+            ebisu.initModel(
+                halflife=100,
+                now=now,
+                power=20,
+                n=5,
+                firstHalflife=50,
+                stdScale=1,
+                newThing=True,
+                w1=.9),
             gamma3Predictor,
-            gamma3Updator,
+            lambda *args, **kwargs: gamma3Updator(
+                *args, **kwargs, verbose=True, updateThreshold=0.9, weightThreshold=10000),
+            ebisu.hoursForRecallDecay,
+        ),
+        (
+            ebisu.initModel(
+                halflife=100,
+                now=now,
+                power=20,
+                n=5,
+                firstHalflife=50,
+                stdScale=1,
+                newThing=True,
+                w1=.9),
+            gamma3Predictor,
+            lambda *args, **kwargs: gamma3Updator(
+                *args, **kwargs, verbose=True, updateThreshold=0.5, weightThreshold=10000),
+            ebisu.hoursForRecallDecay,
+        ),
+        (
+            ebisu.initModel(
+                halflife=100,
+                now=now,
+                power=20,
+                n=5,
+                firstHalflife=50,
+                stdScale=1,
+                newThing=True,
+                w1=.9),
+            gamma3Predictor,
+            lambda *args, **kwargs: gamma3Updator(
+                *args, **kwargs, verbose=True, updateThreshold=10000, weightThreshold=0.05),
             ebisu.hoursForRecallDecay,
         ),
     ]
-    """
-    Why is there so much difference between firstHalfLife=5 vs 50? Because the former, when initial
-    halflife is 100, has much more mass given to the tail (rightmost atoms) than the latter.
-    """
 
     modelsPerIter = [[v[0] for v in modelsPredictorsUpdators]]
 
@@ -162,16 +197,18 @@ if __name__ == '__main__':
             for model, (_, _, _, f) in zip(models, modelsPredictorsUpdators)
         ]
         ps = [round(p, 4) for p in pRecallForModels]
-        modelToAtoms = lambda model: "; ".join([
-            f'p={2**l2w:0.2g} @ {round(a/b,2)} h (a={a:0.2g},b={b:0.2g})' for l2w,
+        modelToAtoms = lambda model: ", ".join([
+            f'(w={2**l2w:0.2g}, h={round(a/b,2)}, a={a:0.2g}, b={b:0.2g})' for l2w,
             (a, b) in zip(model.pred.log2weights, model.pred.halflifeGammas)
         ])
         printableResult = f'{resultArgs["successes"]}/{resultArgs["total"]}/{resultArgs.get("q0", 1)}'
         print(
-            f'\n   {elapsedTime:.1f}h {printableResult}: {ps=}, hls=[{printableList(hls)}] h (80%=[{printableList(hls80)}])'
+            f'   {elapsedTime:.1f}h {printableResult}: {ps=}, hls=[{printableList(hls)}] h (80%=[{printableList(hls80)}])'
         )
-        print(f'     {modelToAtoms(models[-2])}')
-        print(f'     {modelToAtoms(models[-1])}')
+        for m in models:
+          if type(m) == ebisu.models.Model:
+            print(f'     {modelToAtoms(m)}')
+        print('')
       modelsPerIter.append(models)
 
     loglikFinal = np.sum(np.array(logliks), axis=0).tolist()

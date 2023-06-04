@@ -25,6 +25,8 @@ def initModel(
     power: int = 4,
     stdScale: float = 0.5,
     now: Optional[float] = None,
+    newThing=False,
+    w1: Optional[float] = None,
 ) -> Model:
   """
   Create brand new Ebisu model
@@ -44,11 +46,18 @@ def initModel(
       halflives.append(_gammaToMean(*g))
   else:
     assert halflife, "halflife or weightsHalflifeGammas needed"
-    halflives = np.logspace(log10(firstHalflife or (halflife * .1)), log10(finalHalflife),
-                            n).tolist()
-    # pick standard deviation to be half of the mean
-    halflifeGammas = [meanVarToGamma(t, (t * stdScale)**2) for t in halflives]
-    weights = _halflifeToFinalWeight(halflife, halflives, power)
+    if newThing and w1:
+      dsol = minimize_scalar(lambda d: np.abs(1 - sum(np.hstack([w1, w1**(d * np.arange(1, n))]))),
+                             [5, 20])
+      weights = np.hstack([w1, w1**(dsol.x * np.arange(1, n))]).tolist()
+      halflives = np.logspace(np.log10(halflife), np.log10(finalHalflife), n)
+      halflifeGammas = [meanVarToGamma(t, (t * stdScale)**2) for t in halflives]
+    else:
+      halflives = np.logspace(log10(firstHalflife or (halflife * .1)), log10(finalHalflife),
+                              n).tolist()
+      # pick standard deviation to be half of the mean
+      halflifeGammas = [meanVarToGamma(t, (t * stdScale)**2) for t in halflives]
+      weights = _halflifeToFinalWeight(halflife, halflives, power)
 
   wsum = fsum(weights)
   weights = [w / wsum for w in weights]
@@ -79,6 +88,9 @@ def updateRecall(
     q0: Optional[float] = None,
     now: Optional[float] = None,
     extra: Optional[dict] = None,
+    updateThreshold=0.5,
+    weightThreshold=0.1,
+    verbose=False,
 ) -> Model:
   now = now or timeMs()
   t = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
@@ -122,19 +134,18 @@ def updateRecall(
       updated,
       l2w,
       lp,
+      exceededWeight,
   ) in enumerate(
-      zip(
-          model.pred.halflifeGammas,
-          updateds,
-          model.pred.log2weights,
-          individualLogProbabilities,
-      )):
+      zip(model.pred.halflifeGammas, updateds, model.pred.log2weights, individualLogProbabilities,
+          _exceedsThresholdLeft([2**x for x in model.pred.log2weights], weightThreshold))):
     oldHl = _gammaToMean(*m)
     scal = updated.mean / oldHl
     scales.append(scal)
 
     newLog2Weights.append(l2w + lp / LN2)  # particle filter update
-    if scal > .9:
+    # if verbose:
+    #   print(f'_ {scal=}')
+    if scal > updateThreshold or exceededWeight:
       newModels.append((updated.a, updated.b))
     else:
       newModels.append(m)
@@ -150,6 +161,15 @@ def updateRecall(
                                [_gammaToMean(*x) for x in ret.pred.halflifeGammas],
                                model.pred.power)
   return ret
+
+
+def _exceedsThresholdLeft(v, threshold):
+  ret = []
+  last = False
+  for x in v[::-1]:
+    last = last or x > threshold
+    ret.append(last)
+  return ret[::-1]
 
 
 def _appendQuizImpure(model: Model, result: Result) -> None:

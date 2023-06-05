@@ -6,7 +6,7 @@ from typing import Union, Optional
 from scipy.optimize import minimize_scalar
 from scipy.special import logsumexp
 from scipy.stats import binom
-from ebisu.gammaDistribution import meanVarToGamma
+from ebisu.gammaDistribution import gammaToMean, meanVarToGamma
 
 from .models import BinomialResult, HalflifeGamma, Model, NoisyBinaryResult, Predict, Quiz, Result
 from .ebisuHelpers import gammaPredictRecall, gammaUpdateBinomial, gammaUpdateNoisy
@@ -43,7 +43,7 @@ def initModel(
     for w, g in weightsHalflifeGammas:
       weights.append(w)
       halflifeGammas.append(g)
-      halflives.append(_gammaToMean(*g))
+      halflives.append(gammaToMean(*g))
   else:
     assert halflife, "halflife or weightsHalflifeGammas needed"
     if newThing and w1:
@@ -96,8 +96,6 @@ def updateRecall(
   t = (now - model.pred.lastEncounterMs) * HOURS_PER_MILLISECONDS
   resultObj: Union[NoisyBinaryResult, BinomialResult]
 
-  individualLogProbabilities: list[float]
-
   if total == 1:
     assert (0 <= successes <= 1), "`total=1` implies successes in [0, 1]"
     q1 = max(successes, 1 - successes)  # between 0.5 and 1
@@ -105,10 +103,6 @@ def updateRecall(
     z = successes >= 0.5
     updateds = [gammaUpdateNoisy(a, b, t, q1, q0, z) for a, b in model.pred.halflifeGammas]
     resultObj = NoisyBinaryResult(result=successes, q1=q1, q0=q0, hoursElapsed=t)
-    individualLogProbabilities = [
-        np.log(((q1 - q0) * 2**(-t / h) + q0) if z else (q0 - q1) * 2**(-t / h) + (1 - q0))
-        for h in map(lambda x: _gammaToMean(*x), model.pred.halflifeGammas)
-    ]
   else:
     assert successes == np.floor(successes), "float `successes` must have `total=1`"
     assert successes >= 0, "negative `successes` meaningless"
@@ -117,10 +111,11 @@ def updateRecall(
     n = total
     updateds = [gammaUpdateBinomial(a, b, t, k, n) for a, b in model.pred.halflifeGammas]
     resultObj = BinomialResult(successes=int(successes), total=total, hoursElapsed=t)
-    individualLogProbabilities = [
-        float(binom.logpmf(k, n, 2**(-t / h)))
-        for h in map(lambda x: _gammaToMean(*x), model.pred.halflifeGammas)
-    ]
+
+  individualLogProbabilities = [
+      resultToProbability(resultObj, 2**(-t / h))
+      for h in map(lambda x: gammaToMean(*x), model.pred.halflifeGammas)
+  ]
 
   ret = deepcopy(model)  # clone
   _appendQuizImpure(ret, resultObj)
@@ -138,7 +133,7 @@ def updateRecall(
   ) in enumerate(
       zip(model.pred.halflifeGammas, updateds, model.pred.log2weights, individualLogProbabilities,
           _exceedsThresholdLeft([2**x for x in model.pred.log2weights], weightThreshold))):
-    oldHl = _gammaToMean(*m)
+    oldHl = gammaToMean(*m)
     scal = updated.mean / oldHl
     scales.append(scal)
 
@@ -158,8 +153,7 @@ def updateRecall(
   ret.pred.halflifeGammas = newModels
   ret.pred.log2weights = (newLog2Weights - logsumexp(np.array(newLog2Weights) * LN2) / LN2).tolist()
   ret.pred.forSql = _genForSql(ret.pred.log2weights,
-                               [_gammaToMean(*x) for x in ret.pred.halflifeGammas],
-                               model.pred.power)
+                               [gammaToMean(*x) for x in ret.pred.halflifeGammas], model.pred.power)
   return ret
 
 
@@ -292,10 +286,6 @@ def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
   return res.x
 
 
-def _gammaToMean(alpha: float, beta: float) -> float:
-  return alpha / beta
-
-
 def timeMs() -> float:
   return time_ns() / 1_000_000
 
@@ -309,3 +299,12 @@ def _powerMeanLogW(logv: list[float] | np.ndarray,
   res, sgn = logsumexp(p * logv, b=ws, return_sign=True)
   assert sgn > 0
   return float(res / p)
+
+
+def resultToProbability(r: Result, p: float) -> float:
+  if type(r) == NoisyBinaryResult:
+    z = r.result >= 0.5
+    return np.log(((r.q1 - r.q0) * p + r.q0) if z else (r.q0 - r.q1) * p + (1 - r.q0))
+  elif type(r) == BinomialResult:
+    return float(binom.logpmf(r.successes, r.total, p))
+  raise Exception("unknown quiz type")

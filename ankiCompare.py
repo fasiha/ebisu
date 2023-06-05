@@ -1,10 +1,9 @@
-from scipy.stats import binom
 import numpy as np
 import pylab as plt  # type:ignore
 import typing
 
 import ebisu
-from ebisu.models import BinomialResult, NoisyBinaryResult, Result
+from ebisu.ebisu import resultToProbability
 import ebisu3boost
 import utils
 
@@ -20,15 +19,6 @@ hs = np.logspace(0, 4, n)
 
 def printableList(v: list[int | float]) -> str:
   return ", ".join([f'{x:0.1f}' for x in v])
-
-
-def resultToProbability(r: Result, p: float) -> float:
-  if type(r) == NoisyBinaryResult:
-    z = r.result >= 0.5
-    return np.log(((r.q1 - r.q0) * p + r.q0) if z else (r.q0 - r.q1) * p + (1 - r.q0))
-  elif type(r) == BinomialResult:
-    return float(binom.logpmf(r.successes, r.total, p))
-  raise Exception("unknown quiz type")
 
 
 def convertAnkiResultToBinomial(result: int, mode: ConvertAnkiMode) -> dict:

@@ -90,7 +90,7 @@ if __name__ == '__main__':
                 now=now),
             v3Predictor,
             v3Updator,
-            None,
+            lambda model, *rest: model.pred.currentHalflifeHours,
         ),
         (
             ebisu.initModel(halflife=100, now=now, power=15, n=5, firstHalflife=10, stdScale=1),
@@ -140,7 +140,22 @@ if __name__ == '__main__':
                 w1=.9),
             gamma3Predictor,
             lambda *args, **kwargs: gamma3Updator(
-                *args, **kwargs, verbose=True, updateThreshold=10000, weightThreshold=0.05),
+                *args, **kwargs, verbose=True, updateThreshold=.99, weightThreshold=0.05),
+            ebisu.hoursForRecallDecay,
+        ),
+        (
+            ebisu.initModel(
+                halflife=100,
+                now=now,
+                power=1,  ####################### !
+                n=5,
+                firstHalflife=50,
+                stdScale=1,
+                newThing=True,
+                w1=.5),
+            gamma3Predictor,
+            lambda *args, **kwargs: gamma3Updator(
+                *args, **kwargs, verbose=True, updateThreshold=.99, weightThreshold=0.05),
             ebisu.hoursForRecallDecay,
         ),
     ]

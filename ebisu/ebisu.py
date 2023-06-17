@@ -22,7 +22,7 @@ def initModel(
     firstHalflife: Optional[float] = None,
     # above: lazy inputs, below: exact inputs
     weightsHalflifeGammas: Optional[list[tuple[float, HalflifeGamma]]] = None,
-    power: int = 4,
+    power: int = 1,
     stdScale: float = 0.5,
     now: Optional[float] = None,
     newThing=False,

@@ -19,13 +19,11 @@ def initModel(
     halflife: Optional[float] = None,  # hours
     finalHalflife=1e5,  # hours
     n: int = 10,
-    firstHalflife: Optional[float] = None,
     # above: lazy inputs, below: exact inputs
     weightsHalflifeGammas: Optional[list[tuple[float, HalflifeGamma]]] = None,
     power: int = 1,
     stdScale: float = 0.5,
     now: Optional[float] = None,
-    newThing=False,
     w1: Optional[float] = None,
 ) -> Model:
   """
@@ -46,18 +44,11 @@ def initModel(
       halflives.append(gammaToMean(*g))
   else:
     assert halflife, "halflife or weightsHalflifeGammas needed"
-    if newThing and w1:
-      dsol = minimize_scalar(lambda d: np.abs(1 - sum(np.hstack([w1, w1**(d * np.arange(1, n))]))),
-                             [5, 20])
-      weights = np.hstack([w1, w1**(dsol.x * np.arange(1, n))]).tolist()
-      halflives = np.logspace(np.log10(halflife), np.log10(finalHalflife), n)
-      halflifeGammas = [meanVarToGamma(t, (t * stdScale)**2) for t in halflives]
-    else:
-      halflives = np.logspace(log10(firstHalflife or (halflife * .1)), log10(finalHalflife),
-                              n).tolist()
-      # pick standard deviation to be half of the mean
-      halflifeGammas = [meanVarToGamma(t, (t * stdScale)**2) for t in halflives]
-      weights = _halflifeToFinalWeight(halflife, halflives, power)
+    dsol = minimize_scalar(lambda d: np.abs(1 - sum(np.hstack([w1, w1**(d * np.arange(1, n))]))),
+                           [5, 20])
+    weights = np.hstack([w1, w1**(dsol.x * np.arange(1, n))]).tolist()
+    halflives = np.logspace(np.log10(halflife), np.log10(finalHalflife), n)
+    halflifeGammas = [meanVarToGamma(t, (t * stdScale)**2) for t in halflives]
 
   wsum = fsum(weights)
   weights = [w / wsum for w in weights]

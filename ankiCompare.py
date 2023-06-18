@@ -39,6 +39,32 @@ def convertAnkiResultToBinomial(result: int, mode: ConvertAnkiMode) -> dict:
     return dict(successes=int(result > 1), total=1)
 
 
+def cardToLoglik(card: utils.Card,
+                 model,
+                 pred,
+                 update,
+                 now=0,
+                 convertMode: ConvertAnkiMode = 'approx'):
+  logliks = []
+  models = [model]
+  pRecalls = []
+  for ankiResult, elapsedTime in zip(card.results, card.dts_hours):
+    now += elapsedTime * MILLISECONDS_PER_HOUR
+    resultArgs = convertAnkiResultToBinomial(ankiResult, convertMode)
+
+    pRecall = pred(model, elapsedTime)
+    pRecalls.append(pRecall)
+
+    model = update(model, now, **resultArgs)
+    models.append(model)
+
+    ll = resultToProbability(models[-1].quiz.results[-1][-1], pRecall)
+    logliks.append(ll)
+
+  return sum(logliks)
+  # return models, logliks, pRecalls
+
+
 if __name__ == '__main__':
   origNow = ebisu.timeMs()
 
@@ -69,6 +95,24 @@ if __name__ == '__main__':
   fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
   # fracs = [0.75]
   # for card in train:
+
+  listToStr = lambda v: ", ".join([f"{x:0.2f}" for x in v])
+  w1s = np.arange(.4, .99, .05)
+  allLiks = []
+  for w1 in w1s:
+    liks = []
+    for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
+      liks.append(
+          cardToLoglik(
+              card,
+              ebisu.initModel(halflife=100, now=0, power=1, n=5, stdScale=1, w1=w1),
+              gamma3Predictor,
+              lambda *args, **kwargs: gamma3Updator(
+                  *args, **kwargs, updateThreshold=.99, weightThreshold=0.05),
+          ))
+    print(f'{w1=:0.2f}, liks=[{listToStr(liks)}]')
+    allLiks.append(liks)
+
   for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
     hlMeanStd = (24., 24 * .7)
     boostMeanStd = (3, 3 * .7)
@@ -93,51 +137,21 @@ if __name__ == '__main__':
             lambda model, *rest: model.pred.currentHalflifeHours,
         ),
         (
-            ebisu.initModel(halflife=100, now=now, power=15, n=5, firstHalflife=10, stdScale=1),
-            gamma3Predictor,
-            gamma3Updator,
-            ebisu.hoursForRecallDecay,
-        ),
-        (
-            ebisu.initModel(
-                halflife=100,
-                now=now,
-                power=20,
-                n=5,
-                firstHalflife=50,
-                stdScale=1,
-                newThing=True,
-                w1=.9),
+            ebisu.initModel(halflife=100, now=now, power=20, n=5, stdScale=1, w1=.9),
             gamma3Predictor,
             lambda *args, **kwargs: gamma3Updator(
                 *args, **kwargs, verbose=True, updateThreshold=0.9, weightThreshold=10000),
             ebisu.hoursForRecallDecay,
         ),
         (
-            ebisu.initModel(
-                halflife=100,
-                now=now,
-                power=20,
-                n=5,
-                firstHalflife=50,
-                stdScale=1,
-                newThing=True,
-                w1=.9),
+            ebisu.initModel(halflife=100, now=now, power=20, n=5, stdScale=1, w1=.9),
             gamma3Predictor,
             lambda *args, **kwargs: gamma3Updator(
                 *args, **kwargs, verbose=True, updateThreshold=0.5, weightThreshold=10000),
             ebisu.hoursForRecallDecay,
         ),
         (
-            ebisu.initModel(
-                halflife=100,
-                now=now,
-                power=20,
-                n=5,
-                firstHalflife=50,
-                stdScale=1,
-                newThing=True,
-                w1=.9),
+            ebisu.initModel(halflife=100, now=now, power=20, n=5, stdScale=1, w1=.9),
             gamma3Predictor,
             lambda *args, **kwargs: gamma3Updator(
                 *args, **kwargs, verbose=True, updateThreshold=.99, weightThreshold=0.05),
@@ -149,9 +163,7 @@ if __name__ == '__main__':
                 now=now,
                 power=1,  ####################### !
                 n=5,
-                firstHalflife=50,
                 stdScale=1,
-                newThing=True,
                 w1=.5),
             gamma3Predictor,
             lambda *args, **kwargs: gamma3Updator(

@@ -10,12 +10,14 @@ from scipy.special import logsumexp  # type: ignore
 import numpy as np
 from typing import Optional, Union, Any, Callable
 import math
-from datetime import datetime
 
 from ebisu.ebisuHelpers import GammaUpdate, gammaUpdateBinomial, gammaUpdateNoisy
-from ebisu.gammaDistribution import meanVarToGamma
+from ebisu.gammaDistribution import meanVarToGamma, gammaToMeanVar
 
 results: dict[Union[str, tuple], Any] = dict()
+
+# seed = np.random.randint(1, 1_000_000_000)
+seed = 123
 
 MILLISECONDS_PER_HOUR = 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec
 logsumexp: Callable = logsumexp
@@ -104,7 +106,7 @@ def relativeError(actual, expected):
 class TestEbisu(unittest.TestCase):
 
   def setUp(self):
-    pass
+    np.random.seed(seed=seed)  # for sanity when testing with Monte Carlo
 
   def test_gamma_update_noisy(self):
     """Test _gammaUpdateNoisy for various q0 and against Monte Carlo
@@ -119,8 +121,7 @@ class TestEbisu(unittest.TestCase):
 
     a, b = initHlPrior
 
-    MAX_RELERR_AB = .02
-    MAX_RELERR_MEAN = .01
+    MAX_RELERR_MEAN = .005
     for fraction in [0.1, 0.5, 1., 2., 10.]:
       t = initHlMean * fraction
       for q0 in [.15, 0, None]:
@@ -130,18 +131,22 @@ class TestEbisu(unittest.TestCase):
           q1 = noisy if z else 1 - noisy
           q0 = 1 - q1 if q0 is None else q0
           updated = gammaUpdateNoisy(a, b, t, q1, q0, z)
+          # gammaToMeanVar and meanVarToGamma are inverses of each other, i.e.,
+          # `gammaToMeanVar(*meanVarToGamma(a, b))` will be `(a, b)` to machine precision. So we can
+          # convert the Gamma fit to mean/var and then do the same for the Monte Carlo Gamma fit.
+          directMeanVar = gammaToMeanVar(updated.a, updated.b)
 
           for size in [100_000, 500_000, 1_000_000]:
             u2 = _gammaUpdateNoisyMonteCarlo(a, b, t, q1, q0, z, size=size)
-            if (relativeError(updated.a, u2.a) < MAX_RELERR_AB and
-                relativeError(updated.b, u2.b) < MAX_RELERR_AB and
-                relativeError(updated.mean, u2.mean) < MAX_RELERR_MEAN):
-              # found a size that should match the actual tests below
+            mcMeanVar = gammaToMeanVar(u2.a, u2.b)
+            checks = [
+                relativeError(directMeanVar[0], mcMeanVar[0]) < MAX_RELERR_MEAN,
+                relativeError(np.sqrt(directMeanVar[1]), np.sqrt(mcMeanVar[1])) < MAX_RELERR_MEAN,
+            ]
+            if all(checks):
               break
 
-          self.assertLess(relativeError(updated.a, u2.a), MAX_RELERR_AB)  #type:ignore
-          self.assertLess(relativeError(updated.b, u2.b), MAX_RELERR_AB)  #type:ignore
-          self.assertLess(relativeError(updated.mean, u2.mean), MAX_RELERR_MEAN)  #type:ignore
+          self.assertTrue(all(checks))
 
           msg = f'q0={q0}, z={z}, noisy={noisy}'
           if z:
@@ -210,11 +215,8 @@ class TestEbisu(unittest.TestCase):
     initHlPrior = (initHlBeta * initHlMean, initHlBeta)
     a, b = initHlPrior
 
-    # These thresholds on relative error between the analytical and Monte Carlo updates
-    # should be enough for several trials of this unit test (see `trial` below). Nonetheless
-    # I set the seed to avoid test surprises.
-    MAX_RELERR_AB = .05
-    MAX_RELERR_MEAN = .01
+    MAX_RELERR_MEAN = .005
+    MAX_RELERR_STD = .01
     for trial in range(1):
       for fraction in [0.1, 1., 10.]:
         t = initHlMean * fraction
@@ -223,27 +225,23 @@ class TestEbisu(unittest.TestCase):
             updated = gammaUpdateBinomial(a, b, t, result, n)
             self.assertTrue(
                 np.all(np.isfinite([updated.a, updated.b, updated.mean])), f'k={result}, n={n}')
+            directMeanVar = gammaToMeanVar(updated.a, updated.b)
 
             # in order to avoid egregiously long tests, scale up the number of Monte Carlo samples
             # to meet the thresholds above.
             for size in [100_000, 500_000, 2_000_000, 5_000_000]:
               u2 = _gammaUpdateBinomialMonteCarlo(a, b, t, result, n, size=size)
+              mcMeanVar = gammaToMeanVar(u2.a, u2.b)
 
-              if (relativeError(updated.a, u2.a) < MAX_RELERR_AB and
-                  relativeError(updated.b, u2.b) < MAX_RELERR_AB and
-                  relativeError(updated.mean, u2.mean) < MAX_RELERR_MEAN):
-                # found a size that should match the actual tests below
+              checks = [
+                  relativeError(directMeanVar[0], mcMeanVar[0]) < MAX_RELERR_MEAN,
+                  relativeError(np.sqrt(directMeanVar[1]), np.sqrt(mcMeanVar[1])) < MAX_RELERR_STD,
+              ]
+              if all(checks):
                 break
 
-            msg = f'{(trial, t, result, n, size)}'  #type:ignore
-            self.assertLess(relativeError(updated.a, u2.a), MAX_RELERR_AB, msg)  #type:ignore
-            self.assertLess(relativeError(updated.b, u2.b), MAX_RELERR_AB, msg)  #type:ignore
-
-            #type:ignore
-            self.assertLess(
-                relativeError(updated.mean, u2.mean),  #type:ignore
-                MAX_RELERR_MEAN,  #type:ignore
-                msg)
+            msg = f'{(trial, t, result, n, size, checks)}'  #type:ignore
+            self.assertTrue(all(checks), msg)  #type:ignore
 
   def test_1_then_0s(self, verbose=False):
     initHlMean = 10  # hours

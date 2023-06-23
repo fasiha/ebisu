@@ -19,12 +19,12 @@ def initModel(
     halflife: Optional[float] = None,  # hours
     finalHalflife=1e5,  # hours
     n: int = 10,
+    w1: float = 0.9,
     # above: lazy inputs, below: exact inputs
     weightsHalflifeGammas: Optional[list[tuple[float, HalflifeGamma]]] = None,
     power: int = 1,
     stdScale: float = 0.5,
     now: Optional[float] = None,
-    w1: Optional[float] = None,
 ) -> Model:
   """
   Create brand new Ebisu model
@@ -248,7 +248,7 @@ def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
 
 
 def timeMs() -> float:
-  return time_ns() / 1_000_000
+  return float(time_ns() // 1_000_000)
 
 
 def resultToLogProbability(r: Result, p: float) -> float:

@@ -3,7 +3,7 @@ import pylab as plt  # type:ignore
 import typing
 
 import ebisu
-from ebisu.ebisu import resultToProbability
+from ebisu.ebisu import resultToLogProbability
 import ebisu3boost
 import utils
 
@@ -58,7 +58,7 @@ def cardToLoglik(card: utils.Card,
     model = update(model, now, **resultArgs)
     models.append(model)
 
-    ll = resultToProbability(models[-1].quiz.results[-1][-1], pRecall)
+    ll = resultToLogProbability(models[-1].results[-1], pRecall)
     logliks.append(ll)
 
   return sum(logliks)
@@ -84,7 +84,7 @@ if __name__ == '__main__':
       ebisu3boost.updateRecall(model, now=now, **kwargs), size=1000)
 
   gamma3Predictor = lambda model, elapsedTime: ebisu.predictRecall(
-      model, model.pred.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
+      model, model.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
   gamma3Updator = lambda model, now, **kwargs: ebisu.updateRecall(model, now=now, **kwargs)
 
   # np.seterr(all='raise')
@@ -140,21 +140,21 @@ if __name__ == '__main__':
             ebisu.initModel(halflife=100, now=now, power=20, n=5, stdScale=1, w1=.9),
             gamma3Predictor,
             lambda *args, **kwargs: gamma3Updator(
-                *args, **kwargs, verbose=True, updateThreshold=0.9, weightThreshold=10000),
+                *args, **kwargs, updateThreshold=0.9, weightThreshold=10000),
             ebisu.hoursForRecallDecay,
         ),
         (
             ebisu.initModel(halflife=100, now=now, power=20, n=5, stdScale=1, w1=.9),
             gamma3Predictor,
             lambda *args, **kwargs: gamma3Updator(
-                *args, **kwargs, verbose=True, updateThreshold=0.5, weightThreshold=10000),
+                *args, **kwargs, updateThreshold=0.5, weightThreshold=10000),
             ebisu.hoursForRecallDecay,
         ),
         (
             ebisu.initModel(halflife=100, now=now, power=20, n=5, stdScale=1, w1=.9),
             gamma3Predictor,
             lambda *args, **kwargs: gamma3Updator(
-                *args, **kwargs, verbose=True, updateThreshold=.99, weightThreshold=0.05),
+                *args, **kwargs, updateThreshold=.99, weightThreshold=0.05),
             ebisu.hoursForRecallDecay,
         ),
         (
@@ -167,7 +167,7 @@ if __name__ == '__main__':
                 w1=.5),
             gamma3Predictor,
             lambda *args, **kwargs: gamma3Updator(
-                *args, **kwargs, verbose=True, updateThreshold=.99, weightThreshold=0.05),
+                *args, **kwargs, updateThreshold=.99, weightThreshold=0.05),
             ebisu.hoursForRecallDecay,
         ),
     ]
@@ -190,7 +190,7 @@ if __name__ == '__main__':
         _oldModel, p, u, *r = modelsPredictorsUpdators[i]
         modelsPredictorsUpdators[i] = (m, p, u, *r)
 
-      ll = tuple(resultToProbability(models[-1].quiz.results[-1][-1], p) for p in pRecallForModels)
+      ll = tuple(resultToLogProbability(models[-1].results[-1], p) for p in pRecallForModels)
       logliks.append(ll)
 
       if intermediate:
@@ -204,7 +204,7 @@ if __name__ == '__main__':
         ps = [round(p, 4) for p in pRecallForModels]
         modelToAtoms = lambda model: ", ".join([
             f'(w={2**l2w:0.2g}, h={round(a/b,2)}, a={a:0.2g}, b={b:0.2g})' for l2w,
-            (a, b) in zip(model.pred.log2weights, model.pred.halflifeGammas)
+            (a, b) in zip(model.log2weights, model.halflifeGammas)
         ])
         printableResult = f'{resultArgs["successes"]}/{resultArgs["total"]}/{resultArgs.get("q0", 1)}'
         print(

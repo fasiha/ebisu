@@ -34,3 +34,59 @@ This makes `power` very much an "important to tune" parameter and I very much di
 2. Also for a weak card like 1300038030838 where `power=1` has log-likelihood of -22.833 versus -17.031 of `power=20`, you can see that the `power=1` predictor was pessimistic in exactly the right times: on successes inbetween failures.
 
 So I think `power=1` is a pretty good choice.
+
+# Sat Jun 17 22:00:24 PDT 2023
+Going back to `rescaleHalflife`. A thought experiment: suppose you want to drastically increase the halflife by a specific amount, you think the model is too pessimistic. I'm wondering if there's a difference in impact on the weights update between
+- binominal 3 out of 3 at the current/future time versus
+- 1 out of 1 (normal binary) at some even farther future time
+
+as a way to fake a update that results in the halflife increasing say 5x.
+
+> Sidebar: I was wondering if we still wanted `rescaleHalflife` in the API, maybe just binomial quizzes could substitute? No I don't think so because the student has beliefs about the halflife and a 3/3 or 4/4 update might result in a much greater halflife boost than they want.
+
+The new weight is just the old weight plus log-likelihood of the observation. Assuming we found the two times that matched the two cases above, both yielding a 5x increase in halflife, that would increment all weights the same, but what is the relation between those hypothetical quizs' log-likelihoods? Are they the same, one greater than the other?
+
+Answer: they're equal! I.e., if you want to increase the time-to80-percentile by 5x, a 3-out-of-3 result needs to be at 752 hours and a 1-out-of-1 in 2256 hours, and both have the exact same log-likelihoods under all atoms. (Probably the same for 0.5x.)
+
+```py
+from scipy.optimize import minimize_scalar
+import numpy as np
+import ebisu
+
+m = ebisu.initModel(halflife=100, now=0, power=20, n=5, stdScale=1, w1=.5)
+
+hlScale = 5
+
+percentile = 0.8
+initDecay = ebisu.hoursForRecallDecay(m, percentile)
+
+updateKwargs = dict(updateThreshold=0.99, weightThreshold=0.05)
+solBinominal = minimize_scalar(lambda h: abs(initDecay * hlScale - ebisu.hoursForRecallDecay(
+    ebisu.updateRecall(m, 3, 3, now=h * 3600e3, **updateKwargs), percentile)))
+solBinary = minimize_scalar(lambda h: abs(initDecay * hlScale - ebisu.hoursForRecallDecay(
+    ebisu.updateRecall(m, 1, 1, now=h * 3600e3, **updateKwargs), percentile)))
+
+
+def successToLoglik(success: int, t: float, h: float) -> float:
+  return ebisu.resultToLogProbability(ebisu.BinomialResult(success, success, t), 2**(-t / (h)))
+
+
+lls = [[successToLoglik(3, solBinominal.x, a / b) for (a, b) in m.pred.halflifeGammas],
+       [successToLoglik(1, solBinary.x, a / b) for (a, b) in m.pred.halflifeGammas]]
+print(np.array(lls[0]) / np.array(lls[1]))
+# prints [1.00000001 1.00000001 1.00000001 1.00000001 1.00000001]
+```
+
+Note that we don't actually want to create a quiz like this. We just do this to find the new weights.
+
+> We discovered while working on the boost-Gamma model that it's not sufficient to just adjust the initial priors and re-run all the quizzes since then. That's not a reliable rescaling. We really need a hard break: "this model right now is too pessimistic/optimistic, by THIS amount". 
+
+So the proposal is, the student has completed a quiz and is giving us a result and a rescale factor. There's a risk that the result is inflated and overlaps with the rescale factor (i.e., we don't want to student to say 2/2 and scale the halflife by 5x, because that's a bigger change than a 1/1). So we ignore the result. The result shouldn't factor in post-hoc analyses that we do (like the log-likelihood analysis in `ankiCompare.py`). We can create a NoisyBinary quiz type with q1=q0=0.5 and a "rescale" field to indicate the value. When `updateRecall` sees this it knows to apply the rescale logic instead of the normal update.
+
+> Sidebar. We use binomial quizzes to map Anki "easy" to 2-of-2 but I don't want to encourage this in quiz apps. I think rescaling is better.
+
+So for whatever reason your quiz app decided to show the student this quiz at a certain time (maybe because it was "due", maybe because it had low recall probability). At that time the student says "whatever probability you think, it's not right, scale it by this amount". That scale is phrased as halflife. You give Ebisu the old model, Ebisu will do what? In the Python script above, it rescales the 80-percentile-life by 5x. The result is quite different if it scaled the halflife (50-percentile-life). 
+
+# Sun Jun 18 17:30:24 PDT 2023
+Here's the solution: there's two ways to rescale.
+1. pass `rescale: float > 0` to `updateRecall`. This find an imaginary quiz that moves the old model to the current probability of recall,

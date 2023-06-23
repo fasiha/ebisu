@@ -8,6 +8,7 @@ class BinomialResult(DataClassJsonMixin):
   successes: int
   total: int
   hoursElapsed: float
+  rescale: Union[float, int]
 
 
 @dataclass
@@ -16,6 +17,7 @@ class NoisyBinaryResult(DataClassJsonMixin):
   q1: float
   q0: float
   hoursElapsed: float
+  rescale: Union[float, int]
 
 
 Result = Union[BinomialResult, NoisyBinaryResult]
@@ -25,27 +27,17 @@ def cleanup(results):
   """Workaround for dataclasses-json unable to handle Union inside List
   
   See https://github.com/lidatong/dataclasses-json/issues/239"""
-  return [[NoisyBinaryResult(**res) if 'q1' in res else BinomialResult(**res)
-           for res in lst]
-          for lst in results]
-
-
-@dataclass
-class Quiz(DataClassJsonMixin):
-  version: int
-  results: list[list[Result]] = field(metadata=config(decoder=cleanup))
-
-  # same length as `results`. Timestamp of the first item in each sub-array of
-  # `results`
-  startTimestampMs: list[float]
+  return [NoisyBinaryResult(**res) if 'q1' in res else BinomialResult(**res) for res in results]
 
 
 HalflifeGamma = tuple[float, float]  # α, β
 
 
 @dataclass
-class Predict(DataClassJsonMixin):
+class Model(DataClassJsonMixin):
   version: int
+  results: list[Result] = field(metadata=config(decoder=cleanup))
+  startTimestampMs: float  # milliseconds since unix epoch
   lastEncounterMs: float  # milliseconds since unix epoch
   power: int
   log2weights: list[float]
@@ -55,10 +47,3 @@ class Predict(DataClassJsonMixin):
   # recall probability is proportional to:
   # `MAX(log2weights - ((NOW_MS - lastEncounterMs) * HOURS_PER_MILLISECONDS / halflives)`
   # where NOW_MS is milliseconds since Unix epoch.
-
-
-@dataclass
-class Model(DataClassJsonMixin):
-  version: int
-  quiz: Quiz
-  pred: Predict

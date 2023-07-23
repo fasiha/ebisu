@@ -6,6 +6,7 @@ import ebisu
 from ebisu.ebisu import resultToLogProbability
 import ebisu3boost
 import utils
+import ebisu3beta
 
 plt.ion()
 
@@ -87,6 +88,11 @@ if __name__ == '__main__':
       model, model.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
   gamma3Updator = lambda model, now, **kwargs: ebisu.updateRecall(model, now=now, **kwargs)
 
+  beta3pred = lambda model, elapsedTime: ebisu3beta.predictRecall(
+      model, model.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
+  beta3up = lambda model, now, **kwargs: ebisu3beta.updateRecall(
+      model, now=now, **kwargs, updateThreshold=.99, weightThreshold=0.49)
+
   # np.seterr(all='raise')
   # np.seterr(under='warn')
 
@@ -97,7 +103,7 @@ if __name__ == '__main__':
   # for card in train:
 
   listToStr = lambda v: ", ".join([f"{x:0.2f}" for x in v])
-  w1s = np.arange(.4, .99, .05)
+  w1s = []  #  np.arange(.4, .99, .05)
   allLiks = []
   for w1 in w1s:
     liks = []
@@ -125,6 +131,12 @@ if __name__ == '__main__':
     intermediate = not False
 
     modelsPredictorsUpdators = [
+        (
+            ebisu3beta.initModel(hlMeanStd[0], 2.0, n=5, w1=.5, now=now),
+            beta3pred,
+            beta3up,
+            ebisu3beta.hoursForRecallDecay,
+        ),
         (
             ebisu3boost.initModel(
                 initHlMean=hlMeanStd[0],
@@ -206,13 +218,23 @@ if __name__ == '__main__':
             f'(w={2**l2w:0.2g}, h={round(a/b,2)}, a={a:0.2g}, b={b:0.2g})' for l2w,
             (a, b) in zip(model.log2weights, model.halflifeGammas)
         ])
+
+        def betaModelToAtoms(model: ebisu3beta.BetaEnsemble) -> str:
+          return ", ".join([
+              f'(w={2**l2w:0.2g}, h={round(t,2)}, a={a:0.2g}, b={b:0.2g})'
+              for l2w, (a, b, t) in zip(model.log2weights, model.models)
+          ])
+
         printableResult = f'{resultArgs["successes"]}/{resultArgs["total"]}/{resultArgs.get("q0", 1)}'
         print(
             f'   {elapsedTime:.1f}h {printableResult}: {ps=}, hls=[{printableList(hls)}] h (80%=[{printableList(hls80)}])'
         )
-        for m in models:
+        for i, m in enumerate(models):
           if type(m) == ebisu.models.Model:
-            print(f'     {modelToAtoms(m)}')
+            print(f'     ({i}) {modelToAtoms(m)}')
+          elif type(m) == ebisu3beta.BetaEnsemble:
+            print(f'     ({i}) {betaModelToAtoms(m)}')
+
         print('')
       modelsPerIter.append(models)
 

@@ -182,23 +182,16 @@ def predictRecallSemiBayesian(
     model: Model,
     now: Optional[float] = None,
     logDomain=True,
-    innerPower=False,
 ) -> float:
   from .logsumexp import logsumexp
-
+  assert model.power == 1, "do not handle the old q!=1 case"
   now = now if now is not None else timeMs()
   elapsedHours = (now - model.lastEncounterMs) * HOURS_PER_MILLISECONDS
   assert elapsedHours >= 0, "cannot go back in time"
-  if innerPower:
-    l = [
-        log2w * LN2 + gammaPredictRecall(alpha, beta, model.power * elapsedHours, True)
-        for log2w, (alpha, beta) in zip(model.log2weights, model.halflifeGammas)
-    ]
-  else:
-    l = [
-        log2w * LN2 + gammaPredictRecall(alpha, beta, elapsedHours, True) * model.power
-        for log2w, (alpha, beta) in zip(model.log2weights, model.halflifeGammas)
-    ]
+  l = [
+      log2w * LN2 + gammaPredictRecall(alpha, beta, model.power * elapsedHours, True)
+      for log2w, (alpha, beta) in zip(model.log2weights, model.halflifeGammas)
+  ]
 
   logExpect = logsumexp(l) / model.power
   assert np.isfinite(logExpect) and logExpect <= 0

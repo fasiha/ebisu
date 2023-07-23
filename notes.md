@@ -90,3 +90,6 @@ So for whatever reason your quiz app decided to show the student this quiz at a 
 # Sun Jun 18 17:30:24 PDT 2023
 Here's the solution: there's two ways to rescale.
 1. pass `rescale: float > 0` to `updateRecall`. This find an imaginary quiz that moves the old model to the current probability of recall,
+
+# Sat Jul 22 21:21:15 PDT 2023
+I've been thinking about a small simplification of the ebisu v3 mixture-of-Gammas: a mixture of Betas! Just reuse all the same code of Ebisu v2. That's now in `v3-ensemble` branch (`aa5f853`). From a log-likelihood perspective, mixture-of-Betas is competitive with mixture-of-Gammas. On hard quizzes, with a lot of initial failures that then the student properly learns eventually and has long-duration successful quizzes for, the mixture-of-Betas is slower to catch up than a mixture-of-Gammas but again as we discovered when deciding the fix `power=1`, this is not necessarily a bad thing to be conservative—and in fact the mixture-of-Betas outperforms its opponent in log-likelihood terms, -20.1 vs -23.4.

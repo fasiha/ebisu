@@ -82,7 +82,7 @@ def updateRecall(
 ) -> Model:
 
   if rescale != 1:
-    pRecall = predictRecall(model, now, logDomain=False)
+    pRecall = predictRecallApprox(model, now, logDomain=False)
     model = rescaleHalflife(
         model, rescale, pRecall, updateThreshold=updateThreshold, weightThreshold=weightThreshold)
 
@@ -157,7 +157,7 @@ def _exceedsThresholdLeft(v, threshold):
   return ret[::-1]
 
 
-def predictRecall(
+def predictRecallApprox(
     model: Model,
     now: Optional[float] = None,
     logDomain=True,
@@ -178,13 +178,12 @@ def predictRecall(
   return logExpect if logDomain else np.exp2(logExpect)
 
 
-def predictRecallSemiBayesian(
+def predictRecall(
     model: Model,
     now: Optional[float] = None,
     logDomain=True,
 ) -> float:
   from .logsumexp import logsumexp
-  assert model.power == 1, "do not handle the old q!=1 case"
   now = now if now is not None else timeMs()
   elapsedHours = (now - model.lastEncounterMs) * HOURS_PER_MILLISECONDS
   assert elapsedHours >= 0, "cannot go back in time"
@@ -234,7 +233,7 @@ def hoursForRecallDecay(model: Model, percentile=0.5) -> float:
   lp = log2(percentile)
 
   res = minimize_scalar(
-      lambda h: abs(lp - predictRecall(model, now=model.lastEncounterMs + 3600e3 * h)),
+      lambda h: abs(lp - predictRecallApprox(model, now=model.lastEncounterMs + 3600e3 * h)),
       bounds=[.01, 100e3])
   assert res.success
   return res.x

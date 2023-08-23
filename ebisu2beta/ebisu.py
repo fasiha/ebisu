@@ -4,6 +4,11 @@ from scipy.special import betaln, beta as betafn, logsumexp
 import numpy as np
 
 
+def predictRecallApprox(prior, tnow, exact=False):
+  from numpy import exp2
+  ret = -tnow / prior[2]
+  return exp2(ret) if exact else ret
+
 def predictRecall(prior, tnow, exact=False):
   """Expected recall probability now, given a prior distribution on it. 🍏
 

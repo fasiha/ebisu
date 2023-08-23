@@ -87,6 +87,25 @@ def predictRecall(
   return log2Expect if logDomain else np.exp2(log2Expect)
 
 
+def predictRecallApprox(
+    model: BetaEnsemble,
+    now: Optional[float] = None,
+    logDomain=True,
+) -> float:
+  from ebisu.logsumexp import logsumexp
+
+  now = now if now is not None else timeMs()
+  elapsedHours = (now - model.lastEncounterMs) * HOURS_PER_MILLISECONDS
+  assert elapsedHours >= 0, "cannot go back in time"
+
+  log2ps = [-elapsedHours / m[-1] for m in model.models]
+  logs = [LN2 * (l2w + l2p) for l2w, l2p in zip(model.log2weights, log2ps)]
+  log2Expect = logsumexp(logs) / LN2
+
+  assert np.isfinite(log2Expect) and log2Expect <= 0, f'{log2ps=}, {logs=}, {log2Expect=}'
+  return log2Expect if logDomain else np.exp2(log2Expect)
+
+
 def hoursForRecallDecay(model: BetaEnsemble, percentile=0.5) -> float:
   "How many hours for this model's recall probability to decay to `percentile`?"
   assert (0 < percentile <= 1), "percentile must be in (0, 1]"

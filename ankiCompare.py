@@ -132,7 +132,7 @@ if __name__ == '__main__':
 
     modelsPredictorsUpdators = [
         (
-            ebisu3beta.initModel(hlMeanStd[0], 2.0, n=5, w1=.5, now=now),
+            ebisu3beta.initModel(100, 2.0, n=5, w1=.5, now=now),
             beta3pred,
             beta3up,
             ebisu3beta.hoursForRecallDecay,
@@ -179,7 +179,7 @@ if __name__ == '__main__':
                 w1=.5),
             gamma3Predictor,
             lambda *args, **kwargs: gamma3Updator(
-                *args, **kwargs, updateThreshold=.99, weightThreshold=0.05),
+                *args, **kwargs, updateThreshold=.99, weightThreshold=0.49),
             ebisu.hoursForRecallDecay,
         ),
     ]

@@ -59,7 +59,7 @@ class TestEbisu(unittest.TestCase):
       global testpoints
       for t in map(lambda dt: dt * t0, [0.1, .99, 1., 1.01, 5.5]):
         mc = predictRecallMonteCarlo((a, b, t0), t, N=100 * 1000)
-        mean = predictRecall((a, b, t0), t, exact=True)
+        mean = predictRecallApprox((a, b, t0), t, exact=True)
         self.assertLess(relerr(mean, mc['mean']), 5e-2)
         testpoints += [['predict', [a, b, t0], [t], dict(mean=mean)]]
 
@@ -92,7 +92,7 @@ class TestEbisu(unittest.TestCase):
         for k in range(n + 1):
           msg = 'a={},b={},t0={},k={},n={},t={}'.format(a, b, t0, k, n, t)
           newModel = updateRecall((a, b, t0), k, n, t)
-          predicted = np.vectorize(lambda tnow: predictRecall(newModel, tnow))(future)
+          predicted = np.vectorize(lambda tnow: predictRecallApprox(newModel, tnow))(future)
           self.assertTrue(
               np.all(np.diff(predicted) < 0), msg=msg + ' predicted={}'.format(predicted))
 
@@ -153,7 +153,9 @@ class TestEbisu(unittest.TestCase):
     post = rescaleHalflife(pre, 1.0)
     for tnow in [1e-2, .1, 1., 10., 100.]:
       self.assertAlmostEqual(
-          predictRecall(pre, tnow, exact=True), predictRecall(post, tnow, exact=True), delta=1e-3)
+          predictRecallApprox(pre, tnow, exact=True),
+          predictRecallApprox(post, tnow, exact=True),
+          delta=1e-3)
 
   def test_fuzzy(self):
     "Binary quizzes are heavily tested above. Now test float/fuzzy quizzes here"

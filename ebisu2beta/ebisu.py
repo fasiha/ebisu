@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
 
+from math import floor, exp, log
+from typing import Optional, Union
 from scipy.special import betaln, beta as betafn, logsumexp
 import numpy as np
 
+Model = Union[tuple[float, float, float], list[float, float, float]]
+
 
 def predictRecallApprox(prior, tnow, exact=False):
-  from numpy import exp2
   ret = -tnow / prior[2]
-  return exp2(ret) if exact else ret
+  return 2**ret if exact else ret
 
-def predictRecall(prior, tnow, exact=False):
+
+def predictRecall(prior: Model, tnow: float, exact=False):
   """Expected recall probability now, given a prior distribution on it. 🍏
 
   `prior` is a tuple representing the prior distribution on recall probability
@@ -36,7 +40,6 @@ def predictRecall(prior, tnow, exact=False):
 
   See README for derivation.
   """
-  from numpy import exp
   a, b, t = prior
   dt = tnow / t
   ret = betaln(a + dt, b) - _cachedBetaln(a, b)
@@ -57,10 +60,16 @@ def _cachedBetaln(a, b):
 
 def binomln(n, k):
   "Log of scipy.special.binom calculated entirely in the log domain"
-  return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
+  return -betaln(1 + n - k, 1 + k) - log(n + 1)
 
 
-def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=None):
+def updateRecall(prior: Model,
+                 successes: Union[int, float],
+                 total: int,
+                 tnow: float,
+                 rebalance=True,
+                 tback: Optional[float] = None,
+                 q0: Optional[float] = None) -> tuple[float, float, float]:
   """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as in `ebisu.predictRecall`'s arguments: an object
@@ -123,6 +132,10 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=N
   if total == 1:
     return _updateRecallSingle(prior, successes, tnow, rebalance=rebalance, tback=tback, q0=q0)
 
+  assert successes == floor(successes), "float `successes` must have `total=1`"
+  assert successes >= 0, "negative `successes` meaningless"
+  assert total > 0, "positive binomial trials"
+
   (alpha, beta, t) = prior
   dt = tnow / t
   failures = total - successes
@@ -141,7 +154,7 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=N
 
   if rebalance:
     from scipy.optimize import root_scalar
-    target = np.log(0.5)
+    target = log(0.5)
     rootfn = lambda et: (unnormalizedLogMoment(1, et) - logDenominator) - target
     sol = root_scalar(rootfn, bracket=_findBracket(rootfn, 1 / dt))
     et = sol.root
@@ -153,13 +166,13 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=N
     et = tback / tnow
 
   logMean = unnormalizedLogMoment(1, et) - logDenominator
-  mean = np.exp(logMean)
-  m2 = np.exp(unnormalizedLogMoment(2, et) - logDenominator)
+  mean = exp(logMean)
+  m2 = exp(unnormalizedLogMoment(2, et) - logDenominator)
 
   assert mean > 0, message
   assert m2 > 0, message
 
-  meanSq = np.exp(2 * logMean)
+  meanSq = exp(2 * logMean)
   var = m2 - meanSq
   assert var > 0, message
   newAlpha, newBeta = _meanVarToBeta(mean, var)
@@ -167,6 +180,8 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=N
 
 
 def _updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None):
+  assert (0 <= result <= 1), "`total=1` implies successes in [0, 1]"
+
   (alpha, beta, t) = prior
 
   z = result > 0.5
@@ -240,7 +255,7 @@ def modelToPercentileDecay(model, percentile=0.5):
   from scipy.optimize import root_scalar
   alpha, beta, t0 = model
   logBab = betaln(alpha, beta)
-  logPercentile = np.log(percentile)
+  logPercentile = log(percentile)
 
   def f(delta):
     logMean = betaln(alpha + delta, beta) - logBab
@@ -282,7 +297,7 @@ def rescaleHalflife(prior, scale=1.):
 
   logDenominator = betaln(alpha, beta)
   logm2 = betaln(alpha + 2 * dt, beta) - logDenominator
-  m2 = np.exp(logm2)
+  m2 = exp(logm2)
   newAlphaBeta = 1 / (8 * m2 - 2) - 0.5
   assert newAlphaBeta > 0
   return (newAlphaBeta, newAlphaBeta, oldHalflife * scale)

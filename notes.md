@@ -125,3 +125,16 @@ Writing up notes about comparing Beta vs Gamma, why is the Gamma difference betw
 > I'm now investigating what happens if we use a mixture of Betas (the very very straightforward extension of v2)
 
 Posted https://github.com/fasiha/ebisu/issues/62#issuecomment-1689268179
+
+# Tue Aug 22 21:46:50 PDT 2023
+Next question: do I lug around this big `Model` dataclass or do I stick with the v2 style of keeping my model really simple? List of Beta models `(α, β, t, weight)`?
+
+## Improve initial weights
+
+I don't know why I did this weird weight thing. This is simple and correct:
+```py
+w1=.9
+n=4
+sol = minimize_scalar(lambda x: abs(sum(w1 * (x)**i for i in range(n)) - 1), [0.3, 0.6])
+print(w1 * sol.x**np.arange(n))
+```

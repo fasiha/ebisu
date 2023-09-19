@@ -47,9 +47,8 @@ def initModel(
       models.append(g)
   else:
     assert halflife and initAB, "halflife & initAB needed if weightsModel not provided"
-    dsol = minimize_scalar(lambda d: np.abs(1 - sum(np.hstack([w1, w1**(d * np.arange(1, n))]))),
-                           [5, 20])
-    weights = np.hstack([w1, w1**(dsol.x * np.arange(1, n))]).tolist()
+    dsol = minimize_scalar(lambda d: abs(sum(w1 * d**i for i in range(n)) - 1), [0.3, 0.6])
+    weights = [w1 * dsol.x**i for i in range(n)]
     halflives = np.logspace(np.log10(halflife), np.log10(finalHalflife), n)
     models = [(initAB, initAB, t) for t in halflives]
 

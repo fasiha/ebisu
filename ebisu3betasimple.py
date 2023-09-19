@@ -107,9 +107,11 @@ def updateRecall(
     elapsedTime: float,
     total: int = 1,
     q0: Optional[float] = None,
-    updateThreshold=0.5,
-    weightThreshold=0.1,
+    updateThreshold: Optional[float] = None,
+    weightThreshold: Optional[float] = None,
 ) -> BetaEnsemble:
+  updateThreshold = updateThreshold if updateThreshold is not None else 0.99
+  weightThreshold = weightThreshold if weightThreshold is not None else 0.49
   updatedModels = [
       ebisu2.updateRecall((m.alpha, m.beta, m.time), successes, total, tnow=elapsedTime, q0=q0)
       for m in prior

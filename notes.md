@@ -138,3 +138,7 @@ n=4
 sol = minimize_scalar(lambda x: abs(sum(w1 * (x)**i for i in range(n)) - 1), [0.3, 0.6])
 print(w1 * sol.x**np.arange(n))
 ```
+
+# Mon Sep 18 22:04:32 PDT 2023
+## Rescaling
+I'm thinking about how to move the high-weight atoms around to achieve a rescale request (scale the halflife by 0.5, 3x, etc.).

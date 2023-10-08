@@ -185,3 +185,11 @@ def _exceedsThresholdLeft(v: list[float], threshold: float):
     last = last or x > threshold
     ret.append(last)
   return ret[::-1]
+
+
+def rescaleHalflife(model: BetaEnsemble, scale: float) -> BetaEnsemble:
+  ret: BetaEnsemble = []
+  for atom in model:
+    scaled = ebisu2.rescaleHalflife((atom.alpha, atom.beta, atom.time), scale)
+    ret.append(Atom(log2weight=atom.log2weight, alpha=scaled[0], beta=scaled[1], time=scaled[2]))
+  return ret

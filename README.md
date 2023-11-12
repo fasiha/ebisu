@@ -48,25 +48,37 @@ Consider a student memorizing a set of facts.
 
 Ebisu is a public-domain library that answers these two questions. It is intended to be used by software developers writing quiz apps, and provides a simple API to deal with these two aspects of scheduling quizzes:
 - `predictRecall` gives the current recall probability for a given fact.
-- `updateRecall` adjusts the belief about future recall probability given a quiz result.
+- `updateRecall` adjusts the future recall probability after a quiz testing that fact.
 
-Behind these two simple functions, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and exponential forgetting.
+Behind this simple API, Ebisu is using a simple yet powerful model of forgetting, a model that is founded on Bayesian statistics and a power-law model of forgetting. Thanks to these probabilistic foundations, Ebisu allows quiz applications to move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today—an app using Ebisu can ensure that only the facts most in danger of being forgotten are presented for review. And since every fact always has a recall probability at any given time, Ebisu also enables apps to provide an infinite stream of quizzes for students who are cramming. Thus, Ebisu intelligently handles over-reviewing as well as under-reviewing.
 
-With this system, quiz applications can move away from “daily review piles” caused by less flexible scheduling algorithms. For instance, a student might have only five minutes to study today; an app using Ebisu can ensure that only the facts most in danger of being forgotten are reviewed.
+The probabilistic foundation also allows Ebisu to handle a rich variety of quiz types:
+- of course you have your binary quizzes, i.e., pass/fail;
+- you also have Duolingo-style quizzes where the student got X points out of a maximum of Y points (binomial quizzes);
+- you can even customize the probability that the student “passed” the quiz conditional on them having actually forgotten the fact—this is handy for deweighting multiple-choice quizzes where you can’t be *sure* that the student remembered the fact even when they picked the right choice. This is also very useful for reader apps where the readers can click on words they don’t know: the fact that they *didn’t* click on a word suggests that they know it but doesn’t prove it. Ebisu’s probabilistic foundation makes it easy to handle such quiz types.
 
-Ebisu also enables apps to provide an infinite stream of quizzes for students who are cramming. Thus, Ebisu intelligently handles over-reviewing as well as under-reviewing.
+In summary, Ebisu has been able to support creative quiz apps with innovative review systems, not just simple pass/fail flashcards.
 
-This document is a literate source: it contains a detailed mathematical description of the underlying algorithm as well as source code for a Python implementation (requires Scipy and Numpy). Separate implementations in other languages are detailed below.
+This document contains both a detailed mathematical description of the underlying algorithm as well as the software API it exports. Separate implementations in other languages are detailed below.
 
-The next section is a [Quickstart](#quickstart) guide to setup and usage. See this if you know you want to use Ebisu in your app.
+The next sections are installation and an [API Quickstart](#api-quickstart).
 
 Then in the [How It Works](#how-it-works) section, I contrast Ebisu to other scheduling algorithms and describe, non-technically, why you should use it.
 
-Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like Beta-distributed random variables, conjugate priors, and marginalization, this is for you. You’ll also find the key formulas that implement `predictRecall` and `updateRecall` here.
+Then there’s a long [Math](#the-math) section that details Ebisu’s algorithm mathematically. If you like nonlinear-transformed Beta-distributed random variables and weighted ensembles, this is for you.
 
-> Nerdy details in a nutshell: Ebisu begins by positing a [Beta prior](https://en.wikipedia.org/wiki/Beta_distribution) on recall probability at a certain time. As time passes, the recall probability decays exponentially, and Ebisu handles that nonlinearity exactly and analytically—it requires only a few [Beta function](http://mathworld.wolfram.com/BetaFunction.html) evaluations to predict the current recall probability. Next, a *quiz* is modeled as a [binomial trial](https://en.wikipedia.org/wiki/Binomial_distribution) whose underlying probability prior is this non-conjugate nonlinearly-transformed Beta. Ebisu approximates the non-standard posterior with a new Beta distribution by matching its mean and variance, which are also analytically tractable, and require a few evaluations of the Beta function.
+> Nerdy details in a nutshell: Ebisu begins by positing a logarithmically-weighted ensemble of [Beta priors](https://en.wikipedia.org/wiki/Beta_distribution) on recall probability at logarithmically-spaced times. As time passes, each atom’s proposed recall probability decays exponentially, but the weighted ensemble-average follows the psychologically-verified power law distribution. Ebisu can handle the nonlinear exponential exactly and analytically but also allows an approximation that quiz apps could in SQL—the *exact* value of the current recall probability needs a few [Beta function](http://mathworld.wolfram.com/BetaFunction.html) evaluations, but the approximation just needs `exp`, the exponential.
+> 
+> Next, a *quiz* is modeled as a [binomial trial](https://en.wikipedia.org/wiki/Binomial_distribution), whose underlying probability is each atom’s non-conjugate nonlinearly-transformed Beta random variables (a few Beta function calls). Ebisu computes the moments of each atom’s posterior to construct a new Beta distribution, applying the likelihood update to atoms’ weights.
 
-Finally, the [Source Code](#source-code) section presents the literate source of the library, including several tests to validate the math.
+Finally, in the [Source Code](#source-code) section, we describe the software testing done to validate the math, including tests comparing Ebisu’s output to Monte Carlo sampling.
+
+A quick note on history. This document discusses Ebisu v3, which is the *ensemble* extension of v2’s Beta-on-recall. If you are interested, see the [Changelog](https://github.com/fasiha/ebisu/blob/gh-pages/CHANGELOG.md) for details and a migration guide.
+
+
+
+
+
 
 ## Quickstart
 

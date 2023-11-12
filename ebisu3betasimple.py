@@ -1,15 +1,16 @@
-from math import fsum, isfinite, log, log10, log2
-from attr import dataclass
+from math import fsum, isfinite, log, log10, log2, isfinite
 import numpy as np
-from scipy.stats import binom
-from scipy.optimize import minimize_scalar
+from scipy.stats import binom  # type:ignore
+from scipy.optimize import minimize_scalar  # type:ignore
+
 from typing import Optional, Union
+from attr import dataclass
 from dataclasses_json import DataClassJsonMixin
+
 import ebisu2beta as ebisu2
 from ebisu.logsumexp import logsumexp
 
-HOURS_PER_MILLISECONDS = 1 / 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec
-LN2 = np.log(2)
+LN2 = log(2)
 
 
 @dataclass
@@ -77,12 +78,12 @@ def predictRecallApprox(
   logps = [LN2 * (m.log2weight - elapsedTime / m.time) for m in prior]
   log2Expect = logsumexp(logps) / LN2
 
-  assert np.isfinite(log2Expect) and log2Expect <= 0, f'{logps=}, {log2Expect=}'
+  assert isfinite(log2Expect) and log2Expect <= 0, f'{logps=}, {log2Expect=}'
   return log2Expect if logDomain else 2**log2Expect
 
 
-def hoursForRecallDecay(model: BetaEnsemble, percentile=0.5) -> float:
-  "How many hours for this model's recall probability to decay to `percentile`?"
+def modelToPercentileDecay(model: BetaEnsemble, percentile=0.5) -> float:
+  "When will this model's recall probability to decay to `percentile`?"
   assert (0 < percentile <= 1), "percentile must be in (0, 1]"
   l2p = log2(percentile)
 
@@ -132,7 +133,7 @@ def updateRecall(
 
   else:
     individualLogProbabilities = [
-        _binomialLogProbability(successes, total=total, p=p) for p in pRecalls
+        _binomialLogProbability(int(successes), total=total, p=p) for p in pRecalls
     ]
 
   assert all(x < 0 for x in individualLogProbabilities

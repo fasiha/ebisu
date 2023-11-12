@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from ebisu import *
-from ebisu.alternate import *
+from ebisu2beta import updateRecall, predictRecall, modelToPercentileDecay, rescaleHalflife
+from ebisu2beta.alternate import predictRecallMedian, predictRecallMonteCarlo, updateRecallMonteCarlo
 import unittest
 import numpy as np
 
@@ -19,7 +19,7 @@ def maxrelerr(dirts, golds):
 def klDivBeta(a, b, a2, b2):
   """Kullback-Leibler divergence between two Beta distributions in nats"""
   # Via http://bariskurt.com/kullback-leibler-divergence-between-two-dirichlet-and-beta-distributions/
-  from scipy.special import gammaln, psi
+  from scipy.special import gammaln, psi  # type:ignore
   import numpy as np
   left = np.array([a, b])
   right = np.array([a2, b2])

@@ -49,7 +49,7 @@ def predictRecallMedian(prior, tnow, percentile=0.5):
   """
   # [1] `Integrate[p**((a-t)/t) * (1-p**(1/t))**(b-1) / t / Beta[a,b], p]`
   # and see "Alternate form assuming a, b, p, and t are positive".
-  from scipy.special import betaincinv
+  from scipy.special import betaincinv  # type:ignore
   alpha, beta, t = prior
   dt = tnow / t
   return betaincinv(alpha, beta, percentile)**dt
@@ -64,7 +64,7 @@ def predictRecallMonteCarlo(prior, tnow, N=1000 * 1000):
   This function returns a dict containing the mean, variance, median, and mode
   of the current recall probability.
   """
-  import scipy.stats as stats
+  import scipy.stats as stats  # type:ignore
   alpha, beta, t = prior
   tPrior = stats.beta.rvs(alpha, beta, size=N)
   tnowPrior = tPrior**(tnow / t)

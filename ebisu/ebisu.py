@@ -28,7 +28,7 @@ def initModel(
     firstHalflife: float,
     lastHalflife: float,
     firstWeight: float = 0.9,
-    numAtoms: int = 10,
+    numAtoms: int = 5,
     initialAlphaBeta: float = 2.0,
 ) -> BetaEnsemble:
   # We have `numAtoms` weights which have to sum to 1. The first one is `firstWeight`. We want the

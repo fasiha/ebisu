@@ -1,16 +1,13 @@
 # see https://blog.ionelmc.ro/2014/05/25/python-packaging/
 
-from setuptools import setup  # type:ignore
+from setuptools import setup, find_packages  # type:ignore
 from glob import glob
 from os.path import basename
 from os.path import splitext
 
-from setuptools import find_packages
-from setuptools import setup
-
 setup(
     name='ebisu',
-    version='3.0.0-rc1',
+    version='3.0.0rc1',
     description='Intelligent quiz scheduling',
     long_description=('Public-domain library for quiz scheduling with'
                       ' Bayesian statistics.'),

@@ -164,7 +164,8 @@ def updateRecall(
               time=updatedAtom[2],
               log2weight=newLog2Weight))
     else:
-      newAtoms.append(oldAtom)
+      newAtoms.append(
+          Atom(alpha=oldAtom.alpha, beta=oldAtom.beta, time=oldAtom.time, log2weight=newLog2Weight))
 
   # equivalent to
   # ```py

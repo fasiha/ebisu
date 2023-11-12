@@ -35,8 +35,6 @@ def testUpdate():
   init = initModel(10, 10e3)
   initHalflife = modelToPercentileDecay(init)
 
-  summarizeModel(init)
-
   for t in [1, 10, 100, 1000]:
     for success in [True, False]:
       u = updateRecall(init, 1 if success else 0, 1, t)
@@ -44,7 +42,6 @@ def testUpdate():
       if success:
         assert halflife > initHalflife
       else:
-        summarizeModel(u)
         assert halflife < initHalflife, f'{t=}, {success=}'
 
 

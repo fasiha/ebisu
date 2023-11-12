@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from ebisu2beta import updateRecall, predictRecall, modelToPercentileDecay, rescaleHalflife
-from ebisu2beta.alternate import predictRecallMedian, predictRecallMonteCarlo, updateRecallMonteCarlo
+from ebisu.ebisu2beta import updateRecall, predictRecall, modelToPercentileDecay, rescaleHalflife
+from ebisu.ebisu2beta.alternate import predictRecallMedian, predictRecallMonteCarlo, updateRecallMonteCarlo
 import unittest
 import numpy as np
 
@@ -201,8 +201,15 @@ def monotonicDecreasing(v):
 
 
 if __name__ == '__main__':
-  unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(TestEbisu()))
+  t = TestEbisu()
+  print("Starting tests to generate test.json")
+  t.test_prior()
+  print("Prior done")
+  t.test_posterior()
+  print("Posterior done")
+  t.test_fuzzy()
 
   with open("test.json", "w") as out:
     import json
     out.write(json.dumps(testpoints))
+  print("test.json written")

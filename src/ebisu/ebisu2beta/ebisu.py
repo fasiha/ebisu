@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 
-from scipy.special import betaln, beta as betafn, logsumexp
+from typing import Dict, Tuple, Union
+from scipy.special import betaln, beta as betafn, logsumexp  # type:ignore
 import numpy as np
+from math import log, exp
+
+IntFloat = Union[int, float]
+Prior = Tuple[IntFloat, IntFloat, IntFloat]
 
 
-def predictRecall(prior, tnow, exact=False):
+def predictRecall(prior: Prior, tnow: IntFloat, exact=False) -> float:
   """Expected recall probability now, given a prior distribution on it. 🍏
 
   `prior` is a tuple representing the prior distribution on recall probability
@@ -38,10 +43,10 @@ def predictRecall(prior, tnow, exact=False):
   return exp(ret) if exact else ret
 
 
-_BETALNCACHE = {}
+_BETALNCACHE: Dict[Tuple[float, float], float] = {}
 
 
-def _cachedBetaln(a, b):
+def _cachedBetaln(a: IntFloat, b: IntFloat) -> float:
   "Caches `betaln(a, b)` calls in the `_BETALNCACHE` dictionary."
   if (a, b) in _BETALNCACHE:
     return _BETALNCACHE[(a, b)]
@@ -50,9 +55,9 @@ def _cachedBetaln(a, b):
   return x
 
 
-def binomln(n, k):
+def binomln(n: IntFloat, k: IntFloat):
   "Log of scipy.special.binom calculated entirely in the log domain"
-  return -betaln(1 + n - k, 1 + k) - np.log(n + 1)
+  return -betaln(1 + n - k, 1 + k) - log(n + 1)
 
 
 def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=None):
@@ -135,8 +140,8 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=N
       prior=prior, successes=successes, total=total, tnow=tnow, rebalance=rebalance, tback=tback)
 
   if rebalance:
-    from scipy.optimize import root_scalar
-    target = np.log(0.5)
+    from scipy.optimize import root_scalar  # type:ignore
+    target = log(0.5)
     rootfn = lambda et: (unnormalizedLogMoment(1, et) - logDenominator) - target
     sol = root_scalar(rootfn, bracket=_findBracket(rootfn, 1 / dt))
     et = sol.root
@@ -148,13 +153,13 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=N
     et = tback / tnow
 
   logMean = unnormalizedLogMoment(1, et) - logDenominator
-  mean = np.exp(logMean)
-  m2 = np.exp(unnormalizedLogMoment(2, et) - logDenominator)
+  mean = exp(logMean)
+  m2 = exp(unnormalizedLogMoment(2, et) - logDenominator)
 
   assert mean > 0, message
   assert m2 > 0, message
 
-  meanSq = np.exp(2 * logMean)
+  meanSq = exp(2 * logMean)
   var = m2 - meanSq
   assert var > 0, message
   newAlpha, newBeta = _meanVarToBeta(mean, var)
@@ -235,7 +240,7 @@ def modelToPercentileDecay(model, percentile=0.5):
   from scipy.optimize import root_scalar
   alpha, beta, t0 = model
   logBab = betaln(alpha, beta)
-  logPercentile = np.log(percentile)
+  logPercentile = log(percentile)
 
   def f(delta):
     logMean = betaln(alpha + delta, beta) - logBab
@@ -277,7 +282,7 @@ def rescaleHalflife(prior, scale=1.):
 
   logDenominator = betaln(alpha, beta)
   logm2 = betaln(alpha + 2 * dt, beta) - logDenominator
-  m2 = np.exp(logm2)
+  m2 = exp(logm2)
   newAlphaBeta = 1 / (8 * m2 - 2) - 0.5
   assert newAlphaBeta > 0
   return (newAlphaBeta, newAlphaBeta, oldHalflife * scale)

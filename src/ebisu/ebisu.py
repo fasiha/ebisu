@@ -7,7 +7,7 @@ from typing import Optional, Union
 from attr import dataclass
 from dataclasses_json import DataClassJsonMixin
 
-import ebisu2beta as ebisu2
+from . import ebisu2beta as ebisu2
 from ebisu.logsumexp import logsumexp
 
 LN2 = log(2)
@@ -105,8 +105,8 @@ def _binomialLogProbability(successes: int, total: int, p: float) -> float:
 def updateRecall(
     prior: BetaEnsemble,
     successes: Union[float, int],
+    total: int,
     elapsedTime: float,
-    total: int = 1,
     q0: Optional[float] = None,
     updateThreshold: Optional[float] = None,
     weightThreshold: Optional[float] = None,

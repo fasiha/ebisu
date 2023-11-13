@@ -3,7 +3,7 @@ import numpy as np
 from scipy.stats import binom  # type:ignore
 from scipy.optimize import minimize_scalar  # type:ignore
 
-from typing import Optional, Union
+from typing import Optional, Union, List
 from attr import dataclass
 from dataclasses_json import DataClassJsonMixin
 
@@ -15,18 +15,19 @@ LN2 = log(2)
 
 @dataclass
 class Atom(DataClassJsonMixin):
+  "An atom's weight, Beta params, and time horizon"
   log2weight: float
   alpha: float
   beta: float
   time: float
 
 
-BetaEnsemble = list[Atom]
+BetaEnsemble = List[Atom]
 
 
 def initModel(
     firstHalflife: float,
-    lastHalflife: float,
+    lastHalflife: Optional[float] = None,  # default will be `10_000 * firstHalflife`
     firstWeight: float = 0.9,
     numAtoms: int = 5,
     initialAlphaBeta: float = 2.0,
@@ -41,13 +42,14 @@ def initModel(
   solution = minimize_scalar(lambda d: abs(sum(firstWeight * d**i for i in range(numAtoms)) - 1),
                              [0.3, 0.6])
   weights = [firstWeight * solution.x**i for i in range(numAtoms)]
-  # `sum(weights)` ≈ 1, and they are logarithmically spaced, i.e.,
+  # Now `sum(weights)` ≈ 1, and they are logarithmically spaced, i.e.,
   # `np.logspace(np.log10(weights[0]), np.log10(weights[-1]), numAtoms)` ≈ `weights`.
-
-  halflives = np.logspace(log10(firstHalflife), log10(lastHalflife), numAtoms)
 
   wsum = fsum(weights)
   log2weights = [log2(w / wsum) for w in weights]
+
+  halflives = np.logspace(
+      log10(firstHalflife), log10(lastHalflife or firstHalflife * 1e4), numAtoms)
 
   return [
       Atom(log2weight=l2w, alpha=initialAlphaBeta, beta=initialAlphaBeta, time=h)
@@ -108,11 +110,9 @@ def updateRecall(
     total: int,
     elapsedTime: float,
     q0: Optional[float] = None,
-    updateThreshold: Optional[float] = None,
-    weightThreshold: Optional[float] = None,
+    updateThreshold=0.99,
+    weightThreshold=0.49,
 ) -> BetaEnsemble:
-  updateThreshold = updateThreshold if updateThreshold is not None else 0.99
-  weightThreshold = weightThreshold if weightThreshold is not None else 0.49
   updatedModels = [
       ebisu2.updateRecall((m.alpha, m.beta, m.time), successes, total, tnow=elapsedTime, q0=q0)
       for m in prior
@@ -190,6 +190,7 @@ def _exceedsThresholdLeft(v: list[float], threshold: float):
 
 
 def rescaleHalflife(model: BetaEnsemble, scale: float) -> BetaEnsemble:
+  assert scale > 0, "positive scale required"
   ret: BetaEnsemble = []
   for atom in model:
     scaled = ebisu2.rescaleHalflife((atom.alpha, atom.beta, atom.time), scale)

@@ -91,13 +91,13 @@ if __name__ == '__main__':
   beta3pred = lambda model, elapsedTime: ebisu3beta.predictRecall(
       model, model.lastEncounterMs + elapsedTime * 3600e3, logDomain=False)
   beta3up = lambda model, now, **kwargs: ebisu3beta.updateRecall(
-      model, now=now, **kwargs, updateThreshold=.9, weightThreshold=.49)
+      model, now=now, **kwargs, updateThreshold=.7, weightThreshold=.9)
   beta3up2 = lambda model, now, **kwargs: ebisu3beta.updateRecall(
-      model, now=now, **kwargs, updateThreshold=.9, weightThreshold=1.99)
+      model, now=now, **kwargs, updateThreshold=.7, weightThreshold=.9)
   beta3up3 = lambda model, now, **kwargs: ebisu3beta.updateRecall(
-      model, now=now, **kwargs, updateThreshold=.99, weightThreshold=.49)
+      model, now=now, **kwargs, updateThreshold=.9, weightThreshold=.9)
   beta3up4 = lambda model, now, **kwargs: ebisu3beta.updateRecall(
-      model, now=now, **kwargs, updateThreshold=.99, weightThreshold=1.99)
+      model, now=now, **kwargs, updateThreshold=.9, weightThreshold=2)
 
   # np.seterr(all='raise')
   # np.seterr(under='warn')
@@ -126,7 +126,8 @@ if __name__ == '__main__':
     allLiks.append(liks)
 
   # for card in [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]:
-  for card in train:
+  for card in [t for t in train if t.fractionCorrect <= 0.9]:
+    # for card in train:
     hlMeanStd = (24., 24 * .7)
     boostMeanStd = (3, 3 * .7)
     convertMode: ConvertAnkiMode = 'binary'
@@ -141,27 +142,23 @@ if __name__ == '__main__':
         (
             ebisu3beta.initModel(100, 2.0, n=5, w1=.5, now=now),
             beta3pred,
-            beta3up,
+            beta3up3,
+            ebisu3beta.hoursForRecallDecay,
+        ),
+        (
+            ebisu3beta.initModel(100, 2.0, n=10, w1=.5, now=now),
+            beta3pred,
+            beta3up3,
             ebisu3beta.hoursForRecallDecay,
         ),
         (
             ebisu3beta.initModel(100, 2.0, n=5, w1=.5, now=now),
             beta3pred,
-            beta3up2,
+            beta3up4,
             ebisu3beta.hoursForRecallDecay,
         ),
-        # (
-        #     ebisu3beta.initModel(100, 2.0, n=5, w1=.5, now=now),
-        #     beta3pred,
-        #     beta3up3,
-        #     ebisu3beta.hoursForRecallDecay,
-        # ),
-        # (
-        #     ebisu3beta.initModel(100, 2.0, n=5, w1=.5, now=now),
-        #     beta3pred,
-        #     beta3up4,
-        #     ebisu3beta.hoursForRecallDecay,
-        # ),
+
+        # # # boost
         # (
         #     ebisu3boost.initModel(
         #         initHlMean=hlMeanStd[0],

@@ -133,7 +133,7 @@ def updateRecall(
     q0: Optional[float] = None,
     now: Optional[float] = None,
     updateThreshold=0.5,
-    weightThreshold=0.1,
+    weightThreshold=1.0,  # ignore
 ) -> BetaEnsemble:
   now = now or timeMs()
   t = (now - model.lastEncounterMs) * HOURS_PER_MILLISECONDS
@@ -195,10 +195,14 @@ def updateRecall(
   return ret
 
 
-def _exceedsThresholdLeft(v, threshold):
-  ret = []
-  last = False
-  for x in v[::-1]:
-    last = last or x > threshold
-    ret.append(last)
-  return ret[::-1]
+# def _exceedsThresholdLeft(v, threshold):
+#   ret = []
+#   last = False
+#   for x in v[::-1]:
+#     last = last or x > threshold
+#     ret.append(last)
+#   return ret[::-1]
+
+
+def _exceedsThresholdLeft(v: list[float], threshold: float) -> list[bool]:
+  return (np.cumsum(v[::-1])[::-1] > threshold).tolist()

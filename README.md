@@ -52,8 +52,6 @@ model = ebisu.initModel(
 timeSinceLastReview = 20
 probabilityRecall = ebisu.predictRecall(model, timeSinceLastReview)
 print(probabilityRecall)
-# this is in the log-domain (for speed). You can ask for the normal (linear) probability
-print(ebisu.predictRecall(model, timeSinceLastReview, logDomain=False))
 
 # administer a quiz, then update the model, overwriting the old one
 timeSinceLastReview = 20.1
@@ -80,7 +78,7 @@ The biggest difference from v2 is that the new data model for memory have to be 
 
 We initialize the first atom (10 hours) to have weight `firstWeight=0.9` and the rest of the atoms have logarithmically-decreasing weights. Finally, each atom is initialized with a Beta random variable whose `α = β = initialAlphaBeta = 2.0` (see Ebisu [v2 docs](https://fasiha.github.io/ebisu/) for what this means).
 
-There's only one tiny change between v2 and v3's `predictRecall` API: now the keyword for switching between log-probability and normal probability is `logDomain=True` (the default) or `False`.
+There's only one tiny change between v2 and v3's `predictRecall` API: there's no extra argument for whether you want the result as log-probability or normal probability. This function always returns normal (linear) probability.
 
 There is _no_ change to the API for
 

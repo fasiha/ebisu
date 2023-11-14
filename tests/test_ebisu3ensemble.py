@@ -28,8 +28,7 @@ def testPredict():
   init = initModel(10, 10e3)
   t = 10
 
-  assert predictRecall(init, t) < 0
-  pLinear = predictRecall(init, t, logDomain=False)
+  pLinear = predictRecall(init, t)
   assert 0 < pLinear < 1
 
   weights = [2**a.log2weight for a in init]
@@ -60,7 +59,7 @@ def testUpdateBinomial():
   for t in [1, 10, 100, 1000]:
     updateds = [updateRecall(init, success, 2, t) for success in [0, 1, 2]]
     halflives = [modelToPercentileDecay(m) for m in updateds]
-    assert halflives[0] < halflives[1] < halflives[2]
+    assert halflives[0] < halflives[1] < halflives[2], f'{halflives}'
     assert halflives[0] < initHalflife
     assert halflives[2] > initHalflife
 

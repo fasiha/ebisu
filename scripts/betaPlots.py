@@ -15,7 +15,7 @@ for i, ab in enumerate([1.25, 2, 5, 10]):
 
 plt.legend()
 plt.xlabel('Recall probability at halflife')
-plt.ylabel('Probability of recall probability')
+plt.ylabel('Probability of recall probability (normalized)')
 plt.title('Confidence in recall probability after one half-life')
 plt.savefig('figures/betas.png', dpi=300)
 plt.savefig('figures/betas.svg')

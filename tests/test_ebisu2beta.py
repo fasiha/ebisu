@@ -202,11 +202,8 @@ def monotonicDecreasing(v):
 
 if __name__ == '__main__':
   t = TestEbisu()
-  print("Starting tests to generate test.json")
   t.test_prior()
-  print("Prior done")
   t.test_posterior()
-  print("Posterior done")
   t.test_fuzzy()
 
   with open("test.json", "w") as out:

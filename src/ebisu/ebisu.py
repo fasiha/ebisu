@@ -4,8 +4,8 @@ from scipy.stats import binom  # type:ignore
 from scipy.optimize import minimize_scalar  # type:ignore
 
 from typing import Optional, Union, List
-from attr import dataclass
-from dataclasses_json import DataClassJsonMixin
+from dataclasses import dataclass
+from dataclasses_json import dataclass_json
 
 from . import ebisu2beta as ebisu2
 from ebisu.logsumexp import logsumexp, sumexp
@@ -13,8 +13,9 @@ from ebisu.logsumexp import logsumexp, sumexp
 LN2 = log(2)
 
 
+@dataclass_json
 @dataclass
-class Atom(DataClassJsonMixin):
+class Atom:
   "An atom's weight, Beta params, and time horizon"
   log2weight: float
   alpha: float

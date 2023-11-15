@@ -10,7 +10,8 @@ plt.ion()
 def generatePis(deltaT, alpha=10.0, beta=10.0):
   piT = betarv.rvs(alpha, beta, size=50 * 1000)
   piT2 = piT**deltaT
-  plt.hist(piT2, bins=20, label='δ={}'.format(deltaT), alpha=0.25, density=True)
+  direction = 'middle' if .9 < deltaT < 1.1 else 'left' if deltaT > 1.1 else 'right'
+  plt.hist(piT2, bins=20, label=f'δ={deltaT} ({direction})', alpha=0.25, density=True)
 
 
 [generatePis(p) for p in [0.3, 1., 3.]]

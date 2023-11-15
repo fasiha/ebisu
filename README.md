@@ -344,9 +344,9 @@ That is, to time-travel $p_t$ to time $t_2$, we raise it to the $δ = t_2 / t$ p
 
 Unfortunately, a Beta-distributed $p_t$ becomes _non_-Beta-distributed when raised to positive power $δ$. The plot below show what $p_{\text{1 week}} ∼ Beta(10, 10)$ looks like after
 
-- two days (right histogram, $δ=0.3$),
-- one week (middle histogram, $δ=1$),
-- and three weeks (left histogram, $δ=3$).
+- two days (right histogram, $δ=0.3$, sharp peak around 0.8, very little density near 1.0),
+- one week (middle histogram, $δ=1$, Bell-like curve centered at 0.5 and dying out by 0.2 and 0.8),
+- and three weeks (left histogram, $δ=3$, peaking around 0.1 with a lot of support at 0, dying by 0.5).
 
 ![Three histograms per above](figures/pidelta.svg)
 

@@ -359,29 +359,35 @@ $$p_{t_2} = g(p_t) = (p_t)^δ,$$
 and the inverse of this transformation is
 $$p_t = g^{-1}(p_{t_2}) = (p_{t_2})^{1/δ},$$
 the transformed (exponentiated) random variable has probability density
+
 $$
 \begin{align*}
   P(p_{t_2}) &= P\left(g^{-1}(p_{t_2})\right) ⋅ \frac{∂}{∂p_{t_2}} g^{-1}(p_{t_2}) \\
              &= Beta(p_{t_2}^{1/δ}; α, β) ⋅ \frac{p_{t_2}^{1/δ - 1}}{δ},
 \end{align*}
 $$
+
 since $P(p_t) = Beta(p_t; α, β)$, the Beta density on the recall probability at time $t$, and $\frac{∂}{∂p_{t_2}} g^{-1}(p_{t_2})^{1/δ} = \frac{p_{t_2}^{1/δ - 1}}{δ}$. Following some algebra, the final density is
+
 $$
   P(p; p_t^δ) = \frac{p^{α/δ - 1} · (1-p^{1/δ})^{β-1}}{δ · B(α, β)},
 $$
-where $B(α, β) = Γ(α) · Γ(β) / Γ(α + β)$ is [beta function](https://en.wikipedia.org/wiki/Beta_function) (also the normalizing denominator in the Beta density—confusing, sorry), and $Γ(·)$ is the [gamma function](https://en.wikipedia.org/wiki/Gamma_function), a generalization of factorial. 
+
+where $B(α, β) = Γ(α) · Γ(β) / Γ(α + β)$ is [beta function](https://en.wikipedia.org/wiki/Beta_function) (also the normalizing denominator in the Beta density—confusing, sorry), and $Γ(·)$ is the [gamma function](https://en.wikipedia.org/wiki/Gamma_function), a generalization of factorial.
 
 [Robert Kern noticed](https://github.com/fasiha/ebisu/issues/5) that this is a [GB1](<https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)>) (generalized Beta of the first kind) random variable:
 $$p_t^δ ∼ GB1(p; 1/δ, 1, α; β)$$
 When $δ=1$, that is, at exactly the half-life, recall probability is simply the initial Beta we started with.
 
 We will use the density of $p_t^δ$ to reach our two most important goals:
+
 - what’s the recall probability of a given fact right now?, and
 - how do I update my estimate of that recall probability given quiz results?
 
 > To check the above derivation in [Wolfram Alpha](https://www.wolframalpha.com), run `p^((a-1)/d) * (1 - p^(1/d))^(b-1) / Beta[a,b] * D[p^(1/d), y]`.
 >
 > To check it in [Sympy](https://live.sympy.org/), copy-paste the following into the Sympy Live Shell (or save it in a file and run):
+>
 > ```py
 > from sympy import symbols, simplify, diff
 > p_1, p_2, a, b, d, den = symbols('p_1 p_2 α β δ den', positive=True, real=True)
@@ -390,9 +396,11 @@ We will use the density of $p_t^δ$ to reach our two most important goals:
 > prior_t2  # or
 > print(prior_t2)
 > ```
+>
 > which produces `p_2**((α - δ)/δ)*(1 - p_2**(1/δ))**(β - 1)/(den*δ)`.
 >
-> And finally, we can use Monte Carlo to generate random draws from $p_t^δ$, for specific α, β, and δ, and comparing sample moments against the GB1's analytical moments per [Wikipedia](https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)), $E\left[(p_{t}^{δ})^N\right]=\frac{B(α + δ N, β)}{B(α, β)}$:
+> And finally, we can use Monte Carlo to generate random draws from $p_t^δ$, for specific α, β, and δ, and comparing sample moments against the GB1's analytical moments per [Wikipedia](<https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)>), $E\left[(p_{t}^{δ})^N\right]=\frac{B(α + δ N, β)}{B(α, β)}$:
+>
 > ```py
 > (α, β, δ) = 5, 4, 3
 > import numpy as np
@@ -405,19 +413,18 @@ We will use the density of $p_t^δ$ to reach our two most important goals:
 > analyticalMoments = betafn(α + δ * Ns, β) / betafn(α, β)
 > print(list(zip(sampleMoments, analyticalMoments)))
 > ```
+>
 > which produces this tidy table of the first five non-central moments:
-> 
-> | analytical | sample | % difference |
-> |------------|--------|---------------|
-> | 0.2121 | 0.2122 | 0.042% |
-> | 0.06993 | 0.06991 | -0.02955% |
-> | 0.02941 | 0.02937 | -0.1427% |
-> | 0.01445 | 0.01442 | -0.2167% |
-> | 0.007905 | 0.007889 | -0.2082% |
+>
+> | analytical | sample   | % difference |
+> | ---------- | -------- | ------------ |
+> | 0.2121     | 0.2122   | 0.042%       |
+> | 0.06993    | 0.06991  | -0.02955%    |
+> | 0.02941    | 0.02937  | -0.1427%     |
+> | 0.01445    | 0.01442  | -0.2167%     |
+> | 0.007905   | 0.007889 | -0.2082%     |
 >
 > We check both mathematical derivations and their programmatic implementations by comparing them against Monte Carlo as part of an extensive unit test suite in the code below.
-
-
 
 ## Dev
 

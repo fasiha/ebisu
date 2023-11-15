@@ -41,15 +41,15 @@ def testPredict():
   init = initModel(10, 10e3)
   for t in [1, 10, 100]:
 
-    pLinear = predictRecall(init, t)
-    assert 0 < pLinear < 1
+    actual = predictRecall(init, t)
+    assert 0 < actual < 1
 
     weights = [2**a.log2weight for a in init]
     pRecalls = [ebisu2.predictRecall((a.alpha, a.beta, a.time), t, exact=True) for a in init]
     expected = weightedSum(weights, pRecalls)
 
-    assert np.allclose(pLinear, expected)
-    testpoints += [["predict", [modelToJson(init), t], pLinear]]
+    assert np.allclose(actual, expected)
+    testpoints += [["predict", [modelToJson(init), t], actual]]
 
 
 def testUpdateBinary():

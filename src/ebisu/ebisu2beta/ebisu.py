@@ -129,10 +129,11 @@ def updateRecall(prior: Prior,
   if total == 1:
     return _updateRecallSingle(prior, successes, tnow, rebalance=rebalance, tback=tback, q0=q0)
 
+  assert successes == int(successes)
   (alpha, beta, t) = prior
   dt = tnow / t
   failures = total - successes
-  binomlns = [binomln(failures, i) for i in range(failures + 1)]
+  binomlns = [binomln(failures, i) for i in range(int(failures) + 1)]
 
   def unnormalizedLogMoment(m, et):
     return logsumexp([

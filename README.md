@@ -21,6 +21,7 @@
   - [Math](#math)
     - [A single Beta-distributed atom](#a-single-beta-distributed-atom)
       - [Noiy-binary quizzes](#noiy-binary-quizzes)
+    - [Power laws](#power-laws)
   - [Dev](#dev)
     - [Tests](#tests)
   - [Deploy to PyPI](#deploy-to-pypi)
@@ -438,6 +439,7 @@ and for
 In practice, we’ll choose $t'$ to be the posterior’s halflife, i.e., we’ll pick $t'$ such that the new $\hat α ≈ \hat β.$
 
 Whew, that was a whirlwind tour through some mathematical thickets. Let's take a look at what this looks like in practice. Suppose we start with an initial model, that the student’s memory has halflife of one day, that is, a day after studying this fact, we expect the student's recall probability to follow $Beta(3, 3)$. The following plot shows the posterior halflife for a range of quiz times, ranging from a half hour to four days, for
+
 - the binary quiz case, i.e., pass and fail, as well as
 - the binomial $n=2$ case, i.e., the student gets $k$ = 0, 1, or 2 points.
 
@@ -447,9 +449,104 @@ In the binary case, if the student passes the quiz a few minutes after last stud
 
 Ebisu is surprised in the opposite cases: if the student fails the quiz a few minutes after studying, the posterior halflife drops a lot, and similarly if the student passes the quiz after several days of not studying it, the halflife rises a lot.
 
-The *binomial* case evinces the exact same behaviors, but more exaggerated. Notice that the 0 out of 2 points case produces a posterior halflife curve that's strictly lower than the 0 out of 1 points (binary failure) case, while the 2 out of 2 points curve is strictly higher than the 1 out of 1 points (binary pass) curve. The 1 out of 2 points curve is kind of half-way between them. Getting 1 out of 2 points on a quiz around one halflife (one day) after studying leaves the posterior halflife unmoved.
+The _binomial_ case evinces the exact same behaviors, but more exaggerated. Notice that the 0 out of 2 points case produces a posterior halflife curve that's strictly lower than the 0 out of 1 points (binary failure) case, while the 2 out of 2 points curve is strictly higher than the 1 out of 1 points (binary pass) curve. The 1 out of 2 points curve is kind of half-way between the binary curves. Getting 1 out of 2 points on a quiz around one halflife (one day) after studying leaves the posterior halflife unmoved.
 
 #### Noiy-binary quizzes
+
+Can we imagine a quiz type where the student could score 0 or 1 point (out of max 1) but also somewhere in between? As luck would have it, Stack Exchange user [@mef](https://stats.stackexchange.com/a/419320) has invented a lovely way to model this and it is quite useful in capturing some advanced quiz types.
+
+Let $x ∼ \mathrm{Bernoulli}(p_t)$ be a “true” Bernoulli draw representing the answer to the question, “does the student _really_ know this fact?” ($p_t$ here is the time-traveled Beta random variable, i.e., a GB1 random variable.)
+
+But this random variable is hidden from us: we don’t observe $x$. Rather, we observe a quiz, a “noisy report”, $z|x ∼ \mathrm{Bernoulli}(q_x)$ where
+
+- $q_1 = P(z = 1 | x = 1)$, that is, the probability of us observing a successful quiz when the student actually _does_ knows the fact, while
+- $q_0 = P(z = 1 | x = 0)$, i.e., the probability of us observing a successful quiz when the student has in fact _forgotten_ the fact.
+
+In signal processing terms, the true but hidden result $x$ goes through a noisy channel, which might flip the bit, and what we observe is the output of that channel, $z$.
+
+In the plain binary case without fuzziness, $q_1 = 1$ and $q_0 = 0$, but in the soft-binary case, these two parameters are independent and free for you to specify as any numbers between 0 and 1 inclusive.
+
+Given the probability of recall at the time of the quiz $t_2$ is $p_{t_2}∼GB1$ and with known $α$, $β$, $q_1$, and $q_0$, we can ask what the posterior $p_{t_2} | z$ is. According to Bayes,
+
+$$
+P(h|z) = \frac{Lik(z|p_{t_2})Prior(p_{t_2})}{∫_0^∞ Lik(z|p_{t_2})Prior(p_{t_2}) \,\mathrm{d}h},
+$$
+
+with the "prior" being the GB1 density and the likelihood given by
+
+$$
+\begin{split}
+Lik(z|p_{t_2}) &= P(z|x) ⋅ P(x|p_{t_2})
+  \\
+  &= \mathrm{Bernoulli}(z; q_x) ⋅ \mathrm{Bernoulli}\left(x; p_{t_2}\right).
+\end{split}
+$$
+
+Let’s break this likelihood into its two cases: first, for observed *failed* quizzes,
+$$
+\begin{align*}
+  Lik(z=0 | p) &= P(z=0|x=0) P(x=0|p) + P(z=0|x=1) P(x=1|p) \\
+               &= (1-q_0)(1-p) + (1-q_1) p.
+\end{align*}
+$$
+And following the same pattern, for observed *successes*:
+$$
+\begin{align*}
+  Lik(z=1| p) &= P(z=1|x=0) P(x=0|p) + P(z=1|x=1) P(x=1|p) \\
+                 &= q_0 (1-p) + q_1 p.
+\end{align*}
+$$
+
+As in the binomial case, we want the flexibility to time-travel it to any time $t' = ε ⋅ t_2$. We’ve done this twice already—first to transform the Beta prior on recall after $t$ to $t_2 = δ ⋅ t$, and then again to transform the *binomial* posterior from the quiz time $t_2$ to any $t' = ε ⋅ t_2$. Let’s do it a third time. The pattern is the same as before:
+$$
+  P(p; p_{t'}|z_{t_2}) ∝ Prior(p^{1/ε}) ⋅ Lik(p^{1/ε}) ⋅ \frac{1}{ε} p^{1/ε - 1}
+$$
+where the $∝$ symbol is read “proportional to” and just means that the expression on the right has to be normalized (divide it by its integral) to ensure the result is a true probability density whose definite integral sums to one.
+
+We can represent the likelihood of any $n=1$ quiz—binary and noisy!—as $Lik(z|p) = r p + s$ for some $r$ and $s$. Then,
+$$
+  P(p; p_{t'}|z_{t_2}) = \frac{
+    \left( r p^{\frac{α + δ}{δ ε} - 1} + s p^{\frac{α}{δ ε}-1} \right) 
+    \left( 1-p^{\frac{1}{δ ε}} \right)^{β - 1}
+  }{
+    δ ε (r B(α + δ, β) + s B(α, β))
+  }.
+$$
+The normalizing denominator comes from $\int_0^1 p^{a/x - 1} (1-p^{1/x})^{b - 1} dp = x ⋅ B(a, b)$, which we also used in the binomial case above. This fact is also very helpful to evaluate the moments of this posterior:
+$$
+  m_N = E\left[ p_{t'}^N\right] = \frac{
+    c B(α + δ(1 + N ε), β) + s B(α + δ N ε, β) 
+  }{
+    r B(α + δ, β) + s B(α, β)
+  },
+$$
+
+with
+
+- for $z=0$, i.e., a failed quiz, 
+  - $r = q_0 - q_1$ (-1 for a binary non-fuzzy quiz)
+  - $s = 1-q_0$ (1 for a binary non-fuzzy quiz).
+- For $z=1$, a successful quiz,
+  - $r = q_1 - q_0$ (1 for a binary non-fuzzy quiz)
+  - $s = q_0$ (0 for a binary non-fuzzy quiz).
+
+With these moments, we can once again match the first and second moments to get our new model, $[\hat α, \hat β, t']$:
+- $δ = t_2/t$, i.e., time of quiz divided by the original model time,
+- $ε=t'/t_2$, i.e., the time you want the posterior at divided by the time of quiz,
+- $\hat α = (μ(1-μ)/σ^2 - 1) ⋅ μ$ and
+- $\hat β = (μ(1-μ)/σ^2 - 1) ⋅ (1-μ)$, where
+- $μ = m_1$
+- and $σ^2 = m_2 - m_1^2$.
+
+We again note that both $q_1 = P(z = 1 | x = 1)$ and $q_0 = P(z = 1 | x = 0)$ are *free* parameters, and apps have total flexibility in specifying these. In Ebisu’s API presented above, both $z$ and $q_1$ are encoded without loss of generality in `0 <= successes <= 1`:
+- $z=1$ if `successes > 0.5`, otherwise $z=0$.
+- $q_1$ is `max(successes, 1 - successes)`.
+
+Therefore if `successes = 0.1`, then we know $z=0$ and $q_1 = 0.9$.
+
+Meanwhile, $q_0$ is provided in a keyword argument and for the sake of developer experience, $q_0=1-q_1$ is picked as a default when none is provided. While this default is ad hoc, it does have the nice property that `successes` between 0 and 1 will smoothly and symmetrically (around 0.5) scale the posterior halflife between the binary fail/pass cases. Also, as a satisfying bonus, a *totally* uninformative quiz with  `successes = 0.5` results in *no change* to the prior, i.e., $α' = α$ and $β' = β$!
+
+### Power laws
 
 ## Dev
 

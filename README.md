@@ -19,8 +19,8 @@
     - [Bonus: rescale halflife](#bonus-rescale-halflife)
   - [How it works](#how-it-works)
   - [Math](#math)
-    - [Bernoulli quizzes](#bernoulli-quizzes)
-    - [Moving Beta distributions through time](#moving-beta-distributions-through-time)
+    - [A single Beta-distributed atom](#a-single-beta-distributed-atom)
+      - [Noiy-binary quizzes](#noiy-binary-quizzes)
   - [Dev](#dev)
     - [Tests](#tests)
   - [Deploy to PyPI](#deploy-to-pypi)
@@ -144,7 +144,7 @@ def initModel(
 
 The only required argument is `firstHalflife`, your best guess as to how much time it'll take for this student's probability of recall for this fact to drop to 50%. Ebisu doesn't care about what time units you use so you have to be consistent: pick hours or days or whatever, and use the same unit everywhere.
 
-> Ebisu is Bayesian, so it doesn't treat `firstHalflife` as "the truth", but rather as your probabilistic belief about the halflife before you see any quizzes, considering only what you know about this student and this fact. More specifically, you are telling Ebisu that that after `firstHalflife` time units have elapsed, the student's memory will decay to a `Beta(α, β)` random variable, with both parameters, `α` and `β`, set to `initialAlphaBeta > 1`. Here's what that looks like visually for a few different `initialAlphaBeta`:
+> Ebisu is Bayesian, so it doesn't treat `firstHalflife` as "the truth", but rather as your probabilistic _pripr_ belief about the halflife, _prior_ to seeing any quizzes and considering only what you know about this student and this fact. More specifically, you are telling Ebisu that that after `firstHalflife` time units have elapsed, the student's memory will decay to a `Beta(α, β)` random variable, with both parameters, `α` and `β`, set to `initialAlphaBeta > 1`. Here's what that looks like visually for a few different `initialAlphaBeta`:
 >
 > ![Distribution of Beta random variables with parameters 1.25, 2, 5, and 10](./figures/betas.svg)
 >
@@ -170,9 +170,9 @@ The model returned by `initModel` is easily encoded into JSON. I recommend you i
 
 ### 2. Predict recall
 
-So, a student has learned a few facts, you've called `initModel` each time and saved all models in a database.
+So, a student has learned a few facts, and you've called `initModel` to create a model for each flashcard, and stored everything in a database.
 
-Now, what is the probability of recall for those flashcards?
+Now, at this instant, what is the probability of recall for those flashcards?
 
 ```py
 def predictRecall(
@@ -183,8 +183,6 @@ def predictRecall(
 ```
 
 Just give each model to the above function along with how long it's been since the student last saw this flashcard, `elapsedTime`; be sure to use the same units that you used for `initModel`!
-
-(By default, this function will return the log-probability, to save an exponential. Pass in `logDomain=False` to get the normal probability. Log-probability goes from -∞ to 0 whereas regular probability goes from 0 to 1.)
 
 If the student wants to review, you can pick the flashcard with the lowest `predictRecall` and quiz them on that. (If your app schedules a review for when the recall drops below some threshold, see below 👇 for `modelToPercentileDecay`.)
 
@@ -206,13 +204,14 @@ def updateRecall(
 ) -> BetaEnsemble
 ```
 
-There are two-ish distinct quiz types that Ebisu supports thanks to its Bayesian formulation, so this function has a lot of potential arguments.
+There are two-ish distinct quiz types that Ebisu supports thanks to its Bayesian formulation, so this function has a lot of potential arguments. Whatever arguments you pass in, this function returns the new model: save it in your database, with the current timestamp, because future calls to `predictRecall` will need to know when it was last reviewed.
 
 #### Simple binary quizzes
 
-On success, `updateRecall(model, 1, 1, elapsedTime)`.
+- On success, `updateRecall(model, 1, 1, elapsedTime)`.
+- On failure, `updateRecall(model, 0, 1, elapsedTime)`.
 
-On failure, `updateRecall(model, 0, 1, elapsedTime)`. That is, `successes` is 0 or 1 out of a `total=1` and `elapsedTime` in units consistent with `predictRecall` and `initModel`.
+That is, `successes` is 0 or 1 out of a `total=1` and `elapsedTime` in units consistent with `predictRecall` and `initModel`.
 
 #### Binomial quizzes
 
@@ -317,116 +316,140 @@ Now let’s jump into a more formal description of the mathematics, wihch will h
 
 While much psychological literature has identified that forgetting follows power-law decay (e.g., probability of recall $t$ time units after last review $p(t) = (t+1)^{-α}$ for some positive shape parameter $α$), we start by discussing a simpler case, exponential decay, because we will eventually use an ensemble of exponentially-decaying functions to approximate a power law.
 
-### Bernoulli quizzes
+### A single Beta-distributed atom
 
-Let’s begin with a quiz. One way or another, we’ve picked a fact to quiz the student on, $t$ days after they last saw this fact. (The units of $t$ are arbitrary: it can be any positive real number.)
+We begin with a claim: after $t$ time units elapsed since their last review, a student's probability of recalling a fact is distributed according to $Beta(α, β)$ with $α = β$. More formally,
+$$p_t ∼ Beta(α, β) \quad \text{with} \quad α = β$$
+This is the same graph as above—what different Beta random variables look like for different $α=β$:
 
-We’ll model the results of the quiz as a Bernoulli experiment—we’ll later expand this to a binomial experiment. So for Bernoulli quizzes, $x_t ∼ Bernoulli(p)$; $x_t$ can be either 1 (success) with probability $p_t$, or 0 (fail) with probability $1-p_t$. Let’s think about $p_t$ as the recall probability at time $t$. Then $x_t$ is a coin flip, with a $p_t$-weighted coin.
+![Distribution of Beta random variables with parameters 1.25, 2, 5, and 10](./figures/betas.svg)
 
-The [Beta distribution](https://en.wikipedia.org/wiki/Beta_distribution) happens to be the [conjugate prior](https://en.wikipedia.org/wiki/Conjugate_prior) for the Bernoulli distribution. So if our _a priori_ belief about $p_t$ follow a Beta distribution, that is, if
-$$p_t ∼ Beta(α, β)$$
-for specific $α$ and $β$, then observing the quiz result updates our belief about the recall probability to be:
-$$p_t | x_t ∼ Beta(α + x_t, β + 1 - x_t).$$
+> We can call $t$ the "halflife" because after $t$ time units has elapsed, holding $α = β$ means the resultant random variable has mean 0.5.
 
-> **Aside 1** Notice that since $x_t$ is either 1 or 0, the updated parameters $(α + x_t, β + 1 - x_t)$ are $(α + 1, β)$ when the student correctly answered the quiz, and $(α, β + 1)$ when she answered incorrectly.
->
-> **Aside 2** Even if you’re familiar with Bayesian statistics, if you’ve never worked with priors on probabilities, the meta-ness here might confuse you. What the above means is that, before we flipped our $p_t$-weighted coin (before we administered the quiz), we had a specific probability distribution representing the coin’s weighting $p_t$, _not_ just a scalar number. After we observed the result of the coin flip, we updated our belief about the coin’s weighting—it _still_ makes total sense to talk about the probability of something happening after it happens. Said another way, since we’re being Bayesian, something actually happening doesn’t preclude us from maintaining beliefs about what _could_ have happened.
-
-This is totally ordinary, bread-and-butter Bayesian statistics. However, the major complication arises when the experiment took place not at time $t$ but $t_2$: we had a Beta prior on $p_t$ (probability of recall at time $t$) but the test is administered at some other time $t_2$.
-
-How can we update our beliefs about the recall probability at time $t$ to another time $t_2$, either earlier or later than $t$?
-
-### Moving Beta distributions through time
-
-Our old friend Ebbinghaus comes to our rescue. According to the exponentially-decaying forgetting curve, the probability of recall at time $t$ is
+At some _other_ time $t_2 ≠ t$, what is the probability of recall, $p_{t_2}$? Let's use our friend Ebbingaus' exponential decay. According to the exponentially-decaying forgetting curve, the probability of recall at time $t$ is
 $$p_t = 2^{-t/h},$$
 for some notional half-life $h$. Let $t_2 = δ·t$. Then,
 $$p_{t_2} = p_{δ t} = 2^{-δt/h} = (2^{-t/h})^δ = (p_t)^δ.$$
 That is, to time-travel $p_t$ to time $t_2$, we raise it to the $δ = t_2 / t$ power.
 
-Unfortunately, a Beta-distributed $p_t$ becomes _non_-Beta-distributed when raised to positive power $δ$. The plot below show what $p_{\text{1 week}} ∼ Beta(10, 10)$ looks like after
-
-- two days (right histogram, $δ=0.3$, sharp peak around 0.8, very little density near 1.0),
-- one week (middle histogram, $δ=1$, Bell-like curve centered at 0.5 and dying out by 0.2 and 0.8),
-- and three weeks (left histogram, $δ=3$, peaking around 0.1 with a lot of support at 0, dying by 0.5).
-
-![Three histograms per above](figures/pidelta.svg)
-
-We could try to fit this non-Beta random variable with a Beta random variable to do the Bernoulli quiz update, but especially when over- or under-reviewing, the closest Beta fit is very poor. So let’s derive analytically the probability density function (PDF) for $p_t^δ$.
-
-> Throughout this document, I use $P(x; X)$ to denote the density of the random variable $X$ as a function of the algebraic variable $x$.
-
-Recall the conventional way to obtain the density of a [nonlinearly-transformed random variable](https://en.wikipedia.org/w/index.php?title=Random_variable&oldid=771423505#Functions_of_random_variables). Since the new random variable
-$$p_{t_2} = g(p_t) = (p_t)^δ,$$
-and the inverse of this transformation is
-$$p_t = g^{-1}(p_{t_2}) = (p_{t_2})^{1/δ},$$
-the transformed (exponentiated) random variable has probability density
-
-$$
-\begin{align*}
-  P(p_{t_2}) &= P\left(g^{-1}(p_{t_2})\right) ⋅ \frac{∂}{∂p_{t_2}} g^{-1}(p_{t_2}) \\
-             &= Beta(p_{t_2}^{1/δ}; α, β) ⋅ \frac{p_{t_2}^{1/δ - 1}}{δ},
-\end{align*}
-$$
-
-since $P(p_t) = Beta(p_t; α, β)$, the Beta density on the recall probability at time $t$, and $\frac{∂}{∂p_{t_2}} g^{-1}(p_{t_2})^{1/δ} = \frac{p_{t_2}^{1/δ - 1}}{δ}$. Following some algebra, the final density is
-
-$$
-  P(p; p_t^δ) = \frac{p^{α/δ - 1} · (1-p^{1/δ})^{β-1}}{δ · B(α, β)},
-$$
-
-where $B(α, β) = Γ(α) · Γ(β) / Γ(α + β)$ is [beta function](https://en.wikipedia.org/wiki/Beta_function) (also the normalizing denominator in the Beta density—confusing, sorry), and $Γ(·)$ is the [gamma function](https://en.wikipedia.org/wiki/Gamma_function), a generalization of factorial.
+Working through the calculus-heavy technique of obtainining the density of a [nonlinearly-transformed random variable](https://en.wikipedia.org/w/index.php?title=Random_variable&oldid=771423505#Functions_of_random_variables), we can show that if $P(p_t) = Beta(p_t; α, β)$, i.e., the probability density function of $p_t$ is the Beta density, then
+$$P(p; p_t^δ) = \frac{p^{α/δ - 1} · (1-p^{1/δ})^{β-1}}{δ · B(α, β)},$$
+where $B(α, β) = Γ(α) · Γ(β) / Γ(α + β)$ is [Beta function](https://en.wikipedia.org/wiki/Beta_function), not to be confused with the Beta distribution (sorry), and $Γ(·)$ is the [gamma function](https://en.wikipedia.org/wiki/Gamma_function), a generalization of factorial.
 
 [Robert Kern noticed](https://github.com/fasiha/ebisu/issues/5) that this is a [GB1](<https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)>) (generalized Beta of the first kind) random variable:
 $$p_t^δ ∼ GB1(p; 1/δ, 1, α; β)$$
 When $δ=1$, that is, at exactly the half-life, recall probability is simply the initial Beta we started with.
 
-We will use the density of $p_t^δ$ to reach our two most important goals:
+If the recall probability after $t$ time units $p_t$ is distributed according to $Beta(α, β)$, then the expected value (the mean) of $p_{t_2} = p_t^δ$ is
+$$E[p_t^δ] = \frac{B(α+δ, β)}{B(α,β)} = \frac{Γ(α + β)}{Γ(α)}  \frac{Γ(α + δ)}{Γ(α + β + δ)}.$$
+In other words, this is the expected recall probability at any time $t_2$, given that we believe the recall at time $t$ to follow $Beta(α, β)$.
 
-- what’s the recall probability of a given fact right now?, and
-- how do I update my estimate of that recall probability given quiz results?
+Now, at time $t_2$, we have a quiz. There are two types of quizzes we want to model, but lets start with a binomial quiz, parameterized by $k$ successes out of $n$ attempts, with $0 ≤ k ≤ n$ and $n ≥ 1$, both integers. This is equivalent to flipping the $p_{t_2}$-weighted coin a total of $n$ times and winning $k$ tosses.
 
-> To check the above derivation in [Wolfram Alpha](https://www.wolframalpha.com), run `p^((a-1)/d) * (1 - p^(1/d))^(b-1) / Beta[a,b] * D[p^(1/d), y]`.
->
-> To check it in [Sympy](https://live.sympy.org/), copy-paste the following into the Sympy Live Shell (or save it in a file and run):
->
-> ```py
-> from sympy import symbols, simplify, diff
-> p_1, p_2, a, b, d, den = symbols('p_1 p_2 α β δ den', positive=True, real=True)
-> prior_t = p_1**(a - 1) * (1 - p_1)**(b - 1) / den
-> prior_t2 = simplify(prior_t.subs(p_1, p_2**(1 / d)) * diff(p_2**(1 / d), p_2))
-> prior_t2  # or
-> print(prior_t2)
-> ```
->
-> which produces `p_2**((α - δ)/δ)*(1 - p_2**(1/δ))**(β - 1)/(den*δ)`.
->
-> And finally, we can use Monte Carlo to generate random draws from $p_t^δ$, for specific α, β, and δ, and comparing sample moments against the GB1's analytical moments per [Wikipedia](<https://en.wikipedia.org/w/index.php?title=Generalized_beta_distribution&oldid=889147668#Generalized_beta_of_first_kind_(GB1)>), $E\left[(p_{t}^{δ})^N\right]=\frac{B(α + δ N, β)}{B(α, β)}$:
->
-> ```py
-> (α, β, δ) = 5, 4, 3
-> import numpy as np
-> from scipy.stats import beta as betarv
-> from scipy.special import beta as betafn
-> prior_t = betarv.rvs(α, β, size=100_000)
-> prior_t2 = prior_t**δ
-> Ns = np.array([1, 2, 3, 4, 5])
-> sampleMoments = [np.mean(prior_t2**N) for N in Ns]
-> analyticalMoments = betafn(α + δ * Ns, β) / betafn(α, β)
-> print(list(zip(sampleMoments, analyticalMoments)))
-> ```
->
-> which produces this tidy table of the first five non-central moments:
->
-> | analytical | sample   | % difference |
-> | ---------- | -------- | ------------ |
-> | 0.2121     | 0.2122   | 0.042%       |
-> | 0.06993    | 0.06991  | -0.02955%    |
-> | 0.02941    | 0.02937  | -0.1427%     |
-> | 0.01445    | 0.01442  | -0.2167%     |
-> | 0.007905   | 0.007889 | -0.2082%     |
->
-> We check both mathematical derivations and their programmatic implementations by comparing them against Monte Carlo as part of an extensive unit test suite in the code below.
+By application of Bayes rule, the posterior is
+$$Posterior(p|k, n) = \frac{Prior(p) · Lik(k|p,n)}{\int_0^1 Prior(p) · Lik(k|p,n) \, dp}.$$
+Here,
+
+- “prior” refers to the GB1 density $P(p_t^δ)$ derived above.
+- $Lik$ is the binomial likelihood: $Lik(k|p,n) = \binom{n}{k} p^k (1-p)^{n-k}$. This is what you see on Wikipedia etc., the PMF (probability mass function) of a binomial random variable.
+- The denominator is the marginal probability of the observation $k$.
+
+Combining all these into one expression, we have:
+
+$$
+Posterior(p|k, n) = \frac{
+    p^{α/δ - 1} (1-p^{1/δ})^{β - 1} p^k (1-p)^{n-k}
+  }{
+    \int_0^1 p^{α/δ - 1} (1-p^{1/δ})^{β - 1} p^k (1-p)^{n-k} \, dp
+  },
+$$
+
+where note that the big integrand in the denominator is just the numerator.
+
+We use two helpful facts now. The more important one is that
+$$\int_0^1 p^{α/δ - 1} (1-p^{1/δ})^{β - 1} \, dp = δ ⋅ B(α, β),$$
+when $α, β, δ > 0$. We’ll use this fact several times in what follows—you can see the form of this integrand in the big integrand in the above posterior.
+
+The second helpful fact gets us around that pesky $(1-p)^{n-k}$. By applying the [binomial theorem](https://en.wikipedia.org/w/index.php?title=Binomial_theorem&oldid=944317290#Theorem_statement), we can see that
+$$\int_0^1 f(x) (1-x)^n \, dx = \sum_{i=0}^{n} \left[ \binom{n}{i} (-1)^i \int_0^1 x^i f(x) \, dx \right],$$
+for integer $n > 0$.
+
+Putting these two facts to use, we can show that the posterior at time $t_2$ is
+
+$$
+  Posterior(p; p_{t_2}|k, n) = \frac{
+    \sum_{i=0}^{n-k} \binom{n-k}{i} (-1)^i p^{α / δ + k + i - 1} (1-p^{1/δ})^{β - 1}
+  }{
+    δ \sum_{i=0}^{n-k} \binom{n-k}{i} (-1)^i ⋅ B(α + δ (k + i), \, β)
+  }.
+$$
+
+Given a Beta-prior on the recall probability after $t$ time units, and a binomial quiz at some other elapsed time $t_2$, the above gives the updated posterior on recall probability after $t_2$ time units.
+
+We could work with this but let's aim for one more enhancement.
+
+I'd prefer to have the posterior recall probability after some arbitrary time $t'$ has elapsed since last review, totally independent of both $t$ (the time of the original prior) as well as $t_2$ (the time of the quiz). We can follow the rules of [nonlinear transforms of random variables](https://en.wikipedia.org/w/index.php?title=Random_variable&oldid=771423505#Functions_of_random_variables) to get the posterior at this new $t'$, and just as we have $δ=t_2/t$ to go from $t$ (the original prior's time horizon) to $t_2$ (the quiz time), let $ε=t' / t_2$ to go from $t_2$ (the quiz time) to $t'$ (some arbitrary time for the posterior):
+
+$$
+\begin{align*}
+  P(p; p_{t'} | k_{t_2}, n_{t_2})
+  &=
+  Posterior \left(p^{1/ε}; p_{t_2}|k_{t_2}, n_{t_2} \right) ⋅ \frac{1}{ε} p^{1/ε - 1}
+  \\
+  &= \frac{
+    \sum_{i=0}^{n-k} \binom{n-k}{i} (-1)^i p^{\frac{α + δ (k + i)}{δ ε} - 1} (1-p^{1/(δε)})^{β - 1}
+  }{
+    δε \sum_{i=0}^{n-k} \binom{n-k}{i} (-1)^i ⋅ B(α + δ (k + i), \, β)
+  }.
+\end{align*}
+$$
+
+The denominator is the same in this $t'$-time-shifted posterior since it’s just a normalizing constant (and not a function of probability $p$) but the numerator retains the same shape as the original, allowing us to use one of our helpful facts above to derive this transformed posterior’s moments. The $N$th moment, $E[p_{t'}^N]$, is:
+
+$$
+  m_N = \frac{
+    \sum_{i=0}^{n-k} \binom{n-k}{i} (-1)^i ⋅ B(α + (i+k)δ + N δ ε, \, β)
+  }{
+    \sum_{i=0}^{n-k} \binom{n-k}{i} (-1)^i ⋅ B(α + (i+k)δ, \, β)
+  }.
+$$
+
+With these moments of our final posterior at arbitrary time $t'$ in hand, we can moment-match to recover a Beta-distributed random variable that serves as the new prior. Recall that a distribution with mean $μ$ and variance $σ^2$ can be fit to a Beta distribution with parameters:
+
+- $\hat α = (μ(1-μ)/σ^2 - 1) ⋅ μ$ and
+- $\hat β = (μ(1-μ)/σ^2 - 1) ⋅ (1-μ)$.
+
+To summarize the update step: you started with a flashcard whose memory model was $[α, β, t]$, that is, the prior on recall probability after $t$ time units since the previous encounter is $Beta(α, β)$. At time $t_2$, you administer a quiz session that results in $k$ successful recollections of this flashcard, out of a total of $n$. Therefore, the updated model is, for any arbitrary time $t'$,
+
+$$[μ (μ(1-μ)/σ^2 - 1), \, (1-μ) (μ(1-μ)/σ^2 - 1), \, t']$$
+
+and for
+
+- $δ = t_2/t$,
+- $ε=t'/t_2$, where both
+- $μ = m_1$ and
+- $σ^2 = m_2 - μ^2$ come from evaluating the appropriate $m_N$:
+- $m_N = \frac{
+\sum_{i=0}^{n-k} \binom{n-k}{i} (-1)^i ⋅ B(α + (i+k)δ + N δ ε, \, β)
+}{
+\sum_{i=0}^{n-k} \binom{n-k}{i} (-1)^i ⋅ B(α + (i+k)δ, \, β)
+}$.
+
+In practice, we’ll choose $t'$ to be the posterior’s halflife, i.e., we’ll pick $t'$ such that the new $\hat α ≈ \hat β.$
+
+Whew, that was a whirlwind tour through some mathematical thickets. Let's take a look at what this looks like in practice. Suppose we start with an initial model, that the student’s memory has halflife of one day, that is, a day after studying this fact, we expect the student's recall probability to follow $Beta(3, 3)$. The following plot shows the posterior halflife for a range of quiz times, ranging from a half hour to four days, for
+- the binary quiz case, i.e., pass and fail, as well as
+- the binomial $n=2$ case, i.e., the student gets $k$ = 0, 1, or 2 points.
+
+![Comparing the posterior halflife after a binary pass/fail and a binomial 0, 1, and 2 points out of 2](./figures/binaryBinomial.svg)
+
+In the binary case, if the student passes the quiz a few minutes after last studying the fact, Ebisu is not impressed and the posterior halflife barely rises. Similarly, if the student _fails_ a quiz way after four days of not studying (that is, far beyond the fact's halflife), Ebisu is also not surprised at this failure: the posterior halflife drops a bit, not a lot.
+
+Ebisu is surprised in the opposite cases: if the student fails the quiz a few minutes after studying, the posterior halflife drops a lot, and similarly if the student passes the quiz after several days of not studying it, the halflife rises a lot.
+
+The *binomial* case evinces the exact same behaviors, but more exaggerated. Notice that the 0 out of 2 points case produces a posterior halflife curve that's strictly lower than the 0 out of 1 points (binary failure) case, while the 2 out of 2 points curve is strictly higher than the 1 out of 1 points (binary pass) curve. The 1 out of 2 points curve is kind of half-way between them. Getting 1 out of 2 points on a quiz around one halflife (one day) after studying leaves the posterior halflife unmoved.
+
+#### Noiy-binary quizzes
 
 ## Dev
 

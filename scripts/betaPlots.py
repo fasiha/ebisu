@@ -14,7 +14,7 @@ for i, ab in enumerate([1.25, 2, 5, 10]):
   plt.plot(ps, remmax(beta.pdf(ps, ab, ab)), linestyle=linestyles[i], label=f'α=β={ab}')
 
 plt.legend()
-plt.xlabel('Recall probability at halflife')
+plt.xlabel('Recall probability after halflife elapsed')
 plt.ylabel('Probability of recall probability (normalized)')
 plt.title('Confidence in recall probability after one half-life')
 plt.savefig('figures/betas.png', dpi=300)

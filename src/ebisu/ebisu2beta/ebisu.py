@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from typing import Dict, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 from scipy.special import betaln, beta as betafn, logsumexp  # type:ignore
 import numpy as np
 from math import log, exp
@@ -60,7 +60,13 @@ def binomln(n: IntFloat, k: IntFloat):
   return -betaln(1 + n - k, 1 + k) - log(n + 1)
 
 
-def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=None):
+def updateRecall(prior: Prior,
+                 successes: IntFloat,
+                 total: int,
+                 tnow: IntFloat,
+                 rebalance=True,
+                 tback: Optional[IntFloat] = None,
+                 q0: Optional[float] = None) -> Prior:
   """Update a prior on recall probability with a quiz result and time. 🍌
 
   `prior` is same as in `ebisu.predictRecall`'s arguments: an object
@@ -220,7 +226,7 @@ def _meanVarToBeta(mean, var):
   return alpha, beta
 
 
-def modelToPercentileDecay(model, percentile=0.5):
+def modelToPercentileDecay(model: Prior, percentile=0.5):
   """When will memory decay to a given percentile? 🏀
   
   Given a memory `model` of the kind consumed by `predictRecall`,
@@ -256,7 +262,7 @@ def modelToPercentileDecay(model, percentile=0.5):
   return t1
 
 
-def rescaleHalflife(prior, scale=1.):
+def rescaleHalflife(prior: Prior, scale: IntFloat = 1.):
   """Given any model, return a new model with the original's halflife scaled.
   Use this function to adjust the halflife of a model.
   

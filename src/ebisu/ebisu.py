@@ -179,7 +179,7 @@ def updateRecall(
         _binomialLogProbability(int(successes), total=total, p=p) for p in pRecalls
     ]
 
-  assert all(x < 0 for x in individualLogProbabilities
+  assert all(x <= 0 for x in individualLogProbabilities
             ), f'{individualLogProbabilities=}, {model=}, {elapsedTime=}'
 
   newAtoms: BetaEnsemble = []

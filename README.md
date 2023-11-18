@@ -25,6 +25,7 @@
   - [Dev](#dev)
     - [Tests](#tests)
   - [Deploy to PyPI](#deploy-to-pypi)
+  - [Bibliography](#bibliography)
 
 ## Release candidate quick-intro
 
@@ -341,7 +342,7 @@ where $B(α, β) = Γ(α) · Γ(β) / Γ(α + β)$ is [Beta function](https://en
 $$p_t^δ ∼ GB1(p; 1/δ, 1, α; β)$$
 When $δ=1$, that is, at exactly the half-life, recall probability is simply the initial Beta we started with.
 
-If the recall probability after $t$ time units $p_t$ is distributed according to $Beta(α, β)$, then the expected value (the mean) of $p_{t_2} = p_t^δ$ is
+If the recall probability after $t$ time units $p_t$ is distributed according to $Beta(α, β)$, then the expected value (the mean) of $p_{t_2} = p_t^δ$ <a name="precall-formula">is</a>
 $$E[p_t^δ] = \frac{B(α+δ, β)}{B(α,β)} = \frac{Γ(α + β)}{Γ(α)}  \frac{Γ(α + δ)}{Γ(α + β + δ)}.$$
 In other words, this is the expected recall probability at any time $t_2$, given that we believe the recall at time $t$ to follow $Beta(α, β)$.
 
@@ -482,14 +483,17 @@ Lik(z|p_{t_2}) &= P(z|x) ⋅ P(x|p_{t_2})
 \end{split}
 $$
 
-Let’s break this likelihood into its two cases: first, for observed *failed* quizzes,
+Let’s break this likelihood into its two cases: first, for observed _failed_ quizzes,
+
 $$
 \begin{align*}
   Lik(z=0 | p) &= P(z=0|x=0) P(x=0|p) + P(z=0|x=1) P(x=1|p) \\
                &= (1-q_0)(1-p) + (1-q_1) p.
 \end{align*}
 $$
-And following the same pattern, for observed *successes*:
+
+And following the same pattern, for observed _successes_:
+
 $$
 \begin{align*}
   Lik(z=1| p) &= P(z=1|x=0) P(x=0|p) + P(z=1|x=1) P(x=1|p) \\
@@ -497,25 +501,30 @@ $$
 \end{align*}
 $$
 
-As in the binomial case, we want the flexibility to time-travel it to any time $t' = ε ⋅ t_2$. We’ve done this twice already—first to transform the Beta prior on recall after $t$ to $t_2 = δ ⋅ t$, and then again to transform the *binomial* posterior from the quiz time $t_2$ to any $t' = ε ⋅ t_2$. Let’s do it a third time. The pattern is the same as before:
+As in the binomial case, we want the flexibility to time-travel it to any time $t' = ε ⋅ t_2$. We’ve done this twice already—first to transform the Beta prior on recall after $t$ to $t_2 = δ ⋅ t$, and then again to transform the _binomial_ posterior from the quiz time $t_2$ to any $t' = ε ⋅ t_2$. Let’s do it a third time. The pattern is the same as before:
+
 $$
   P(p; p_{t'}|z_{t_2}) ∝ Prior(p^{1/ε}) ⋅ Lik(p^{1/ε}) ⋅ \frac{1}{ε} p^{1/ε - 1}
 $$
+
 where the $∝$ symbol is read “proportional to” and just means that the expression on the right has to be normalized (divide it by its integral) to ensure the result is a true probability density whose definite integral sums to one.
 
 We can represent the likelihood of any $n=1$ quiz—binary and noisy!—as $Lik(z|p) = r p + s$ for some $r$ and $s$. Then,
+
 $$
   P(p; p_{t'}|z_{t_2}) = \frac{
-    \left( r p^{\frac{α + δ}{δ ε} - 1} + s p^{\frac{α}{δ ε}-1} \right) 
+    \left( r p^{\frac{α + δ}{δ ε} - 1} + s p^{\frac{α}{δ ε}-1} \right)
     \left( 1-p^{\frac{1}{δ ε}} \right)^{β - 1}
   }{
     δ ε (r B(α + δ, β) + s B(α, β))
   }.
 $$
+
 The normalizing denominator comes from $\int_0^1 p^{a/x - 1} (1-p^{1/x})^{b - 1} dp = x ⋅ B(a, b)$, which we also used in the binomial case above. This fact is also very helpful to evaluate the moments of this posterior:
+
 $$
   m_N = E\left[ p_{t'}^N\right] = \frac{
-    c B(α + δ(1 + N ε), β) + s B(α + δ N ε, β) 
+    c B(α + δ(1 + N ε), β) + s B(α + δ N ε, β)
   }{
     r B(α + δ, β) + s B(α, β)
   },
@@ -523,7 +532,7 @@ $$
 
 with
 
-- for $z=0$, i.e., a failed quiz, 
+- for $z=0$, i.e., a failed quiz,
   - $r = q_0 - q_1$ (-1 for a binary non-fuzzy quiz)
   - $s = 1-q_0$ (1 for a binary non-fuzzy quiz).
 - For $z=1$, a successful quiz,
@@ -531,6 +540,7 @@ with
   - $s = q_0$ (0 for a binary non-fuzzy quiz).
 
 With these moments, we can once again match the first and second moments to get our new model, $[\hat α, \hat β, t']$:
+
 - $δ = t_2/t$, i.e., time of quiz divided by the original model time,
 - $ε=t'/t_2$, i.e., the time you want the posterior at divided by the time of quiz,
 - $\hat α = (μ(1-μ)/σ^2 - 1) ⋅ μ$ and
@@ -538,15 +548,50 @@ With these moments, we can once again match the first and second moments to get 
 - $μ = m_1$
 - and $σ^2 = m_2 - m_1^2$.
 
-We again note that both $q_1 = P(z = 1 | x = 1)$ and $q_0 = P(z = 1 | x = 0)$ are *free* parameters, and apps have total flexibility in specifying these. In Ebisu’s API presented above, both $z$ and $q_1$ are encoded without loss of generality in `0 <= successes <= 1`:
+We again note that both $q_1 = P(z = 1 | x = 1)$ and $q_0 = P(z = 1 | x = 0)$ are _free_ parameters, and apps have total flexibility in specifying these. In Ebisu’s API presented above, both $z$ and $q_1$ are encoded without loss of generality in `0 <= successes <= 1`:
+
 - $z=1$ if `successes > 0.5`, otherwise $z=0$.
 - $q_1$ is `max(successes, 1 - successes)`.
 
 Therefore if `successes = 0.1`, then we know $z=0$ and $q_1 = 0.9$.
 
-Meanwhile, $q_0$ is provided in a keyword argument and for the sake of developer experience, $q_0=1-q_1$ is picked as a default when none is provided. While this default is ad hoc, it does have the nice property that `successes` between 0 and 1 will smoothly and symmetrically (around 0.5) scale the posterior halflife between the binary fail/pass cases. Also, as a satisfying bonus, a *totally* uninformative quiz with  `successes = 0.5` results in *no change* to the prior, i.e., $α' = α$ and $β' = β$!
+Meanwhile, $q_0$ is provided in a keyword argument and for the sake of developer experience, $q_0=1-q_1$ is picked as a default when none is provided. While this default is ad hoc, it does have the nice property that `successes` between 0 and 1 will smoothly and symmetrically (around 0.5) scale the posterior halflife between the binary fail/pass cases. Also, as a satisfying bonus, a _totally_ uninformative quiz with `successes = 0.5` results in _no change_ to the prior, i.e., $α' = α$ and $β' = β$!
+
+The above is a very fast tour through the mathematics of taking a single Beta random variable for a particular time through two distinct kinds of quizzes: binomial quizzes and noisy-binary quizzes. This is what Ebisu v2 and previous historically were. However, we need more.
 
 ### Power laws
+
+Everything above has relied on the _exponential_ forgetting model, where our beliefs about the recall probability at time $t$ are converted to beliefs on recall probabilty at other times via $p_{δ \cdot t} = p_t^δ$, even though considerable research has shown forgetting is a power-law phenomenon. In this section, we will show how a staggered sequence of exponentials leads us to the power law we’d like to govern Ebisu recall.
+
+To set the stage first—recall that there is a truly _fundamental_ difference between _exponential_ decay, where the time factor $t$ is in the exponent, versus power-law decay, where $t$ is in the base. An exponential like $2^{-t}$ decays _incredibly_ quickly—you will recall what Einstein apparently said about exponentials being the most powerful force in the universe. After seven halflives, the probability of recall has dropped less than 1%: $2^{-7} = 1/128$. Meanwhile, power laws decay much more slowly: $(t+1)^{-1}$ has the same halflife as $2^{-t}$ (both have decayed to 0.5 at $t=1$) but after seven halflives, the probability of recall for the power law is still $1/8$, i.e., 12.5%, more than an order of magnitude higher than 0.8%!
+
+> This captures the experience we’ve all had where lots of things just “stick in your head”, i.e., have very durable memories, despite having not studied them intensively.
+
+Mozer et al. in both their 2009 NIPS conference paper and their 2014 <cite>Psychological Science</cite> journal article (see [bibliography](#bibliography)) propose a model of recall that uses a _series_ of exponentials, which they call a “cascade of leaky integrators” to invoke previous psychology research. We will adopt this by constructing a model consisting on not just one Beta random variable but a weighted ensemble of them over a wide range of halflives.
+
+Ebisu constructs models with $N$ distinct $Beta(α, β)$ random variables governing the expected recall probability over $N$ logarithmically-spaced time horizons, each with a logarithmically-decreasing weight. For example, an ensemble with five atoms, with initial halflives ranging from 10 hours to 100,000 hours (11 years), and weights ranging from 50% for the shortest-duration atom to 4% for the longest-duration one, generates the following five curves for recall probability, with the ensemble's overall recall probability being just the weighted sum of all atoms':
+
+![Between 0 and 200 hours since last review, the recall probability for five atoms and the overall ensemble](./figures/power-linear.svg)
+
+The largest-weighted atom is also the fastest-decaying, whereas the lowest-weighted atom decays very slowly. The curves are exponential-ish because they describe the $E[p_t^δ]$ curve we computed above for $p_t∼Beta(α, β)$. The first 10-hour-halflife atom's recall probabily quickly falls below each less-weighted atom's till after 75 hours it's dropped below the 11-year-halflife atom' recall probability. This results in the overall ensemble's recall probability decaying quite quickly initially but have a _long tail_, propped up by the lower-weighted long-duration atoms.
+
+Switching the above plot’s x and y scales to log-log gives and zooming out to see more time gives us this—
+
+![The same plot above but with the x axis going from 0.1 hours to a million hours. In the log-log domain, each exponential starts out flat (full recall), then quickly dies away. The overall ensemble curve though starts out flat at 100% (full recall), has a long linear section (power law), before it drops off steeply with the last exponential](./figures/power-log.svg)
+
+Recall that in a log-log plot, a true power law is a straight line, and the ensemble's recall probability describes a nice, sloping line for a huge chunk of time, from roughly 10 hours to roughly 10 years. For very short intervals between study, we have full recall (flat), and for intervals longer than our longest-duration atom, we have a rapidly-decaying exponential, and indeed any natural power law will have to taper off somewhere.
+
+It's through the logarithmic spacing of atoms' initial halflives and weights that, despite each atom describing an exponentially-decaying memory, the overall ensemble achieves this smooth power law recall that still assigns a one-ish percent probability of remembering this fact a decade after last studying it.
+
+When we discussed a single Beta random variable governing recall probability at some time, we parameterized it with three numbers: $[α, β, t]$; in words, the recall probability $t$ time after last study was $p_t ∼ Beta(α, β)$. To parameterize an ensemble of $N$ weighted Beta-distributed random variables, we have $[α_i, β_i, t_i, w_i]$ for $i=1, 2, \cdots, N$.
+
+An important feature of weighted mixtures is the weights must sum to 1. Ebisu's `initModel` API requests a `firstWeight`, i.e., $0 < w_1 < 1$, and computes other weights by finding $x$ that achieves $\min_x \left| 1-∑_{i=0}^{N-1} w_1 x^{i} \right|$. As far as I know this can’t be done analytically so we do a quick grid search.
+
+The ensemble's overall recall probability at time $t_2$ is simply the weighted sum of individual atoms’ recall probability:
+$$E[p_{t_2}] = ∑_{i=1}^N w_i E\left[p_i^{δ_i}\right]$$
+where we denote the $i$th atom’s probability at time $t_2$ as $p_i^{δ_i}$ for $δ_i = t_2 / t_i$, and $p_i ∼ Beta(α_i, β_i)$. The expectation in the sum is give [above](#precall-formula).
+
+The final question remains: how do we _update_ an ensemble after a binomial or noisy-binary quiz?
 
 ## Dev
 
@@ -571,3 +616,11 @@ pytest
 ```sh
 rm dist/* && python setup.py sdist bdist_wheel && python3 setup.py sdist bdist_wheel && twine upload dist/* --skip-existing
 ```
+
+## Bibliography
+
+While most citations are given inline above, this section contains academic papers, to whose PDFs I want to provide multiple links.
+
+Lindsey, R. V., Shroyer, J. D., Pashler, H., & Mozer, M. C. (2014). Improving Students’ Long-Term Knowledge Retention Through Personalized Review. <cite>Psychological Science</cite>, 25(3), 639–647. [DOI](https://doi.org/10.1177/0956797613504302), [academic copy](https://home.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/LindseyShroyerPashlerMozer2014Published.pdf). The authors also share some very interesting mathematical details as “Additional Methods” under [Supplemental Material](https://journals.sagepub.com/doi/10.1177/0956797613504302#supplementary-materials) on SagePub.
+
+Michael C. Mozer, Harold Pashler, Nicholas Cepeda, Robert Lindsey, and Ed Vul. 2009. Predicting the optimal spacing of study: a multiscale context model of memory. In <cite>Proceedings of the 22nd International Conference on Neural Information Processing Systems (NIPS'09)</cite>. Curran Associates Inc., Red Hook, NY, USA, 1321–1329. [DOI](https://dl.acm.org/doi/10.5555/2984093.2984242), [academic copy](https://home.cs.colorado.edu/~mozer/Research/Selected%20Publications/reprints/MozerPashlerCepedaLindseyVul2009.pdf).

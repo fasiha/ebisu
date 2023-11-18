@@ -63,7 +63,7 @@ def initModel(
   # We have `numAtoms` weights which have to sum to 1. The first one is `firstWeight`. We want the
   # rest of them to be logarithmically-decaying. So we need to find $d$ such that
   #
-  # $1 = ∑_{i=1}^n (w_1)^(d * (i-1))$
+  # $1 = ∑_{i=1}^n (w_1 * d^i)$
   #
   # where $w_1$ is `firstWeight`. As far as I know, we can't solve this analytically so we do a
   # quick search.

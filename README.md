@@ -342,7 +342,7 @@ where $B(α, β) = Γ(α) · Γ(β) / Γ(α + β)$ is [Beta function](https://en
 $$p_t^δ ∼ GB1(p; 1/δ, 1, α; β)$$
 When $δ=1$, that is, at exactly the half-life, recall probability is simply the initial Beta we started with.
 
-If the recall probability after $t$ time units $p_t$ is distributed according to $Beta(α, β)$, then the expected value (the mean) of $p_{t_2} = p_t^δ$ <a name="precall-formula">is</a>
+If the recall probability after $t$ time units $p_t$ is distributed according to $Beta(α, β)$, then the expected value (the mean) of $p_{t_2} = p_t^δ$ is<a name="predict-recall-formula"></a>
 $$E[p_t^δ] = \frac{B(α+δ, β)}{B(α,β)} = \frac{Γ(α + β)}{Γ(α)}  \frac{Γ(α + δ)}{Γ(α + β + δ)}.$$
 In other words, this is the expected recall probability at any time $t_2$, given that we believe the recall at time $t$ to follow $Beta(α, β)$.
 
@@ -573,7 +573,7 @@ Ebisu constructs models with $N$ distinct $Beta(α, β)$ random variables govern
 
 ![Between 0 and 200 hours since last review, the recall probability for five atoms and the overall ensemble](./figures/power-linear.svg)
 
-The largest-weighted atom is also the fastest-decaying, whereas the lowest-weighted atom decays very slowly. The curves are exponential-ish because they describe the $E[p_t^δ]$ curve we computed above for $p_t∼Beta(α, β)$. The first 10-hour-halflife atom's recall probabily quickly falls below each less-weighted atom's till after 75 hours it's dropped below the 11-year-halflife atom' recall probability. This results in the overall ensemble's recall probability decaying quite quickly initially but have a _long tail_, propped up by the lower-weighted long-duration atoms.
+The largest-weighted atom is also the fastest-decaying, whereas the lowest-weighted atom decays very slowly. The curves are exponential-ish because they describe the $E[p_t^δ]$ curve we computed above for $p_t∼Beta(α, β)$. The first 10-hour-halflife atom's recall probabily quickly falls below each less-weighted atom's till after 75 hours it's dropped below the 11-year-halflife atom' recall probability. This results in the overall ensemble's recall probability decaying quite quickly initially but having a _long tail_, propped up by the lower-weighted long-duration atoms.
 
 Switching the above plot’s x and y scales to log-log gives and zooming out to see more time gives us this—
 
@@ -589,9 +589,32 @@ An important feature of weighted mixtures is the weights must sum to 1. Ebisu's 
 
 The ensemble's overall recall probability at time $t_2$ is simply the weighted sum of individual atoms’ recall probability:
 $$E[p_{t_2}] = ∑_{i=1}^N w_i E\left[p_i^{δ_i}\right]$$
-where we denote the $i$th atom’s probability at time $t_2$ as $p_i^{δ_i}$ for $δ_i = t_2 / t_i$, and $p_i ∼ Beta(α_i, β_i)$. The expectation in the sum is give [above](#precall-formula).
+where we denote the $i$th atom’s probability at time $t_2$ as $p_i^{δ_i}$ for $δ_i = t_2 / t_i$, and $p_i ∼ Beta(α_i, β_i)$. The expectation in the sum is give [above](#predict-recall-formula).
 
 The final question remains: how do we _update_ an ensemble after a binomial or noisy-binary quiz?
+
+The short answer is, we simply apply the single-Beta update on each atom and scale its weight by the likelihood that atom assigned the quiz observation. The long answer is, nothing is ever that easy, so we need to do a little bit of ad hoc massaging to keep the nice properties we want out of our ensemble.
+
+In the [previous section](#a-single-beta-distributed-atom) we detailed the math of updating a single Beta random variable specifying recall probability for a specific time after last study. But why do we update its weight by multiplying it by the probability of this quiz result? This is a bog-standard approach in mixture models and particle filters where a set of weighted atoms (usually Monte Carlo samples) represents your prior, and when data comes in, the atoms are all reweighted by the likelihood each atom assigned to seeing that data.
+
+So, in our case, the probability of observing $k$ successes out of $n$ total tries (that is, the student getting $k$ points out of a total of $n$) is
+$$P(k; n) = ∫_0^1 Prior(p) Lik(k|p, n) dp$$
+where the "prior" is the GB1 prior parameterized by $α_i$, $β_i$, and $δ_i = t_2/t_i$ (the ratio between the time elapsed between last study and quiz, $t_2$, and the original time of the Beta random variable) and the likelihood ($Lik$) is the binomial likelihood. We solved this above so I'll just give the result: the probability of observing $k$ successes out of $n$ total for the $i$th atom is
+$$P_i(k;n) = \frac{1}{B(α_i, β_i)} \binom{n}{k} ∑_{l=0}^{n-k} (-1)^l \binom{n-k}{l}  B(α_i + δ_i(k+l), β_i).$$
+
+For the case of a noisy-binary quiz, the result is quite a bit easier since the likelihood is linear: the $i$th atom's probability of seeing $z$ given $q_1$ and $q_0$ is
+$$P_i(z; q_0, q_1) = \frac{B(α_i+δ_i, β_i)}{B(α_i, β_i)}r + s$$
+where, repeating above,
+
+- for $z=0$, i.e., a failed quiz,
+  - $r = q_0 - q_1$ (-1 for a binary non-fuzzy quiz)
+  - $s = 1-q_0$ (1 for a binary non-fuzzy quiz).
+- For $z=1$, a successful quiz,
+  - $r = q_1 - q_0$ (1 for a binary non-fuzzy quiz)
+  - $s = q_0$ (0 for a binary non-fuzzy quiz).
+
+Thus, the new weight is equal to the old weight scaled by this probability of seeing the result, binomial or noisy-binary:
+$$w_i | k = w_i P_i(z \text{ or } k).$$
 
 ## Dev
 

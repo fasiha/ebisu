@@ -1,12 +1,13 @@
 from math import fsum, isfinite, log, log10, log2, isfinite
 import numpy as np
-from scipy.stats import binom  # type:ignore
+from scipy.special import betaln  # type:ignore
 from scipy.optimize import minimize_scalar  # type:ignore
 
 from typing import Optional, Union, List
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
 
+from ebisu.ebisu2beta.ebisu import binomln
 from . import ebisu2beta as ebisu2
 from ebisu.logsumexp import logsumexp, sumexp
 
@@ -137,8 +138,13 @@ def _noisyLogProbability(result: Union[int, float], q1: float, q0: float, p: flo
   return log(((q1 - q0) * p + q0) if z else (q0 - q1) * p + (1 - q0))
 
 
-def _binomialLogProbability(successes: int, total: int, p: float) -> float:
-  return float(binom.logpmf(successes, total, p))
+def _binomialLogProbability(k: int, n: int, alpha: float, beta: float, delta: float) -> float:
+  assert k <= n
+  failures = n - k
+  prefix = binomln(n, k) - betaln(alpha, beta)
+  return prefix + logsumexp(
+      [binomln(failures, i) + betaln(alpha + delta * (k + i), beta) for i in range(failures + 1)],
+      [(-1)**i for i in range(failures + 1)])
 
 
 def updateRecall(
@@ -178,21 +184,23 @@ def updateRecall(
   ]
   # That's the updated Beta models! Now we need to update weights.
 
-  pRecalls = [
-      ebisu2.predictRecall((m.alpha, m.beta, m.time), elapsedTime, exact=True) for m in model
-  ]
   if total == 1:
     # some of this is repeated from ebisu2beta
     q1 = max(successes, 1 - successes)  # between 0.5 and 1
     q0 = 1 - q1 if q0 is None else q0  # either the input argument OR between 0 and 0.5
 
+    pRecalls = [
+        ebisu2.predictRecall((m.alpha, m.beta, m.time), elapsedTime, exact=True) for m in model
+    ]
     individualLogProbabilities = [
         _noisyLogProbability(successes, q1=q1, q0=q0, p=p) for p in pRecalls
     ]
 
   else:
     individualLogProbabilities = [
-        _binomialLogProbability(int(successes), total=total, p=p) for p in pRecalls
+        _binomialLogProbability(
+            k=int(successes), n=total, alpha=m.alpha, beta=m.beta, delta=elapsedTime / m.time)
+        for m in model
     ]
 
   assert all(x <= 0 for x in individualLogProbabilities

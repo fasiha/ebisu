@@ -111,7 +111,23 @@ def modelToPercentileDecay(model: BetaEnsemble, percentile=0.5) -> float:
   "When will this model's recall probability to decay to `percentile`?"
   assert (0 < percentile <= 1), "percentile must be in (0, 1]"
 
-  res = minimize_scalar(lambda h: abs(percentile - predictRecall(model, h)), bounds=[.01, 100e3])
+  logLeft, logRight = 1, 2
+  counter = 0
+  while predictRecall(model, 10**logLeft) <= 0.5:
+    logLeft -= 1
+    counter += 1
+    if counter >= 10:
+      raise Exception('unable to find left bound')
+
+  counter = 0
+  while predictRecall(model, 10**logRight) >= 0.5:
+    logRight += 1
+    counter += 1
+    if counter >= 10:
+      raise Exception('unable to find right bound')
+
+  res = minimize_scalar(
+      lambda h: abs(percentile - predictRecall(model, h)), bracket=[10**logLeft, 10**logRight])
   assert res.success
   return res.x
 

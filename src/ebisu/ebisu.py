@@ -97,7 +97,7 @@ def predictRecall(model: BetaEnsemble, elapsedTime: float) -> float:
           (m.alpha, m.beta, m.time), tnow=elapsedTime, exact=False) for m in model
   ]
   result = sumexp(logps)
-  assert isfinite(result) and 0 <= result <= 1
+  assert isfinite(result) and 0 <= result <= 1, f'{result=}, {model=}'
   return result
 
 
@@ -127,7 +127,7 @@ def modelToPercentileDecay(model: BetaEnsemble, percentile=0.5) -> float:
       raise Exception('unable to find right bound')
 
   res = minimize_scalar(
-      lambda h: abs(percentile - predictRecall(model, h)), bracket=[10**logLeft, 10**logRight])
+      lambda h: abs(percentile - predictRecall(model, h)), bounds=[10**logLeft, 10**logRight])
   assert res.success
   return res.x
 

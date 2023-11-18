@@ -111,7 +111,7 @@ def modelToPercentileDecay(model: BetaEnsemble, percentile=0.5) -> float:
   "When will this model's recall probability to decay to `percentile`?"
   assert (0 < percentile <= 1), "percentile must be in (0, 1]"
 
-  logLeft, logRight = 1, 2
+  logLeft, logRight = 0, 0
   counter = 0
   while predictRecall(model, 10**logLeft) <= 0.5:
     logLeft -= 1

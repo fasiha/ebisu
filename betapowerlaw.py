@@ -1,3 +1,4 @@
+from tqdm import tqdm  #type:ignore
 from scipy.optimize import minimize_scalar  # type:ignore
 import ebisu2beta as ebisu2
 from scipy.stats import beta as betarv  # type:ignore
@@ -154,6 +155,15 @@ def printDetails(cards, initModels, modelsDb, logLikDb):
       )
 
 
+def analyzeModelsGrid(cards, initModels, modelsDb, logLikDb, abVec, hlVec):
+  # key: (card integer, model number, quiz number)
+  sums = np.zeros((len(hlVec), len(abVec)))
+  raveled = sums.ravel()
+  for (cardNum, modelNum, quizNum), ll in logLikDb.items():
+    raveled[modelNum] += ll
+  return sums
+
+
 if __name__ == '__main__':
   df = utils.sqliteToDf('collection.anki2', True)
   print(f'loaded SQL data, {len(df)} rows')
@@ -164,7 +174,7 @@ if __name__ == '__main__':
   fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
   cards = [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]
   # or
-  cards = train
+  # cards = train
 
   initModels: list[tuple[float, float, float]] = [
       (2.0, 2, 10),
@@ -173,9 +183,16 @@ if __name__ == '__main__':
       (5, 5, 100),
   ]
 
+  abVec, hlVec, GRID_MODE = None, None, False
+  GRID_MODE = True
+  abVec = list(np.arange(2, 5, .5))
+  # abVec = list(range(2, 6))
+  hlVec = list(range(10, 1000, 50))
+  initModels = [(ab, ab, hl) for hl in hlVec for ab in abVec]
+
   allModels = dict()  # key: (card integer, model number, quiz number)
   allLogliks = dict()
-  for cardNum, card in enumerate(cards):
+  for cardNum, card in tqdm(enumerate(cards), total=len(cards)):
     models = initModels
 
     for quizNum, (ankiResult, elapsedTime) in enumerate(zip(card.results, card.dts_hours)):
@@ -203,18 +220,34 @@ if __name__ == '__main__':
       models = newModels
 
   # SUMMARY
-  summary = [[
-      sum([ll
-           for k, ll in allLogliks.items()
-           if k[0] == cardNum and k[1] == modelNum])
-      for modelNum in range(len(models))
-  ]
-             for cardNum in range(len(cards))]
+  summary = np.zeros((len(cards), len(initModels)))
+  for (cardNum, modelNum, quizNum), ll in allLogliks.items():
+    summary[cardNum, modelNum] += ll
 
   # DETAILS
-  printDetails(cards, models, allModels, allLogliks)
+  DETAILS, VIZ = True, True
+  DETAILS, VIZ = False, False
+  if DETAILS:
+    printDetails(cards, models, allModels, allLogliks)
   VIZ = True
   if VIZ:
     plt.figure()
     plt.plot(np.array(sorted(summary, key=lambda v: v[2])))
     plt.legend([f'{m}' for m in initModels])
+
+  if GRID_MODE:
+    sums = analyzeModelsGrid(cards, initModels, allModels, allLogliks, abVec, hlVec)
+
+    def extents(f):
+      delta = f[1] - f[0]
+      return [f[0] - delta / 2, f[-1] + delta / 2]
+
+    plt.figure()
+    plt.imshow(
+        sums,
+        aspect='auto',
+        interpolation='none',
+        extent=extents(abVec) + extents(hlVec),
+        origin='lower')
+    plt.colorbar()
+    plt.xlabel('')

@@ -4,7 +4,6 @@ from scipy.stats import multinomial  #type:ignore
 import numpy as np
 from typing import Callable, TypeVar
 from collections.abc import Iterable
-import typing
 
 T = TypeVar('T')
 

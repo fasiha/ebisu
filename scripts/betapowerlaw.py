@@ -1,0 +1,269 @@
+"""
+Needs numpy, scipy, pandas, matplotlib, tqdm, and of course ebisu.
+"""
+
+from tqdm import tqdm  #type:ignore
+from scipy.optimize import minimize_scalar  # type:ignore
+from scipy.stats import beta as betarv, binom as binomrv  # type:ignore
+from scipy.special import beta as betafn  # type:ignore
+import pylab as plt  # type:ignore
+import numpy as np
+import typing
+from math import log
+
+import ebisu.ebisu2beta as ebisu2
+import utils
+
+plt.style.use('ggplot')
+plt.rcParams['svg.fonttype'] = 'none'
+plt.ion()
+
+
+def predictRecall(model, elapsed):
+  delta = elapsed / model[-1]
+  l = np.log2(1 + delta)
+  return ebisu2.predictRecall(model, l * model[-1], exact=True)
+
+
+def confirmMath(VIZ=False):
+  alpha, beta, t = 2, 2, 10
+  elapsed = 15
+
+  bs = betarv.rvs(alpha, beta, size=100_000)
+
+  delta = elapsed / t
+  prior = bs**np.log2(1 + delta)
+
+  p = np.linspace(0, 1, 1001)[1:]
+  l = np.log2(1 + delta)
+  pdf = p**(alpha / l - 1) * (1 - p**(1 / l))**(beta - 1) / l / betafn(alpha, beta)
+
+  if VIZ:
+    plt.figure()
+    plt.hist(prior, bins=50, density=True, alpha=0.5)
+    plt.plot(p, pdf)
+
+  def g(x, delta=3):
+    return x**(np.log2(1 + delta))
+
+  def ginv(y, delta=3):
+    return y**(1 / (np.log2(1 + delta)))
+
+  assert (np.isclose(g(ginv(.3)), .3))
+  assert (np.isclose(g(ginv(1.3)), 1.3))
+
+  results = ([
+      np.mean(prior),
+      betafn(alpha + l, beta) / betafn(alpha, beta),
+      predictRecall((alpha, beta, t), elapsed)
+  ])
+  assert np.allclose(results, results[0], rtol=1e-2)
+
+
+confirmMath()
+
+
+def updateRecall(model, result, elapsed):
+  delta = elapsed / model[-1]
+  l = np.log2(1 + delta)
+  return ebisu2.updateRecall(model, result, 1, tnow=l * model[-1], rebalance=False)
+
+
+def modelToPercentileDecay(model, percentile=0.5):
+  logLeft, logRight = 0, 0
+  counter = 0
+  while predictRecall(model, 10**logLeft) <= 0.5:
+    logLeft -= 1
+    counter += 1
+    if counter >= 20:
+      raise Exception('unable to find left bound')
+
+  counter = 0
+  while predictRecall(model, 10**logRight) >= 0.5:
+    logRight += 1
+    counter += 1
+    if counter >= 20:
+      raise Exception('unable to find right bound')
+
+  res = minimize_scalar(
+      lambda h: abs(percentile - predictRecall(model, h)), bounds=[10**logLeft, 10**logRight])
+  assert res.success
+  return res.x
+
+
+ConvertAnkiMode = typing.Literal['approx', 'binary']
+MILLISECONDS_PER_HOUR = 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec
+
+
+def convertAnkiResultToBinomial(result: int, mode: ConvertAnkiMode) -> dict:
+  if mode == 'approx':
+    # Try to approximate hard to easy with binomial: this is tricky and ad hoc
+    if result == 1:  # fail
+      return dict(successes=0, total=1)
+    elif result == 2:  # hard
+      return dict(successes=1, total=1, q0=0.2)
+    elif result == 3:  # good
+      return dict(successes=1, total=1)
+    elif result == 4:  # easy
+      return dict(successes=2, total=2)
+    else:
+      raise Exception('unknown Anki result')
+  elif mode == 'binary':
+    # hard or better is pass
+    return dict(successes=int(result > 1), total=1)
+
+
+def _binomialLogProbability(k: int, n: int, p: float) -> float:
+  assert k <= n
+  return float(binomrv.logpmf(k, n, p))
+
+
+def _noisyLogProbability(z: bool, q1: float, q0: float, p: float) -> float:
+  return log(((q1 - q0) * p + q0) if z else (q0 - q1) * p + (1 - q0))
+
+
+def printableList(v: list[int | float], more=False) -> str:
+  return ", ".join([f'{x:0.1f}' for x in v]) if not more else ", ".join([f'{x:0.2f}' for x in v])
+
+
+def printDetails(cards, initModels, modelsDb, logLikDb):
+  # key: (card integer, model number, quiz number)
+  for cardNum, card in enumerate(cards):
+    sumLls = [
+        sum([ll
+             for k, ll in logLikDb.items()
+             if k[0] == cardNum and k[1] == modelNum])
+        for modelNum in range(len(initModels))
+    ]
+    print(f'{cardNum}, key={card.key}, lls={printableList(sumLls)}')
+    numQuizzes = len([ll for k, ll in logLikDb.items() if k[0] == cardNum and k[1] == 0])
+
+    lls = []
+    hls = []
+    ps = []
+    for quizNum in range(numQuizzes):
+      lls.append([logLikDb[(cardNum, modelNum, quizNum)] for modelNum in range(len(initModels))])
+      hls.append([
+          modelToPercentileDecay(modelsDb[(cardNum, modelNum, quizNum)])
+          for modelNum in range(len(initModels))
+      ])
+    for quizNum, t in enumerate(card.dts_hours):
+      oldModels = initModels if quizNum == 0 else [
+          modelsDb[(cardNum, modelNum, quizNum - 1)] for modelNum in range(len(initModels))
+      ]
+      ps.append([predictRecall(m, t) for m in oldModels])
+
+    cumsumLls = np.cumsum(lls, axis=0)
+    for indiv, cumulative, res, t, hl, p in zip(lls, cumsumLls, card.results, card.dts_hours, hls,
+                                                ps):
+      print(
+          f'  {res=}, {t:.1f}h, p={printableList(p, True)}, hl={printableList(hl)}, ll={printableList(indiv)}, cumulative={printableList(cumulative)}'
+      )
+
+
+def analyzeModelsGrid(cards, initModels, modelsDb, logLikDb, abVec, hlVec):
+  # key: (card integer, model number, quiz number)
+  sums = np.zeros((len(hlVec), len(abVec)))
+  raveled = sums.ravel()
+  for (cardNum, modelNum, quizNum), ll in logLikDb.items():
+    raveled[modelNum] += ll
+  return sums
+
+
+if __name__ == '__main__':
+  import os
+  from pathlib import Path
+  ankiPath = Path(os.path.dirname(os.path.realpath(__file__))) / 'collection-no-fields.anki2'
+  df = utils.sqliteToDf(str(ankiPath), True)
+  print(f'loaded SQL data, {len(df)} rows')
+
+  train, TEST_TRAIN = utils.traintest(df, noPerfectCardsInTraining=False)
+  print(f'split flashcards into train/test, {len(train)} cards in train set')
+
+  fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
+  cards = [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]
+  # or
+  cards = train
+
+  initModels: list[tuple[float, float, float]] = [
+      # (2.0, 2, 10), # leads to very large halflives
+      (3, 3, 100),
+      (5, 5, 10),
+      (2, 2, 100),  # seems to be the best for a wide range
+      (5, 5, 100),
+  ]
+
+  GRID_MODE = False
+  if GRID_MODE:
+    abVec = list(np.arange(1.25, 5, .5))
+    # abVec = list(range(2, 6))
+    hlVec = list(range(10, 1000, 50))
+    initModels = [(ab, ab, hl) for hl in hlVec for ab in abVec]
+  else:
+    abVec, hlVec, GRID_MODE = [], [], False
+
+  allModels = dict()  # key: (card integer, model number, quiz number)
+  allLogliks = dict()
+  for cardNum, card in tqdm(enumerate(cards), total=len(cards)):
+    models = initModels
+
+    for quizNum, (ankiResult, elapsedTime) in enumerate(zip(card.results, card.dts_hours)):
+      resultArgs = convertAnkiResultToBinomial(ankiResult, 'approx')
+
+      newModels = []
+      for modelNum, m in enumerate(models):
+        key = (cardNum, modelNum, quizNum)
+
+        delta = elapsedTime / m[-1]
+        l = np.log2(1 + delta)
+        newModel = ebisu2.updateRecall(m, tnow=l * m[-1], rebalance=False, **resultArgs)
+        newModels.append(newModel)
+        allModels[key] = newModel
+
+        if resultArgs['total'] == 1:
+          z = resultArgs['successes'] >= 0.5
+          q1 = max(resultArgs['successes'], 1 - resultArgs['successes'])
+          q0 = resultArgs['q0'] if 'q0' in resultArgs else 1 - q1
+          loglik = _noisyLogProbability(z, q1, q0, predictRecall(m, elapsedTime))
+        else:
+          loglik = _binomialLogProbability(resultArgs['successes'], resultArgs['total'],
+                                           predictRecall(m, elapsedTime))
+        allLogliks[key] = loglik
+      models = newModels
+
+  # SUMMARY
+  summary = np.zeros((len(cards), len(initModels)))
+  for (cardNum, modelNum, quizNum), ll in allLogliks.items():
+    summary[cardNum, modelNum] += ll
+
+  # DETAILS
+  DETAILS, VIZ = True, True
+  DETAILS, VIZ = False, True
+  if DETAILS:
+    printDetails(cards, models, allModels, allLogliks)
+  if VIZ:
+    plt.figure()
+    plt.plot(np.array(sorted(summary, key=lambda v: v[2])))
+    plt.legend([f'{m}' for m in initModels])
+    plt.xlabel('quiz number')
+    plt.ylabel('∑log likelihood')
+    plt.title('Powerlaw-beta performance for training set')
+
+  if GRID_MODE:
+    sums = analyzeModelsGrid(cards, initModels, allModels, allLogliks, abVec, hlVec)
+
+    def extents(f):
+      delta = f[1] - f[0]
+      return [f[0] - delta / 2, f[-1] + delta / 2]
+
+    plt.figure()
+    plt.imshow(
+        sums,
+        aspect='auto',
+        interpolation='none',
+        extent=extents(abVec) + extents(hlVec),
+        origin='lower')
+    plt.colorbar()
+    plt.xlabel('initial α=β')
+    plt.ylabel('initial halflife')
+    plt.title('sum log lik, all cards in training set (higher is better)')

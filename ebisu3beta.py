@@ -8,8 +8,10 @@ import ebisu2beta as ebisu2
 import numpy as np
 from scipy.stats import binom
 from scipy.optimize import minimize_scalar
-from scipy.special import logsumexp
+from scipy.special import logsumexp, betaln
 from typing import Optional, Union
+
+from ebisu2beta.ebisu import binomln
 
 HOURS_PER_MILLISECONDS = 1 / 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec
 LN2 = np.log(2)
@@ -126,15 +128,14 @@ def resultToLogProbability(r: Result, p: float) -> float:
   raise Exception("unknown quiz type")
 
 
-def updateRecall(
-    model: BetaEnsemble,
-    successes: Union[float, int],
-    total: int = 1,
-    q0: Optional[float] = None,
-    now: Optional[float] = None,
-    updateThreshold=0.5,
-    weightThreshold=1.0,  # ignore
-) -> BetaEnsemble:
+def updateRecall(model: BetaEnsemble,
+                 successes: Union[float, int],
+                 total: int = 1,
+                 q0: Optional[float] = None,
+                 now: Optional[float] = None,
+                 updateThreshold=0.5,
+                 weightThreshold=1.0,
+                 approx=False) -> BetaEnsemble:
   now = now or timeMs()
   t = (now - model.lastEncounterMs) * HOURS_PER_MILLISECONDS
 
@@ -152,10 +153,16 @@ def updateRecall(
     assert total > 0, "positive binomial trials"
     resultObj = BinomialResult(successes=int(successes), total=total, hoursElapsed=t, rescale=1)
 
-  individualLogProbabilities = [
-      resultToLogProbability(resultObj, ebisu2.predictRecall(m, t, exact=True))
-      for m in model.models
-  ]
+  if approx or isinstance(resultObj, NoisyBinaryResult):
+    individualLogProbabilities = [
+        resultToLogProbability(resultObj, ebisu2.predictRecall(m, t, exact=True))
+        for m in model.models
+    ]
+  else:
+    individualLogProbabilities = [
+        _binomialLogProbability(resultObj.successes, resultObj.total, m[0], m[1], t / m[2])
+        for m in model.models
+    ]
   assert all(
       x < 0
       for x in individualLogProbabilities), f'{individualLogProbabilities=}, {model.models=}, {t=}'
@@ -193,6 +200,14 @@ def updateRecall(
   ret.models = newModels
   ret.log2weights = (newLog2Weights - logsumexp(np.array(newLog2Weights) * LN2) / LN2).tolist()
   return ret
+
+
+def _binomialLogProbability(k: int, n: int, alpha: float, beta: float, delta: float) -> float:
+  failures = n - k
+  prefix = binomln(n, k) - betaln(alpha, beta)
+  return prefix + logsumexp(
+      [binomln(n - k, i) + betaln(alpha + delta * (k + i), beta) for i in range(failures + 1)],
+      b=[(-1)**i for i in range(failures + 1)])
 
 
 # def _exceedsThresholdLeft(v, threshold):

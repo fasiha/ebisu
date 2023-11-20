@@ -48,39 +48,42 @@ def printableList(v: list[int | float], more=False) -> str:
   return ", ".join([f'{x:0.1f}' for x in v]) if not more else ", ".join([f'{x:0.2f}' for x in v])
 
 
-def printDetails(cards, initModels, modelsDb, logLikDb):
+def printDetails(cards, initModels, modelsDb, logLikDb, outfile=None):
   # key: (card integer, model number, quiz number)
-  for cardNum, card in enumerate(cards):
-    sumLls = [
-        sum([ll
-             for k, ll in logLikDb.items()
-             if k[0] == cardNum and k[1] == modelNum])
-        for modelNum in range(len(initModels))
-    ]
-    print(f'{cardNum}, key={card.key}, lls={printableList(sumLls)}')
-    numQuizzes = len([ll for k, ll in logLikDb.items() if k[0] == cardNum and k[1] == 0])
-
-    lls = []
-    hls = []
-    ps = []
-    for quizNum in range(numQuizzes):
-      lls.append([logLikDb[(cardNum, modelNum, quizNum)] for modelNum in range(len(initModels))])
-      hls.append([
-          ebisu.modelToPercentileDecay(modelsDb[(cardNum, modelNum, quizNum)])
+  if outfile:
+    print(f'Writing details to {outfile}')
+  with open(outfile, 'w') if outfile else None as outfile:
+    for cardNum, card in tqdm(enumerate(cards), total=len(cards)):
+      sumLls = [
+          sum([ll
+               for k, ll in logLikDb.items()
+               if k[0] == cardNum and k[1] == modelNum])
           for modelNum in range(len(initModels))
-      ])
-    for quizNum, t in enumerate(card.dts_hours):
-      oldModels = initModels if quizNum == 0 else [
-          modelsDb[(cardNum, modelNum, quizNum - 1)] for modelNum in range(len(initModels))
       ]
-      ps.append([ebisu.predictRecall(m, t) for m in oldModels])
+      print(f'{cardNum}, key={card.key}, lls={printableList(sumLls)}', file=outfile)
+      numQuizzes = len([ll for k, ll in logLikDb.items() if k[0] == cardNum and k[1] == 0])
 
-    cumsumLls = np.cumsum(lls, axis=0)
-    for indiv, cumulative, res, t, hl, p in zip(lls, cumsumLls, card.results, card.dts_hours, hls,
-                                                ps):
-      print(
-          f'  {res=}, {t:.1f}h, p={printableList(p, True)}, hl={printableList(hl)}, ll={printableList(indiv)}, cumulative={printableList(cumulative)}'
-      )
+      lls = []
+      hls = []
+      ps = []
+      for quizNum in range(numQuizzes):
+        lls.append([logLikDb[(cardNum, modelNum, quizNum)] for modelNum in range(len(initModels))])
+        hls.append([
+            ebisu.modelToPercentileDecay(modelsDb[(cardNum, modelNum, quizNum)])
+            for modelNum in range(len(initModels))
+        ])
+      for quizNum, t in enumerate(card.dts_hours):
+        oldModels = initModels if quizNum == 0 else [
+            modelsDb[(cardNum, modelNum, quizNum - 1)] for modelNum in range(len(initModels))
+        ]
+        ps.append([ebisu.predictRecall(m, t) for m in oldModels])
+
+      cumsumLls = np.cumsum(lls, axis=0)
+      for indiv, cumulative, res, t, hl, p in zip(lls, cumsumLls, card.results, card.dts_hours, hls,
+                                                  ps):
+        print(
+            f'  {res=}, {t:.1f}h, p={printableList(p, True)}, hl={printableList(hl)}, ll={printableList(indiv)}, cumulative={printableList(cumulative)}',
+            file=outfile)
 
 
 if __name__ == '__main__':
@@ -136,14 +139,16 @@ if __name__ == '__main__':
     summary[cardNum, modelNum] += ll
 
   # DETAILS
-  DETAILS, VIZ = True, True
-  DETAILS, VIZ = False, True
-  if DETAILS:
-    printDetails(cards, models, allModels, allLogliks)
+  VIZ = True
+  printDetails(cards, models, allModels, allLogliks, outfile='ensemble-compare.txt')
   if VIZ:
     plt.figure()
     plt.plot(np.array(sorted(summary, key=lambda v: v[1])))
+    plt.ylim((-25, 0))
+    plt.yticks(np.arange(-25, 0.1, 2.5))
     plt.legend([f'{m}' for m in initModelParams])
     plt.xlabel('quiz number')
     plt.ylabel('∑log likelihood')
     plt.title('Ensemble v3 performance for training set')
+    plt.savefig('ensemble-compare.png', dpi=300)
+    plt.savefig('ensemble-compare.svg')

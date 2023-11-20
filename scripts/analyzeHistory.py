@@ -147,7 +147,7 @@ if __name__ == '__main__':
     plt.ylim((-25, 0))
     plt.yticks(np.arange(-25, 0.1, 2.5))
     plt.legend([f'{m}' for m in initModelParams])
-    plt.xlabel('quiz number')
+    plt.xlabel('flashcard number')
     plt.ylabel('∑log likelihood')
     plt.title('Ensemble v3 performance for training set')
     plt.savefig('ensemble-compare.png', dpi=300)

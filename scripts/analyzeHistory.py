@@ -50,6 +50,15 @@ def printDetails(cards, initModels, modelsDb, logLikDb, outfile=None):
             file=outfile)
 
 
+def analyzeModelsGrid(logLikDb, abVec, hlVec):
+  # key: (card integer, model number, quiz number)
+  sums = np.zeros((len(hlVec), len(abVec)))
+  raveled = sums.ravel()
+  for (cardNum, modelNum, quizNum), ll in logLikDb.items():
+    raveled[modelNum] += ll
+  return sums
+
+
 if __name__ == '__main__':
   FOCAL_GAMMA = 2
 
@@ -70,6 +79,23 @@ if __name__ == '__main__':
       dict(firstHalflife=10, lastHalflife=10e3, firstWeight=0.9),
       dict(firstHalflife=100, lastHalflife=10e3, firstWeight=0.9),
   ]
+
+  GRID_MODE = True
+  if GRID_MODE:
+    FIRST_WEIGHT = 0.5
+    abVec = list(np.arange(1.25, 4, .5))
+    hlVec = list(range(10, 400, 45))
+    initModelParams = [
+        dict(
+            firstHalflife=hl,
+            initialAlphaBeta=ab,
+            lastHalflife=10e3,
+            firstWeight=FIRST_WEIGHT,
+        ) for hl in hlVec for ab in abVec
+    ]
+  else:
+    abVec, hlVec, GRID_MODE, FIRST_WEIGHT = [], [], False, 0
+
   initModels = [ebisu.initModel(**args) for args in initModelParams]  #type:ignore
 
   allModels = dict()  # key: (card integer, model number, quiz number)
@@ -120,3 +146,22 @@ if __name__ == '__main__':
     plt.title('Ensemble v3 performance for training set')
     plt.savefig('ensemble-compare.png', dpi=300)
     plt.savefig('ensemble-compare.svg')
+
+  if GRID_MODE:
+    sums = analyzeModelsGrid(allLogliks, abVec, hlVec)
+
+    def extents(f):
+      delta = f[1] - f[0]
+      return [f[0] - delta / 2, f[-1] + delta / 2]
+
+    plt.figure()
+    plt.imshow(
+        sums,
+        aspect='auto',
+        interpolation='none',
+        extent=extents(abVec) + extents(hlVec),
+        origin='lower')
+    plt.colorbar()
+    plt.xlabel('initial α=β')
+    plt.ylabel('initial halflife')
+    plt.title(f'sum log lik, all cards in training set, w1={FIRST_WEIGHT}')

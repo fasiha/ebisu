@@ -130,7 +130,7 @@ def printDetails(cards, initModels, modelsDb, logLikDb, outfile=None):
             file=outfile)
 
 
-def analyzeModelsGrid(cards, initModels, modelsDb, logLikDb, abVec, hlVec):
+def analyzeModelsGrid(logLikDb, abVec, hlVec):
   # key: (card integer, model number, quiz number)
   sums = np.zeros((len(hlVec), len(abVec)))
   raveled = sums.ravel()
@@ -226,7 +226,7 @@ if __name__ == '__main__':
     plt.savefig('beta-powerlaw-compare.svg')
 
   if GRID_MODE:
-    sums = analyzeModelsGrid(cards, initModels, allModels, allLogliks, abVec, hlVec)
+    sums = analyzeModelsGrid(allLogliks, abVec, hlVec)
 
     def extents(f):
       delta = f[1] - f[0]

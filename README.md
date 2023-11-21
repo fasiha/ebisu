@@ -614,7 +614,9 @@ where, repeating above,
   - $s = q_0$ (0 for a binary non-fuzzy quiz).
 
 Thus, the new weight is equal to the old weight scaled by this probability of seeing the result, binomial or noisy-binary:
-$$w_i | k = w_i P_i(z \text{ or } k).$$
+$$w_i | (z \text{ or } k) = w_i P_i(z \text{ or } k).$$
+
+Now for the ad hoc adjustments, the fine print. Recall that we initialize a new model for freshly-learned cards with atoms that have very long halflives (months, years), which encode the hope that the student's memory will *eventually* strengthen to those levels. Unfortunately, when we inevtiably have early failed quizzes, the posteriors for these long atoms will be severely impacted—Ebisu thinks, "You said the halflife for this flashcard was a year but you failed it after a day?! The model needs to be severely recalibrated!" This is not good. We don't want failures to damage long
 
 ## Dev
 

@@ -114,14 +114,14 @@ def modelToPercentileDecay(model: BetaEnsemble, percentile=0.5) -> float:
 
   logLeft, logRight = 0, 0
   counter = 0
-  while predictRecall(model, 10**logLeft) <= 0.5:
+  while predictRecall(model, 10**logLeft) <= percentile:
     logLeft -= 1
     counter += 1
     if counter >= 10:
       raise Exception('unable to find left bound')
 
   counter = 0
-  while predictRecall(model, 10**logRight) >= 0.5:
+  while predictRecall(model, 10**logRight) >= percentile:
     logRight += 1
     counter += 1
     if counter >= 10:

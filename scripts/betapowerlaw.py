@@ -2,6 +2,7 @@
 Needs numpy, scipy, pandas, matplotlib, tqdm, and of course ebisu.
 """
 
+import json
 from tqdm import tqdm  #type:ignore
 from scipy.optimize import minimize_scalar  # type:ignore
 from scipy.stats import beta as betarv, binom as binomrv  # type:ignore
@@ -10,7 +11,7 @@ import pylab as plt  # type:ignore
 import numpy as np
 
 import ebisu.ebisu2beta as ebisu2
-from utils import binomialLogProbabilityFocal, convertAnkiResultToBinomial, noisyLogProbabilityFocal, printableList, sqliteToDf, traintest
+from utils import binomialLogProbabilityFocal, convertAnkiResultToBinomial, noisyLogProbabilityFocal, printableList, sqliteToDf, traintest, clipclim
 
 plt.style.use('ggplot')
 plt.rcParams['svg.fonttype'] = 'none'
@@ -139,6 +140,15 @@ def analyzeModelsGrid(logLikDb, abVec, hlVec):
   return sums
 
 
+def oneModelAllHalflives(modelsDb, numCards, p=0.5, modelNum=0):
+  assert 0 < p < 1
+  hls = []
+  for cardNum in range(numCards):
+    numQuizzes = next(filter(lambda q: (cardNum, modelNum, q) not in allModels, range(1000)))
+    hls.append(modelToPercentileDecay(modelsDb[(cardNum, modelNum, numQuizzes - 1)], p))
+  return hls
+
+
 if __name__ == '__main__':
   FOCAL_GAMMA = 2
 
@@ -243,9 +253,9 @@ if __name__ == '__main__':
     plt.xlabel('initial α=β')
     plt.ylabel('initial halflife')
     plt.title('sum log lik, all cards in training set (higher is better)')
+    plt.grid(False)
 
-
-def clipclim(z: float, ax=None):
-  im = (ax or plt.gca()).get_images()[0]
-  c = im.get_clim()
-  im.set_clim([max(c) - z, max(c)])
+  with open('beta-powerlaw-compare.json', 'w') as fid:
+    json.dump(
+        {str(p): oneModelAllHalflives(allModels, len(cards), p=p, modelNum=0) for p in [0.5, 0.8]},
+        fid)

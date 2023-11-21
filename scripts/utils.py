@@ -1,3 +1,4 @@
+import pylab as plt  # type:ignore
 import pandas as pd  # type: ignore
 from dataclasses import dataclass
 from scipy.stats import multinomial  #type:ignore
@@ -285,3 +286,9 @@ def noisyLogProbabilityFocal(result: float,
   focalP = p**((1 - p)**gamma)
   focalQ = (1 - p)**(p**gamma)
   return log((q1 * focalP + q0 * focalQ) if z else ((1 - q1) * focalP + (1 - q0) * focalQ))
+
+
+def clipclim(z: float, ax=None):
+  im = (ax or plt.gca()).get_images()[0]
+  c = im.get_clim()
+  im.set_clim([max(c) - z, max(c)])

@@ -1,5 +1,6 @@
 import ebisu
 
+import json
 from tqdm import tqdm  #type:ignore
 import numpy as np
 import pylab as plt  # type:ignore
@@ -59,6 +60,15 @@ def analyzeModelsGrid(logLikDb, abVec, hlVec):
   return sums
 
 
+def oneModelAllHalflives(modelsDb, numCards, p=0.5, modelNum=0):
+  assert 0 < p < 1
+  hls = []
+  for cardNum in range(numCards):
+    numQuizzes = next(filter(lambda q: (cardNum, modelNum, q) not in allModels, range(1000)))
+    hls.append(ebisu.modelToPercentileDecay(modelsDb[(cardNum, modelNum, numQuizzes - 1)], p))
+  return hls
+
+
 if __name__ == '__main__':
   FOCAL_GAMMA = 2
 
@@ -74,17 +84,16 @@ if __name__ == '__main__':
   cards = train
 
   initModelParams = [
-      dict(firstHalflife=10, lastHalflife=10e3, firstWeight=0.5),
+      dict(firstHalflife=40, lastHalflife=10e3, firstWeight=0.5, initialAlphaBeta=1.25),
+      dict(firstHalflife=40, lastHalflife=10e3, firstWeight=0.5, initialAlphaBeta=2),
       dict(firstHalflife=100, lastHalflife=10e3, firstWeight=0.5),
-      dict(firstHalflife=10, lastHalflife=10e3, firstWeight=0.9),
-      dict(firstHalflife=100, lastHalflife=10e3, firstWeight=0.9),
   ]
 
-  GRID_MODE = True
+  GRID_MODE = False
   if GRID_MODE:
     FIRST_WEIGHT = 0.5
-    abVec = list(np.arange(1.25, 4, .5))
-    hlVec = list(range(10, 400, 45))
+    abVec = list(np.arange(1.25, 3, .25))
+    hlVec = list(range(10, 400, 25))
     initModelParams = [
         dict(
             firstHalflife=hl,
@@ -137,7 +146,7 @@ if __name__ == '__main__':
     printDetails(cards, models, allModels, allLogliks, outfile='ensemble-compare.txt')
   if VIZ:
     plt.figure()
-    plt.plot(np.array(sorted(summary, key=lambda v: v[1])))
+    plt.plot(np.array(sorted(summary, key=lambda v: v[0])))
     plt.ylim((-25, 0))
     plt.yticks(np.arange(-25, 0.1, 2.5))
     plt.legend([f'{m}' for m in initModelParams])
@@ -165,3 +174,11 @@ if __name__ == '__main__':
     plt.xlabel('initial α=β')
     plt.ylabel('initial halflife')
     plt.title(f'sum log lik, all cards in training set, w1={FIRST_WEIGHT}')
+    plt.grid(False)
+    plt.savefig(f'focal-ensemble-{FIRST_WEIGHT}.png', dpi=300)
+    plt.savefig(f'focal-ensemble-{FIRST_WEIGHT}.svg')
+
+  with open('ensemble-compare-halflives.json', 'w') as fid:
+    json.dump(
+        {str(p): oneModelAllHalflives(allModels, len(cards), p=p, modelNum=0) for p in [0.5, 0.8]},
+        fid)

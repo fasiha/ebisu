@@ -6,3 +6,5 @@ build/
 dist/
 ebisu.egg-info/
 .ipynb_checkpoints/
+/*.png
+/*.svg

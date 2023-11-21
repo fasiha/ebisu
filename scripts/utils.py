@@ -264,6 +264,14 @@ def binomln(n: float, k: float):
   return -betaln(1 + n - k, 1 + k) - log(n + 1)
 
 
+def bernoulliLogProbabilityFocal(result: bool, p: float, gamma: float = 2) -> float:
+  assert 0 <= p <= 1
+  assert 0 <= gamma
+  focalP = p**((1 - p)**gamma)
+  focalQ = (1 - p)**(p**gamma)
+  return log(focalP if result else focalQ)
+
+
 def binomialLogProbabilityFocal(k: int, n: int, p: float, gamma: float = 2) -> float:
   assert 0 <= k <= n
   assert 0 <= p <= 1

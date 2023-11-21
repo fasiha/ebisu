@@ -223,14 +223,22 @@ if __name__ == '__main__':
   VIZ = True
   if len(initModels) < 10:
     printDetails(cards, models, allModels, allLogliks, outfile='beta-powerlaw-compare.txt')
+
+    with open('beta-powerlaw-compare.json', 'w') as fid:
+      json.dump(
+          {
+              str(p): oneModelAllHalflives(allModels, len(cards), p=p, modelNum=0)
+              for p in [0.5, 0.8]
+          }, fid)
+
   if VIZ:
     plt.figure()
     plt.plot(np.array(sorted(summary, key=lambda v: v[0])))
     plt.legend([f'{m}' for m in initModels])
-    plt.ylim((-25, 0))
-    plt.yticks(np.arange(-25, 0.1, 2.5))
+    plt.ylim((-10, 1))
+    plt.yticks(np.arange(-10, 0.1, 2.5))
     plt.xlabel('flashcard number')
-    plt.ylabel('∑log likelihood')
+    plt.ylabel('∑ focal loss')
     plt.title('Powerlaw-beta performance for training set')
     plt.savefig('beta-powerlaw-compare.png', dpi=300)
     plt.savefig('beta-powerlaw-compare.svg')
@@ -252,10 +260,7 @@ if __name__ == '__main__':
     plt.colorbar()
     plt.xlabel('initial α=β')
     plt.ylabel('initial halflife')
-    plt.title('sum log lik, all cards in training set (higher is better)')
+    plt.title('Focal loss, Beta-power-law\nall cards in training set (higher is better)')
     plt.grid(False)
-
-  with open('beta-powerlaw-compare.json', 'w') as fid:
-    json.dump(
-        {str(p): oneModelAllHalflives(allModels, len(cards), p=p, modelNum=0) for p in [0.5, 0.8]},
-        fid)
+    plt.savefig(f'focal-betapowerlaw.png', dpi=300)
+    plt.savefig(f'focal-betapowerlaw.svg')

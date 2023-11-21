@@ -144,14 +144,22 @@ if __name__ == '__main__':
   VIZ = True
   if len(initModelParams) < 10:
     printDetails(cards, models, allModels, allLogliks, outfile='ensemble-compare.txt')
+
+    with open('ensemble-compare-halflives.json', 'w') as fid:
+      json.dump(
+          {
+              str(p): oneModelAllHalflives(allModels, len(cards), p=p, modelNum=0)
+              for p in [0.5, 0.8]
+          }, fid)
+
   if VIZ:
     plt.figure()
     plt.plot(np.array(sorted(summary, key=lambda v: v[0])))
-    plt.ylim((-25, 0))
-    plt.yticks(np.arange(-25, 0.1, 2.5))
+    plt.ylim((-10, 1))
+    plt.yticks(np.arange(-10, 0.1, 2.5))
     plt.legend([f'{m}' for m in initModelParams])
     plt.xlabel('flashcard number')
-    plt.ylabel('∑log likelihood')
+    plt.ylabel('∑ focal loss')
     plt.title('Ensemble v3 performance for training set')
     plt.savefig('ensemble-compare.png', dpi=300)
     plt.savefig('ensemble-compare.svg')
@@ -173,12 +181,7 @@ if __name__ == '__main__':
     plt.colorbar()
     plt.xlabel('initial α=β')
     plt.ylabel('initial halflife')
-    plt.title(f'sum log lik, all cards in training set, w1={FIRST_WEIGHT}')
+    plt.title(f'Focal loss, v3-ensemble\nall cards in training set, w1={FIRST_WEIGHT}')
     plt.grid(False)
     plt.savefig(f'focal-ensemble-{FIRST_WEIGHT}.png', dpi=300)
     plt.savefig(f'focal-ensemble-{FIRST_WEIGHT}.svg')
-
-  with open('ensemble-compare-halflives.json', 'w') as fid:
-    json.dump(
-        {str(p): oneModelAllHalflives(allModels, len(cards), p=p, modelNum=0) for p in [0.5, 0.8]},
-        fid)

@@ -3,49 +3,13 @@ import ebisu
 from tqdm import tqdm  #type:ignore
 import numpy as np
 import pylab as plt  # type:ignore
-import typing
-import utils
-from scipy.stats import binom as binomrv  # type:ignore
-from math import log
+from utils import binomialLogProbabilityFocal, convertAnkiResultToBinomial, noisyLogProbabilityFocal, printableList, sqliteToDf, traintest
 
 plt.style.use('ggplot')
 plt.rcParams['svg.fonttype'] = 'none'
 plt.ion()
 
-ConvertAnkiMode = typing.Literal['approx', 'binary']
 MILLISECONDS_PER_HOUR = 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec
-
-
-def convertAnkiResultToBinomial(result: int, mode: ConvertAnkiMode) -> dict:
-  if mode == 'approx':
-    # Try to approximate hard to easy with binomial: this is tricky and ad hoc
-    if result == 1:  # fail
-      return dict(successes=0, total=1)
-    elif result == 2:  # hard
-      return dict(successes=1, total=1, q0=0.2)
-    elif result == 3:  # good
-      return dict(successes=1, total=1)
-    elif result == 4:  # easy
-      return dict(successes=2, total=2)
-    else:
-      raise Exception('unknown Anki result')
-  elif mode == 'binary':
-    # hard or better is pass
-    return dict(successes=int(result > 1), total=1)
-
-
-def _binomialLogProbability(k: int, n: int, p: float) -> float:
-  assert k <= n
-  return float(binomrv.logpmf(k, n, p))
-
-
-def _noisyLogProbability(result: typing.Union[int, float], q1: float, q0: float, p: float) -> float:
-  z = result >= 0.5
-  return log(((q1 - q0) * p + q0) if z else (q0 - q1) * p + (1 - q0))
-
-
-def printableList(v: list[int | float], more=False) -> str:
-  return ", ".join([f'{x:0.1f}' for x in v]) if not more else ", ".join([f'{x:0.2f}' for x in v])
 
 
 def printDetails(cards, initModels, modelsDb, logLikDb, outfile=None):
@@ -87,10 +51,12 @@ def printDetails(cards, initModels, modelsDb, logLikDb, outfile=None):
 
 
 if __name__ == '__main__':
-  df = utils.sqliteToDf('collection.anki2', True)
+  FOCAL_GAMMA = 2
+
+  df = sqliteToDf('collection.anki2', True)
   print(f'loaded SQL data, {len(df)} rows')
 
-  train, TEST_TRAIN = utils.traintest(df, noPerfectCardsInTraining=False)
+  train, TEST_TRAIN = traintest(df, noPerfectCardsInTraining=False)
   print(f'split flashcards into train/test, {len(train)} cards in train set')
 
   fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
@@ -126,10 +92,11 @@ if __name__ == '__main__':
           z = resultArgs['successes'] >= 0.5
           q1 = max(resultArgs['successes'], 1 - resultArgs['successes'])
           q0 = resultArgs['q0'] if 'q0' in resultArgs else 1 - q1
-          loglik = _noisyLogProbability(z, q1, q0, ebisu.predictRecall(m, elapsedTime))
+          loglik = noisyLogProbabilityFocal(z, q1, q0, ebisu.predictRecall(m, elapsedTime),
+                                            FOCAL_GAMMA)
         else:
-          loglik = _binomialLogProbability(resultArgs['successes'], resultArgs['total'],
-                                           ebisu.predictRecall(m, elapsedTime))
+          loglik = binomialLogProbabilityFocal(resultArgs['successes'], resultArgs['total'],
+                                               ebisu.predictRecall(m, elapsedTime), FOCAL_GAMMA)
         allLogliks[key] = loglik
       models = newModels
 
@@ -140,7 +107,8 @@ if __name__ == '__main__':
 
   # DETAILS
   VIZ = True
-  printDetails(cards, models, allModels, allLogliks, outfile='ensemble-compare.txt')
+  if len(initModelParams) < 10:
+    printDetails(cards, models, allModels, allLogliks, outfile='ensemble-compare.txt')
   if VIZ:
     plt.figure()
     plt.plot(np.array(sorted(summary, key=lambda v: v[1])))

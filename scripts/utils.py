@@ -4,6 +4,10 @@ from scipy.stats import multinomial  #type:ignore
 import numpy as np
 from typing import Callable, TypeVar
 from collections.abc import Iterable
+import typing
+from scipy.stats import binom as binomrv  # type:ignore
+from math import log
+from scipy.special import betaln  #type:ignore
 
 T = TypeVar('T')
 
@@ -208,3 +212,76 @@ class Card:
   dts_hours: list[float]
   results: list[int]
   absts_hours: list[float]
+
+
+def printableList(v: list[int | float], more=False) -> str:
+  return ", ".join([f'{x:0.1f}' for x in v]) if not more else ", ".join([f'{x:0.2f}' for x in v])
+
+
+ConvertAnkiMode = typing.Literal['approx', 'binary']
+
+
+def convertAnkiResultToBinomial(result: int, mode: ConvertAnkiMode) -> dict:
+  if mode == 'approx':
+    # Try to approximate hard to easy with binomial: this is tricky and ad hoc
+    if result == 1:  # fail
+      return dict(successes=0, total=1)
+    elif result == 2:  # hard
+      return dict(successes=1, total=1, q0=0.2)
+    elif result == 3:  # good
+      return dict(successes=1, total=1)
+    elif result == 4:  # easy
+      return dict(successes=2, total=2)
+    else:
+      raise Exception('unknown Anki result')
+  elif mode == 'binary':
+    # hard or better is pass
+    return dict(successes=int(result > 1), total=1)
+
+
+def binomialLogProbability(k: int, n: int, p: float) -> float:
+  assert k <= n
+  return float(binomrv.logpmf(k, n, p))
+
+
+def noisyLogProbability(result: typing.Union[int, float], q1: float, q0: float, p: float) -> float:
+  z = result >= 0.5
+  return log(((q1 - q0) * p + q0) if z else (q0 - q1) * p + (1 - q0))
+
+
+def focalLoss(result: bool, pTrue: float, gamma: float) -> float:
+  "https://arxiv.org/pdf/1708.02002.pdf"
+  assert 0 <= pTrue <= 1
+  assert 0 <= gamma
+  pT = pTrue if result else 1 - pTrue
+  return -(1 - pT)**gamma * log(pT)
+
+
+def binomln(n: float, k: float):
+  assert 0 <= k <= n
+  "Log of scipy.special.binom calculated entirely in the log domain"
+  return -betaln(1 + n - k, 1 + k) - log(n + 1)
+
+
+def binomialLogProbabilityFocal(k: int, n: int, p: float, gamma: float = 2) -> float:
+  assert 0 <= k <= n
+  assert 0 <= p <= 1
+  assert 0 <= gamma
+  focalP = p**((1 - p)**gamma)
+  focalQ = (1 - p)**(p**gamma)
+  return binomln(n, k) + k * log(focalP) + (n - k) * log(focalQ)
+
+
+def noisyLogProbabilityFocal(result: float,
+                             q1: float,
+                             q0: float,
+                             p: float,
+                             gamma: float = 2) -> float:
+  z = result >= 0.5
+  assert 0 <= q1 <= 1
+  assert 0 <= q0 <= 1
+  assert 0 <= p <= 1
+  assert 0 <= gamma
+  focalP = p**((1 - p)**gamma)
+  focalQ = (1 - p)**(p**gamma)
+  return log((q1 * focalP + q0 * focalQ) if z else ((1 - q1) * focalP + (1 - q0) * focalQ))

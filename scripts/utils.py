@@ -298,7 +298,7 @@ def noisyLogProbabilityFocal(result: float,
   z = result >= 0.5
   if z:
     focalP = p**((1 - p)**gamma)
-    return q1 * focalP + q0 * (1 - focalP)
+    return log(q1 * focalP + q0 * (1 - focalP))
 
   focalQ = (1 - p)**(p**gamma)
   return log((1 - q1) * (1 - focalQ) + (1 - q0) * focalQ)

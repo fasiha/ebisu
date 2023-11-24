@@ -245,9 +245,13 @@ def binomialLogProbability(k: int, n: int, p: float) -> float:
   return float(binomrv.logpmf(k, n, p))
 
 
-def noisyLogProbability(result: typing.Union[int, float], q1: float, q0: float, p: float) -> float:
+def noisyProbability(result: typing.Union[int, float], q1: float, q0: float, p: float) -> float:
   z = result >= 0.5
-  return log(((q1 - q0) * p + q0) if z else (q0 - q1) * p + (1 - q0))
+  return ((q1 - q0) * p + q0) if z else (q0 - q1) * p + (1 - q0)
+
+
+def noisyLogProbability(*args) -> float:
+  return log(noisyProbability(*args))
 
 
 def focalLoss(result: bool, pTrue: float, gamma: float) -> float:
@@ -286,14 +290,18 @@ def noisyLogProbabilityFocal(result: float,
                              q0: float,
                              p: float,
                              gamma: float = 2) -> float:
-  z = result >= 0.5
+  assert 0 <= result <= 1
   assert 0 <= q1 <= 1
   assert 0 <= q0 <= 1
   assert 0 <= p <= 1
   assert 0 <= gamma
-  focalP = p**((1 - p)**gamma)
+  z = result >= 0.5
+  if z:
+    focalP = p**((1 - p)**gamma)
+    return q1 * focalP + q0 * (1 - focalP)
+
   focalQ = (1 - p)**(p**gamma)
-  return log((q1 * focalP + q0 * focalQ) if z else ((1 - q1) * focalP + (1 - q0) * focalQ))
+  return log((1 - q1) * (1 - focalQ) + (1 - q0) * focalQ)
 
 
 def clipclim(z: float, ax=None):

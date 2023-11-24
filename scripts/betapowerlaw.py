@@ -62,10 +62,10 @@ def confirmMath(VIZ=False):
 confirmMath()
 
 
-def updateRecall(model, result, elapsed):
+def updateRecall(model, result, total, elapsed):
   delta = elapsed / model[-1]
   l = np.log2(1 + delta)
-  return ebisu2.updateRecall(model, result, 1, tnow=l * model[-1], rebalance=False)
+  return ebisu2.updateRecall(model, result, total, tnow=l * model[-1], rebalance=False)
 
 
 def modelToPercentileDecay(model, percentile=0.5):
@@ -168,9 +168,9 @@ if __name__ == '__main__':
 
   initModels: list[tuple[float, float, float]] = [
       # (2.0, 2, 10), # leads to very large halflives
-      (1.25, 1.25, 100),  # seems to be the best for a wide range
-      (2, 2, 100),  # seems to be the best for a wide range
-      (3, 3, 100),
+      (1.25, 1.25, 125),
+      (2, 2, 125),
+      (3, 3, 125),
       # (2, 2, 10),
       (3, 3, 10),
       (5, 5, 10),
@@ -178,9 +178,9 @@ if __name__ == '__main__':
 
   GRID_MODE = False
   if GRID_MODE:
-    abVec = list(np.arange(1.25, 4, .25))
+    abVec = list(np.arange(1.25, 3, .25))
     # abVec = list(range(2, 6))
-    hlVec = list(range(10, 400, 25))
+    hlVec = list(range(10, 300, 25))
     initModels = [(ab, ab, hl) for hl in hlVec for ab in abVec]
   else:
     abVec, hlVec, GRID_MODE = [], [], False
@@ -220,7 +220,6 @@ if __name__ == '__main__':
     summary[cardNum, modelNum] += ll
 
   # DETAILS
-  VIZ = True
   if len(initModels) < 10:
     printDetails(cards, models, allModels, allLogliks, outfile='beta-powerlaw-compare.txt')
 
@@ -231,17 +230,16 @@ if __name__ == '__main__':
               for p in [0.5, 0.8]
           }, fid)
 
-  if VIZ:
-    plt.figure()
-    plt.plot(np.array(sorted(summary, key=lambda v: v[0])))
-    plt.legend([f'{m}' for m in initModels])
-    plt.ylim((-10, 1))
-    plt.yticks(np.arange(-10, 0.1, 2.5))
-    plt.xlabel('flashcard number')
-    plt.ylabel('∑ focal loss')
-    plt.title('Powerlaw-beta performance for training set')
-    plt.savefig('beta-powerlaw-compare.png', dpi=300)
-    plt.savefig('beta-powerlaw-compare.svg')
+      plt.figure()
+      plt.plot(np.array(sorted(summary, key=lambda v: v[0])))
+      plt.legend([f'{m}' for m in initModels])
+      plt.ylim((-10, 1))
+      plt.yticks(np.arange(-10, 0.1, 1))
+      plt.xlabel('flashcard number')
+      plt.ylabel('∑ focal loss')
+      plt.title('Powerlaw-beta performance for training set')
+      plt.savefig('beta-powerlaw-compare.png', dpi=300)
+      plt.savefig('beta-powerlaw-compare.svg')
 
   if GRID_MODE:
     sums = analyzeModelsGrid(allLogliks, abVec, hlVec)

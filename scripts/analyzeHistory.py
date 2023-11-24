@@ -4,7 +4,7 @@ import json
 from tqdm import tqdm  #type:ignore
 import numpy as np
 import pylab as plt  # type:ignore
-from utils import binomialLogProbabilityFocal, convertAnkiResultToBinomial, noisyLogProbabilityFocal, printableList, sqliteToDf, traintest
+from utils import binomialLogProbabilityFocal, convertAnkiResultToBinomial, noisyLogProbabilityFocal, printableList, sqliteToDf, traintest, clipclim
 
 plt.style.use('ggplot')
 plt.rcParams['svg.fonttype'] = 'none'
@@ -84,16 +84,16 @@ if __name__ == '__main__':
   cards = train
 
   initModelParams = [
-      dict(firstHalflife=40, lastHalflife=10e3, firstWeight=0.5, initialAlphaBeta=1.25),
-      dict(firstHalflife=40, lastHalflife=10e3, firstWeight=0.5, initialAlphaBeta=2),
-      dict(firstHalflife=100, lastHalflife=10e3, firstWeight=0.5),
+      dict(firstHalflife=50, firstWeight=0.5, initialAlphaBeta=1.25, lastHalflife=10e3),
+      dict(firstHalflife=50, firstWeight=0.5, initialAlphaBeta=2, lastHalflife=10e3),
+      dict(firstHalflife=100, firstWeight=0.5, lastHalflife=10e3),
   ]
 
   GRID_MODE = False
   if GRID_MODE:
     FIRST_WEIGHT = 0.5
     abVec = list(np.arange(1.25, 3, .25))
-    hlVec = list(range(10, 400, 25))
+    hlVec = list(range(10, 300, 25))
     initModelParams = [
         dict(
             firstHalflife=hl,
@@ -141,7 +141,6 @@ if __name__ == '__main__':
     summary[cardNum, modelNum] += ll
 
   # DETAILS
-  VIZ = True
   if len(initModelParams) < 10:
     printDetails(cards, models, allModels, allLogliks, outfile='ensemble-compare.txt')
 
@@ -152,17 +151,16 @@ if __name__ == '__main__':
               for p in [0.5, 0.8]
           }, fid)
 
-  if VIZ:
-    plt.figure()
-    plt.plot(np.array(sorted(summary, key=lambda v: v[0])))
-    plt.ylim((-10, 1))
-    plt.yticks(np.arange(-10, 0.1, 2.5))
-    plt.legend([f'{m}' for m in initModelParams])
-    plt.xlabel('flashcard number')
-    plt.ylabel('∑ focal loss')
-    plt.title('Ensemble v3 performance for training set')
-    plt.savefig('ensemble-compare.png', dpi=300)
-    plt.savefig('ensemble-compare.svg')
+      plt.figure()
+      plt.plot(np.array(sorted(summary, key=lambda v: v[0])))
+      plt.ylim((-10, 1))
+      plt.yticks(np.arange(-10, 0.1, 1))
+      plt.legend([f'{m}' for m in initModelParams])
+      plt.xlabel('flashcard number')
+      plt.ylabel('∑ focal loss')
+      plt.title('Ensemble v3 performance for training set')
+      plt.savefig('ensemble-compare.png', dpi=300)
+      plt.savefig('ensemble-compare.svg')
 
   if GRID_MODE:
     sums = analyzeModelsGrid(allLogliks, abVec, hlVec)

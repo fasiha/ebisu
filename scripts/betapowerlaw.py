@@ -172,11 +172,11 @@ if __name__ == '__main__':
   initModels: list[tuple[float, float, float]] = [
       # (2.0, 2, 10), # leads to very large halflives
       (1.25, 1.25, 125),
-      # (2, 2, 125),
-      # (3, 3, 125),
-      # # (2, 2, 10),
-      # (3, 3, 10),
-      # (5, 5, 10),
+      (2, 2, 125),
+      (3, 3, 125),
+      # (2, 2, 10),
+      (3, 3, 10),
+      (5, 5, 10),
   ]
 
   GRID_MODE = False

@@ -215,8 +215,10 @@ class Card:
   absts_hours: list[float]
 
 
-def printableList(v: list[int | float], more=False) -> str:
-  return ", ".join([f'{x:0.1f}' for x in v]) if not more else ", ".join([f'{x:0.2f}' for x in v])
+def printableList(v: list[int | float | str], more=False, sep=', ') -> str:
+  if isinstance(v[0], str):
+    return sep.join(v)  #type:ignore
+  return sep.join([f'{x:0.1f}' for x in v]) if not more else sep.join([f'{x:0.2f}' for x in v])
 
 
 ConvertAnkiMode = typing.Literal['approx', 'binary']

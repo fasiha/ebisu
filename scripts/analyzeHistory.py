@@ -34,8 +34,11 @@ def printDetails(cards, initModels, modelsDb, logLikDb, outfile=None):
       for quizNum in range(numQuizzes):
         lls.append([logLikDb[(cardNum, modelNum, quizNum)] for modelNum in range(len(initModels))])
         hls.append([
-            ebisu.modelToPercentileDecay(modelsDb[(cardNum, modelNum, quizNum)])
-            for modelNum in range(len(initModels))
+            printableList([
+                ebisu.modelToPercentileDecay(modelsDb[(cardNum, modelNum, quizNum)]),
+                ebisu.modelToPercentileDecay(modelsDb[(cardNum, modelNum, quizNum)], .8)
+            ],
+                          sep='/') for modelNum in range(len(initModels))
         ])
       for quizNum, t in enumerate(card.dts_hours):
         oldModels = initModels if quizNum == 0 else [

@@ -62,10 +62,10 @@ def confirmMath(VIZ=False):
 confirmMath()
 
 
-def updateRecall(model, result, total, elapsed):
+def updateRecall(model, result, total, elapsed, q0=None):
   delta = elapsed / model[-1]
   l = np.log2(1 + delta)
-  return ebisu2.updateRecall(model, result, total, tnow=l * model[-1], rebalance=False)
+  return ebisu2.updateRecall(model, result, total, tnow=l * model[-1], rebalance=False, q0=q0)
 
 
 def modelToPercentileDecay(model, percentile=0.5):

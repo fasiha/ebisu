@@ -5,11 +5,10 @@ from scipy.special import betaln, beta as betafn, logsumexp  # type:ignore
 import numpy as np
 from math import log, exp
 
-IntFloat = Union[int, float]
-Prior = Tuple[IntFloat, IntFloat, IntFloat]
+Prior = Tuple[float, float, float]
 
 
-def predictRecall(prior: Prior, tnow: IntFloat, exact=False) -> float:
+def predictRecall(prior: Prior, tnow: float, exact=False) -> float:
   """Expected recall probability now, given a prior distribution on it. 🍏
 
   `prior` is a tuple representing the prior distribution on recall probability
@@ -46,7 +45,7 @@ def predictRecall(prior: Prior, tnow: IntFloat, exact=False) -> float:
 _BETALNCACHE: Dict[Tuple[float, float], float] = {}
 
 
-def _cachedBetaln(a: IntFloat, b: IntFloat) -> float:
+def _cachedBetaln(a: float, b: float) -> float:
   "Caches `betaln(a, b)` calls in the `_BETALNCACHE` dictionary."
   if (a, b) in _BETALNCACHE:
     return _BETALNCACHE[(a, b)]
@@ -55,17 +54,17 @@ def _cachedBetaln(a: IntFloat, b: IntFloat) -> float:
   return x
 
 
-def binomln(n: IntFloat, k: IntFloat):
+def binomln(n: float, k: float):
   "Log of scipy.special.binom calculated entirely in the log domain"
   return -betaln(1 + n - k, 1 + k) - log(n + 1)
 
 
 def updateRecall(prior: Prior,
-                 successes: IntFloat,
+                 successes: float,
                  total: int,
-                 tnow: IntFloat,
+                 tnow: float,
                  rebalance=True,
-                 tback: Optional[IntFloat] = None,
+                 tback: Optional[float] = None,
                  q0: Optional[float] = None) -> Prior:
   """Update a prior on recall probability with a quiz result and time. 🍌
 
@@ -263,7 +262,7 @@ def modelToPercentileDecay(model: Prior, percentile=0.5):
   return t1
 
 
-def rescaleHalflife(prior: Prior, scale: IntFloat = 1.):
+def rescaleHalflife(prior: Prior, scale: float = 1.):
   """Given any model, return a new model with the original's halflife scaled.
   Use this function to adjust the halflife of a model.
   

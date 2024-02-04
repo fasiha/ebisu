@@ -9,6 +9,7 @@ from scipy.stats import beta as betarv, binom as binomrv  # type:ignore
 from scipy.special import beta as betafn  # type:ignore
 import pylab as plt  # type:ignore
 import numpy as np
+from scipy.special import betaln  # type:ignore
 
 import ebisu.ebisu2beta as ebisu2
 from utils import binomialLogProbabilityFocal, convertAnkiResultToBinomial, noisyLogProbabilityFocal, printableList, sqliteToDf, traintest, clipclim
@@ -88,6 +89,19 @@ def modelToPercentileDecay(model, percentile=0.5):
       lambda h: abs(percentile - predictRecall(model, h)), bounds=[10**logLeft, 10**logRight])
   assert res.success
   return res.x
+
+
+def rescaleHalflife(prior, scale: float = 1.):
+  (alpha, beta, t) = prior
+  oldHalflife = modelToPercentileDecay(prior)
+  dt = np.log2(1 + oldHalflife / t)
+
+  logDenominator = betaln(alpha, beta)
+  logm2 = betaln(alpha + 2 * dt, beta) - logDenominator
+  m2 = np.exp(logm2)
+  newAlphaBeta = 1 / (8 * m2 - 2) - 0.5
+  assert newAlphaBeta > 0
+  return (newAlphaBeta, newAlphaBeta, oldHalflife * scale)
 
 
 MILLISECONDS_PER_HOUR = 3600e3  # 60 min/hour * 60 sec/min * 1e3 ms/sec

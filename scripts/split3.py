@@ -6,6 +6,7 @@ import betapowerlaw
 HOURS_PER_YEAR = 365 * 24
 SubModel = Tuple[float, float, float, float]
 Model = Tuple[SubModel, SubModel, SubModel]
+Ebisu2Model = Tuple[float, float, float]
 
 
 def norm(v: list[float]) -> list[float]:
@@ -136,8 +137,10 @@ def printableSub(m: SubModel, i: int) -> str:
   return f'w={m[0]:g}, α=β={m[1]}, hl={m[-1]}' if i <= 1 else f'w={m[0]:g}, hl={m[-1]}'
 
 
-def printableModel(m: Model) -> str:
-  return '(' + "), (".join([printableSub(v, i) for i, v in enumerate(m)]) + ')'
+def printableModel(m: Model | Ebisu2Model) -> str:
+  if type(m[0]) == tuple:
+    return '(' + "), (".join([printableSub(v, i) for i, v in enumerate(m)]) + ')'
+  return f'(α=β={m[0]:0.3f}, hl={m[2]:0.3f})'
 
 
 if __name__ == "__main__":
@@ -184,16 +187,19 @@ if __name__ == "__main__":
   # or
   cards = train
 
-  initModels: list[Model] = [
+  initModels: list[Model | Ebisu2Model] = [
       initModel(1.25, 24, w1=0.35, w2=0.35, scale2=5, hl3=365 * 24 * 10),
-      initModel(1.25, 24, w1=0.35, w2=0.35, scale2=5),
-      initModel(1.25, 24, w1=0.35, w2=0.35),
+      # initModel(1.25, 24, w1=0.35, w2=0.35, scale2=5),
+      # initModel(1.25, 24, w1=0.35, w2=0.35),
       #
-      initModel(1.25, 100, w1=0.35, w2=0.35, scale2=5),
+      # initModel(1.25, 100, w1=0.35, w2=0.35, scale2=5),
       initModel(1.25, 100, w1=0.35, w2=0.35),
       #
       # initModel(1.25, 100, w1=0.6, w2=0.3),
       # initModel(1.25, 100, w1=0.9, w2=0.05),
+      ebisu2.defaultModel(24, 1.25),
+      # ebisu2.defaultModel(24, 2.5),
+      ebisu2.defaultModel(24 * 7, 1),
   ]
 
   GRID_MODE = False
@@ -219,22 +225,26 @@ if __name__ == "__main__":
       for modelNum, m in enumerate(models):
         key = (cardNum, modelNum, quizNum)
 
-        newModel = updateRecall(m, elapsed=elapsedTime, **resultArgs)
+        newModel = (
+            updateRecall(m, elapsed=elapsedTime, **resultArgs)
+            if type(m[0]) == tuple else ebisu2.updateRecall(m, tnow=elapsedTime, **resultArgs))
         newModels.append(newModel)
         allModels[key] = newModel
 
+        pRecall = (
+            predictRecall(m, elapsedTime) if type(m[0]) == tuple else ebisu2.predictRecall(
+                m, elapsedTime, exact=True))
         if resultArgs['total'] == 1:
           z = resultArgs['successes'] >= 0.5
           q1 = max(resultArgs['successes'], 1 - resultArgs['successes'])
           q0 = resultArgs['q0'] if 'q0' in resultArgs else 1 - q1
-          pRecall = predictRecall(m, elapsedTime)
           loglik = noisyLogProbabilityFocal(z, q1, q0, pRecall, FOCAL_GAMMA)
           if resultProbForAuc is not None:
             resultProbForAuc.append((z, pRecall))
         else:
           resultProbForAuc = None
           loglik = binomialLogProbabilityFocal(resultArgs['successes'], resultArgs['total'],
-                                               predictRecall(m, elapsedTime), FOCAL_GAMMA)
+                                               pRecall, FOCAL_GAMMA)
         allLogliks[key] = loglik
         if forAuc is not None:
           if resultProbForAuc is not None:
@@ -285,7 +295,7 @@ if __name__ == "__main__":
       aucs = np.abs(np.trapz(truePositiveRate, falsePositiveRate, axis=0))
       plt.legend([f'{printableModel(m)} AUC={a:.3f}' for m, a in zip(initModels, aucs)],
                  fontsize="x-small")
-
+      plt.title('AUC/ROC')
       plt.savefig('split-auc.png', dpi=300)
       plt.savefig('split-auc.svg')
 

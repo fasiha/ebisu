@@ -13,12 +13,17 @@ def norm(v: list[float]) -> list[float]:
   return [x / s for x in v]
 
 
-def initModel(alphaBeta: float, hlHours: float, w1=0.65, w2=0.3, scale2=2) -> Model:
+def initModel(alphaBeta: float,
+              hlHours: float,
+              w1=0.65,
+              w2=0.3,
+              scale2=2,
+              hl3=HOURS_PER_YEAR) -> Model:
   ws = norm([w1, w2, 1 - w1 - w2])
   return (
       (ws[0], alphaBeta, alphaBeta, hlHours),
       (ws[1], alphaBeta, alphaBeta, hlHours * scale2),
-      (ws[2], alphaBeta, alphaBeta, HOURS_PER_YEAR),
+      (ws[2], alphaBeta, alphaBeta, hl3),
   )
 
 
@@ -180,6 +185,7 @@ if __name__ == "__main__":
   cards = train
 
   initModels: list[Model] = [
+      initModel(1.25, 24, w1=0.35, w2=0.35, scale2=5, hl3=365 * 24 * 10),
       initModel(1.25, 24, w1=0.35, w2=0.35, scale2=5),
       initModel(1.25, 24, w1=0.35, w2=0.35),
       #
@@ -201,13 +207,15 @@ if __name__ == "__main__":
 
   allModels = dict()  # key: (card integer, model number, quiz number)
   allLogliks = dict()
+  forAuc: None | list[list[tuple[bool, float]]] = list()
   for cardNum, card in tqdm(enumerate(cards), total=len(cards)):
     models = initModels
 
     for quizNum, (ankiResult, elapsedTime) in enumerate(zip(card.results, card.dts_hours)):
-      resultArgs = convertAnkiResultToBinomial(ankiResult, 'approx')
+      resultArgs = convertAnkiResultToBinomial(ankiResult, 'binary')
 
       newModels = []
+      resultProbForAuc: None | list[tuple[bool, float]] = list()
       for modelNum, m in enumerate(models):
         key = (cardNum, modelNum, quizNum)
 
@@ -219,11 +227,21 @@ if __name__ == "__main__":
           z = resultArgs['successes'] >= 0.5
           q1 = max(resultArgs['successes'], 1 - resultArgs['successes'])
           q0 = resultArgs['q0'] if 'q0' in resultArgs else 1 - q1
-          loglik = noisyLogProbabilityFocal(z, q1, q0, predictRecall(m, elapsedTime), FOCAL_GAMMA)
+          pRecall = predictRecall(m, elapsedTime)
+          loglik = noisyLogProbabilityFocal(z, q1, q0, pRecall, FOCAL_GAMMA)
+          if resultProbForAuc is not None:
+            resultProbForAuc.append((z, pRecall))
         else:
+          resultProbForAuc = None
           loglik = binomialLogProbabilityFocal(resultArgs['successes'], resultArgs['total'],
                                                predictRecall(m, elapsedTime), FOCAL_GAMMA)
         allLogliks[key] = loglik
+        if forAuc is not None:
+          if resultProbForAuc is not None:
+            forAuc.append(resultProbForAuc)
+          else:
+            forAuc = None
+
       models = newModels
 
   # SUMMARY
@@ -244,7 +262,34 @@ if __name__ == "__main__":
     plt.savefig('split-compare.png', dpi=300)
     plt.savefig('split-compare.svg')
 
-    printDetails(cards, models, allModels, allLogliks, outfile='split-compare.txt')
+    # ROC/AUC
+    if forAuc:
+      roc = np.array(forAuc)
+      vals = roc[:, :, 1]
+      outcomes = roc[:, :, 0]
+
+      aucThresholds = np.linspace(0, 1, 51)
+      truePositives = [np.logical_and(vals > t, outcomes) for t in aucThresholds]
+      falsePositives = [np.logical_and(vals > t, np.logical_not(outcomes)) for t in aucThresholds]
+
+      positivePopulation = sum(outcomes[:, 0])
+      negativePopulation = len(forAuc) - positivePopulation
+      truePositiveRate = np.sum(truePositives, axis=1) / positivePopulation
+      falsePositiveRate = np.sum(falsePositives, axis=1) / negativePopulation
+
+      plt.figure()
+      plt.plot(falsePositiveRate, truePositiveRate)
+      plt.plot([0, 1], [0, 1], 'r--')
+      plt.xlabel('false positive rate')
+      plt.ylabel('true positive rate')
+      aucs = np.abs(np.trapz(truePositiveRate, falsePositiveRate, axis=0))
+      plt.legend([f'{printableModel(m)} AUC={a:.3f}' for m, a in zip(initModels, aucs)],
+                 fontsize="x-small")
+
+      plt.savefig('split-auc.png', dpi=300)
+      plt.savefig('split-auc.svg')
+
+    # printDetails(cards, models, allModels, allLogliks, outfile='split-compare.txt')
 
     with open('split-compare.json', 'w') as fid:
       json.dump(

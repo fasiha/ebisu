@@ -189,6 +189,19 @@ class TestEbisu(unittest.TestCase):
     post = updateRecall(prior, 1, 1, 1., rebalance=False)
     self.assertAlmostEqual(post[2], prior[2])
 
+  def test_large_alpha_beta(self):
+    "Fix #68, convergence for large alpha or beta"
+    global testpoints
+    t = 37.98442774938748
+    elapsed = 24.0
+    for alphaBeta in [400, 531.94, 531.9401709401171, 600]:
+      prior = (alphaBeta, alphaBeta, t)
+      args = [0, 1, elapsed]
+      post = updateRecall(prior, *args)
+      assert post[0] > alphaBeta * 0.99
+
+      testpoints += [['update', list(prior), args, dict(post=post)]]
+
 
 def monotonicIncreasing(v):
   # allow a tiny bit of negative slope

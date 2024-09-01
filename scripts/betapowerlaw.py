@@ -11,7 +11,7 @@ import pylab as plt  # type:ignore
 import numpy as np
 from scipy.special import betaln  # type:ignore
 
-import ebisu.ebisu2beta as ebisu2
+import ebisu2
 from utils import binomialLogProbabilityFocal, convertAnkiResultToBinomial, noisyLogProbabilityFocal, printableList, sqliteToDf, traintest, clipclim
 
 plt.style.use('ggplot')

@@ -1,7 +1,7 @@
 from collections import namedtuple
 from scipy.optimize import minimize_scalar  # type:ignore
 from typing import Optional, Tuple
-import ebisu.ebisu2beta as ebisu2
+import ebisu2
 import betapowerlaw
 
 HOURS_PER_YEAR = 365 * 24
@@ -180,9 +180,9 @@ if __name__ == "__main__":
   SAVE_DETAILS = False  # save card-by-card model-by-model results to text file
   USE_FSRS_DATASET = True
   FSRS_CARD_PERCENT = 1
-  FSRS_USER_PERCENT = 0.25
+  FSRS_USER_PERCENT = 0.1
   FSRS_SEED = 123
-  FSRS_LIMIT = 1000
+  FSRS_LIMIT_CARDS = 10_000_000
 
   aucThresholds = np.linspace(0, 1, 51)
 
@@ -204,11 +204,11 @@ if __name__ == "__main__":
         results, dts_hours = zip(*innerList)
         yield Mapped(results=results, dts_hours=dts_hours)
         cardNum += 1
-        if cardNum >= FSRS_LIMIT:
+        if cardNum >= FSRS_LIMIT_CARDS:
           break
 
     cards = gen()
-    numTotalCards = min(FSRS_LIMIT, round(186292444 * FSRS_CARD_PERCENT))
+    numTotalCards = min(FSRS_LIMIT_CARDS, round(186292444 * FSRS_CARD_PERCENT))
   else:
     ankiPath = Path(os.path.dirname(os.path.realpath(__file__))) / 'collection-no-fields.anki2'
     df = sqliteToDf(str(ankiPath), True)
@@ -262,6 +262,7 @@ if __name__ == "__main__":
   falsePositives = np.zeros((len(aucThresholds), len(initModels)), dtype=int)
 
   logLossesPerCard: list[np.ndarray] = []
+  totalFocalLoss = np.zeros(len(initModels))
 
   for cardNum, card in tqdm(enumerate(cards), total=numTotalCards):
     models = initModels
@@ -309,11 +310,22 @@ if __name__ == "__main__":
         negativePopulation += not z
 
       models = newModels
-    logLossesPerCard.append(llsPerCard)
+    if len(logLossesPerCard) < 10_000:
+      logLossesPerCard.append(llsPerCard)
+    totalFocalLoss += llsPerCard
+    if cardNum % 50_001 == 50_000:
+      print(
+          f'\n{cardNum=}, auc',
+          np.abs(
+              np.trapz(
+                  truePositives / positivePopulation,
+                  falsePositives / negativePopulation,
+                  axis=0,
+              )))
 
   # SUMMARY
   print('completed cards analysis')
-  numTotalCards = len(logLossesPerCard)  # update in case we got more or fewer
+  numTotalCards = cardNum + 1  # update in case we got more or fewer
   logLosses = np.array(logLossesPerCard)
 
   if not ignoreAuc:

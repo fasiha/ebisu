@@ -175,9 +175,10 @@ if __name__ == "__main__":
   plt.ion()
 
   FOCAL_GAMMA = 2
-  GRID_MODE = False
+  GRID_MODE = True
+  GRID_MODE_EBISU2 = True
   SAVE_DETAILS = False  # save card-by-card model-by-model results to text file
-  USE_FSRS_DATASET = not True
+  USE_FSRS_DATASET = not True and not GRID_MODE
   FSRS_PERCENT = 0.5
   FSRS_SEED = 123
   FSRS_LIMIT = 1_000_000
@@ -226,15 +227,20 @@ if __name__ == "__main__":
       # initModel(1.25, 100, w1=0.6, w2=0.3),
       # initModel(1.25, 100, w1=0.9, w2=0.05),
       ebisu2.defaultModel(24, 1.25),
+      ebisu2.defaultModel(7, 1.5),
       # ebisu2.defaultModel(24, 2.5),
       ebisu2.defaultModel(24 * 7, 1.01),
   ]
 
-  # GRID_MODE = True
   if GRID_MODE:
-    abVec = list(np.arange(1.25, 2.5, .25))
-    hlVec = list(range(10, 200, 20))
-    initModels = [initModel(ab, hl, w1=0.35, w2=0.35) for hl in hlVec for ab in abVec]
+    if not GRID_MODE_EBISU2:
+      abVec = list(np.arange(1.25, 2.5, .25))
+      hlVec = list(range(10, 200, 20))
+      initModels = [initModel(ab, hl, w1=0.35, w2=0.35) for hl in hlVec for ab in abVec]
+    else:
+      abVec = list(np.arange(1.05, 2.5, .25))
+      hlVec = list(range(1, 20, 1))
+      initModels = [ebisu2.defaultModel(hl, ab) for hl in hlVec for ab in abVec]
   else:
     abVec, hlVec, GRID_MODE = [], [], False
 
@@ -290,6 +296,37 @@ if __name__ == "__main__":
     summary[cardNum, modelNum] += ll
   print('generated summary')
 
+  if forAuc:
+    roc = np.array(forAuc)
+    outcomes = roc[:, 0].astype(bool)
+    outcomes = outcomes[:, np.newaxis]
+    vals = roc[:, 1:]
+    roc = []  # save memory
+
+    positivePopulation = sum(outcomes)
+    negativePopulation = len(forAuc) - positivePopulation
+
+    aucThresholds = np.linspace(0, 1, 51)
+    # truePositives = [np.logical_and(vals > t, outcomes) for t in aucThresholds]
+    # falsePositives = [np.logical_and(vals > t, np.logical_not(outcomes)) for t in aucThresholds]
+
+    truePositives = []
+    falsePositives = []
+    notOutcomes = np.logical_not(outcomes)
+    for t in aucThresholds:
+      left = vals > t
+      truePositives.append(np.logical_and(left, outcomes))
+      falsePositives.append(np.logical_and(left, notOutcomes))
+    notOutcomes = []  # save memory
+    vals = []  # save memory
+    outcomes = []  # save memory
+
+    truePositiveRate = np.sum(truePositives, axis=1) / positivePopulation
+    falsePositiveRate = np.sum(falsePositives, axis=1) / negativePopulation
+    aucs = np.abs(np.trapz(truePositiveRate, falsePositiveRate, axis=0))
+
+    print('completed AUC')
+
   # DETAILS
   totalFocalLoss = sum(summary, 0)
   if len(initModels) < 10:
@@ -308,36 +345,6 @@ if __name__ == "__main__":
 
     # ROC/AUC
     if forAuc:
-      roc = np.array(forAuc)
-      outcomes = roc[:, 0].astype(bool)
-      outcomes = outcomes[:, np.newaxis]
-      vals = roc[:, 1:]
-      roc = []  # save memory
-
-      positivePopulation = sum(outcomes)
-      negativePopulation = len(forAuc) - positivePopulation
-
-      aucThresholds = np.linspace(0, 1, 51)
-      # truePositives = [np.logical_and(vals > t, outcomes) for t in aucThresholds]
-      # falsePositives = [np.logical_and(vals > t, np.logical_not(outcomes)) for t in aucThresholds]
-
-      truePositives = []
-      falsePositives = []
-      notOutcomes = np.logical_not(outcomes)
-      for t in aucThresholds:
-        left = vals > t
-        truePositives.append(np.logical_and(left, outcomes))
-        falsePositives.append(np.logical_and(left, notOutcomes))
-      notOutcomes = []  # save memory
-      vals = []  # save memory
-      outcomes = []  # save memory
-
-      truePositiveRate = np.sum(truePositives, axis=1) / positivePopulation
-      falsePositiveRate = np.sum(falsePositives, axis=1) / negativePopulation
-      aucs = np.abs(np.trapz(truePositiveRate, falsePositiveRate, axis=0))
-
-      print('completed AUC')
-
       plt.figure()
       plt.plot(falsePositiveRate, truePositiveRate)
       plt.plot([0, 1], [0, 1], 'r--')
@@ -379,3 +386,18 @@ if __name__ == "__main__":
     plt.grid(False)
     plt.savefig(f'focal-split.png', dpi=300)
     plt.savefig(f'focal-split.svg')
+
+    plt.figure()
+    plt.imshow(
+        aucs.reshape((len(hlVec), len(abVec))),
+        aspect='auto',
+        interpolation='none',
+        extent=extents(abVec) + extents(hlVec),
+        origin='lower')
+    plt.colorbar()
+    plt.xlabel('initial α=β')
+    plt.ylabel('initial halflife')
+    plt.title('AUC')
+    plt.grid(False)
+    plt.savefig(f'auc-split.png', dpi=300)
+    plt.savefig(f'auc-split.svg')

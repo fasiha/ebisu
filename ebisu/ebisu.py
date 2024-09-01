@@ -2,6 +2,7 @@
 
 from scipy.special import betaln, beta as betafn, logsumexp
 import numpy as np
+from math import log, exp, isfinite
 
 
 def predictRecall(prior, tnow, exact=False):
@@ -161,8 +162,15 @@ def updateRecall(prior, successes, total, tnow, rebalance=True, tback=None, q0=N
   return (newAlpha, newBeta, tback)
 
 
-def _updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None):
+def _updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None, useLog=False):
   (alpha, beta, t) = prior
+
+  # at various points in execution, we might decide we need to bail to the log domain
+  rerunAsLog = lambda: _updateRecallSingle(
+      prior=prior, result=result, tnow=tnow, rebalance=rebalance, tback=tback, q0=q0, useLog=True)
+  # we'll do that right now!
+  if alpha > 400 and beta > 400 and not useLog:
+    return rerunAsLog()
 
   z = result > 0.5
   q1 = result if z else 1 - result  # alternatively, max(result, 1-result)
@@ -177,6 +185,8 @@ def _updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None
     c, d = (q1 - q0, q0)
 
   den = c * betafn(alpha + dt, beta) + d * (betafn(alpha, beta) if d else 0)
+  logDen = None if not useLog else logsumexp(
+      [betaln(alpha + dt, beta), betaln(alpha, beta) or -np.inf], b=[c, d])
 
   def moment(N, et):
     num = c * betafn(alpha + dt + N * dt * et, beta)
@@ -184,10 +194,32 @@ def _updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None
       num += d * betafn(alpha + N * dt * et, beta)
     return num / den
 
+  def logMoment(N, et):
+    if d != 0:
+      res = logsumexp([betaln(alpha + dt + N * dt * et, beta),
+                       betaln(alpha + N * dt * et, beta)],
+                      b=[c, d])
+      return res - logDen
+    return log(c) + betaln(alpha + dt + N * dt * et, beta) - logDen
+
   if rebalance:
     from scipy.optimize import root_scalar
-    rootfn = lambda et: moment(1, et) - 0.5
-    sol = root_scalar(rootfn, bracket=_findBracket(rootfn, 1 / dt))
+    if useLog:
+      target = log(0.5)
+      rootfn = lambda et: logMoment(1, et) - target
+    else:
+      rootfn = lambda et: moment(1, et) - 0.5
+
+    try:
+      bracket = _findBracket(rootfn, 1 / dt)
+    except AssertionError as e:
+      # sometimes we can't find a bracket because of numerical instability
+      if not useLog:
+        return rerunAsLog()
+      else:
+        raise e
+
+    sol = root_scalar(rootfn, bracket=bracket)
     et = sol.root
     tback = et * tnow
   elif tback:
@@ -196,13 +228,21 @@ def _updateRecallSingle(prior, result, tnow, rebalance=True, tback=None, q0=None
     tback = t
     et = tback / tnow
 
-  mean = moment(1, et)  # could be just a bit away from 0.5 after rebal, so reevaluate
-  secondMoment = moment(2, et)
+  # could be just a bit away from 0.5 after rebal, so reevaluate
+  mean, secondMoment = ((moment(1, et), moment(2, et)) if not useLog else
+                        (exp(logMoment(1, et)), exp(logMoment(2, et))))
 
   var = secondMoment - mean * mean
   newAlpha, newBeta = _meanVarToBeta(mean, var)
+
+  # sometimes instability can be fixed in the log domain
+  if not (newAlpha > 0 and newBeta > 0 and isfinite(newAlpha) and isfinite(newBeta)) and not useLog:
+    return rerunAsLog()
+
   assert newAlpha > 0
   assert newBeta > 0
+  assert isfinite(newAlpha)
+  assert isfinite(newBeta)
   return (newAlpha, newBeta, tback)
 
 

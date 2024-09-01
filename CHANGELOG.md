@@ -1,5 +1,21 @@
 # Changes to Ebisu
 
+## 2.2.0: better numerical stability at high α and β
+
+Fixes https://github.com/fasiha/ebisu/issues/68: in the binary quiz case, weird things happen in `updateRecall`. Either you get very wrong answers or exceptions are thrown. We can fix this by calculating moments in the log domain.
+
+If you're testing old quizzes, this version will differ for models in the affected regions. Compare:
+```py
+import ebisu
+print(ebisu.updateRecall((531,531, 37.98), 0, 1, 24.0))
+
+# old: (36.55688622754491, 36.886227544910184, 38.089740065719965)
+
+# new: # (531.9583078300888, 531.9583078290626, 37.920753773390835)
+```
+
+(We actually already figured this out in the JavaScript version: https://github.com/fasiha/ebisu.js/pull/21 and https://github.com/fasiha/ebisu.js/pull/24.)
+
 ## 2.1.0: soft-binary quizzes and halflife rescaling
 
 ### 1) Soft-binary fuzzy quizzes

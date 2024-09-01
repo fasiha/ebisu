@@ -1,3 +1,4 @@
+from collections import namedtuple
 from scipy.optimize import minimize_scalar  # type:ignore
 from typing import Optional, Tuple
 import ebisu.ebisu2beta as ebisu2
@@ -174,18 +175,45 @@ if __name__ == "__main__":
   plt.ion()
 
   FOCAL_GAMMA = 2
+  GRID_MODE = False
+  SAVE_DETAILS = False  # save card-by-card model-by-model results to text file
+  USE_FSRS_DATASET = not True
+  FSRS_PERCENT = 0.5
+  FSRS_SEED = 123
+  FSRS_LIMIT = 1_000_000
 
-  ankiPath = Path(os.path.dirname(os.path.realpath(__file__))) / 'collection-no-fields.anki2'
-  df = sqliteToDf(str(ankiPath), True)
-  print(f'loaded SQL data, {len(df)} rows')
+  if USE_FSRS_DATASET:
+    import fsrs_anki_20k_reader as fsrs_reader
 
-  train, TEST_TRAIN = traintest(df, noPerfectCardsInTraining=False)
-  print(f'split flashcards into train/test, {len(train)} cards in train set')
+    def gen():
+      Mapped = namedtuple('Mapped', ['results', 'dts_hours'])
 
-  fracs = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.]
-  cards = [next(t for t in train if t.fractionCorrect >= frac) for frac in fracs]
-  # or
-  cards = train
+      cardNum = 0
+      for card in fsrs_reader.allCards(
+          os.path.join(os.getenv('FSRS_PATH', '.'), 'dataset'),
+          train_percent=FSRS_PERCENT,
+          seed=FSRS_SEED):
+        if cardNum >= FSRS_LIMIT:
+          break
+        innerList = [(review.rating, review.delta_t * 24) for review in card if review.delta_t > 0]
+        if len(innerList) < 1:
+          continue
+        results, dts_hours = zip(*innerList)
+        yield Mapped(results=results, dts_hours=dts_hours)
+        cardNum += 1
+
+    cards = gen()
+    numTotalCards = min(FSRS_LIMIT, round(186292444 * FSRS_PERCENT))
+  else:
+    ankiPath = Path(os.path.dirname(os.path.realpath(__file__))) / 'collection-no-fields.anki2'
+    df = sqliteToDf(str(ankiPath), True)
+    print(f'loaded SQL data, {len(df)} rows')
+
+    train, TEST_TRAIN = traintest(df, noPerfectCardsInTraining=False)
+    print(f'split flashcards into train/test, {len(train)} cards in train set')
+
+    numTotalCards = len(train)
+    cards = train
 
   initModels: list[Model | Ebisu2Model] = [
       initModel(1.25, 24, w1=0.35, w2=0.35, scale2=5, hl3=365 * 24 * 10),
@@ -199,10 +227,9 @@ if __name__ == "__main__":
       # initModel(1.25, 100, w1=0.9, w2=0.05),
       ebisu2.defaultModel(24, 1.25),
       # ebisu2.defaultModel(24, 2.5),
-      ebisu2.defaultModel(24 * 7, 1),
+      ebisu2.defaultModel(24 * 7, 1.01),
   ]
 
-  GRID_MODE = False
   # GRID_MODE = True
   if GRID_MODE:
     abVec = list(np.arange(1.25, 2.5, .25))
@@ -213,15 +240,15 @@ if __name__ == "__main__":
 
   allModels = dict()  # key: (card integer, model number, quiz number)
   allLogliks = dict()
-  forAuc: None | list[list[tuple[bool, float]]] = list()
-  for cardNum, card in tqdm(enumerate(cards), total=len(cards)):
+  forAuc: None | list[list[bool | float]] = list()
+  for cardNum, card in tqdm(enumerate(cards), total=numTotalCards):
     models = initModels
 
     for quizNum, (ankiResult, elapsedTime) in enumerate(zip(card.results, card.dts_hours)):
       resultArgs = convertAnkiResultToBinomial(ankiResult, 'binary')
 
       newModels = []
-      resultProbForAuc: None | list[tuple[bool, float]] = list()
+      pRecallsForAuc: None | list[float] = list()
       for modelNum, m in enumerate(models):
         key = (cardNum, modelNum, quizNum)
 
@@ -229,7 +256,8 @@ if __name__ == "__main__":
             updateRecall(m, elapsed=elapsedTime, **resultArgs)
             if type(m[0]) == tuple else ebisu2.updateRecall(m, tnow=elapsedTime, **resultArgs))
         newModels.append(newModel)
-        allModels[key] = newModel
+        if SAVE_DETAILS:
+          allModels[key] = newModel
 
         pRecall = (
             predictRecall(m, elapsedTime) if type(m[0]) == tuple else ebisu2.predictRecall(
@@ -239,31 +267,37 @@ if __name__ == "__main__":
           q1 = max(resultArgs['successes'], 1 - resultArgs['successes'])
           q0 = resultArgs['q0'] if 'q0' in resultArgs else 1 - q1
           loglik = noisyLogProbabilityFocal(z, q1, q0, pRecall, FOCAL_GAMMA)
-          if resultProbForAuc is not None:
-            resultProbForAuc.append((z, pRecall))
+          if pRecallsForAuc is not None:
+            pRecallsForAuc.append(pRecall)
         else:
-          resultProbForAuc = None
+          pRecallsForAuc = None
           loglik = binomialLogProbabilityFocal(resultArgs['successes'], resultArgs['total'],
                                                pRecall, FOCAL_GAMMA)
         allLogliks[key] = loglik
-        if forAuc is not None:
-          if resultProbForAuc is not None:
-            forAuc.append(resultProbForAuc)
-          else:
-            forAuc = None
+      if forAuc is not None:
+        if pRecallsForAuc is not None:
+          forAuc.append([z] + pRecallsForAuc)
+        else:
+          forAuc = None
 
       models = newModels
 
   # SUMMARY
-  summary = np.zeros((len(cards), len(initModels)))
+  print('completed cards analysis')
+  numTotalCards = cardNum + 1
+  summary = np.zeros((numTotalCards, len(initModels)))
   for (cardNum, modelNum, quizNum), ll in allLogliks.items():
     summary[cardNum, modelNum] += ll
+  print('generated summary')
 
   # DETAILS
+  totalFocalLoss = sum(summary, 0)
   if len(initModels) < 10:
     plt.figure()
     plt.plot(np.array(sorted(summary, key=lambda v: v[0])), alpha=0.5)
-    plt.legend([printableModel(m) for m in initModels], fontsize="x-small")
+    plt.legend(
+        [f'{printableModel(m)} (∑l {tot:0.3g})' for m, tot in zip(initModels, totalFocalLoss)],
+        fontsize="x-small")
     plt.ylim((-10, 1))
     plt.yticks(np.arange(-10, 0.1, 1))
     plt.xlabel('flashcard number')
@@ -275,38 +309,54 @@ if __name__ == "__main__":
     # ROC/AUC
     if forAuc:
       roc = np.array(forAuc)
-      vals = roc[:, :, 1]
-      outcomes = roc[:, :, 0]
+      outcomes = roc[:, 0].astype(bool)
+      outcomes = outcomes[:, np.newaxis]
+      vals = roc[:, 1:]
+      roc = []  # save memory
+
+      positivePopulation = sum(outcomes)
+      negativePopulation = len(forAuc) - positivePopulation
 
       aucThresholds = np.linspace(0, 1, 51)
-      truePositives = [np.logical_and(vals > t, outcomes) for t in aucThresholds]
-      falsePositives = [np.logical_and(vals > t, np.logical_not(outcomes)) for t in aucThresholds]
+      # truePositives = [np.logical_and(vals > t, outcomes) for t in aucThresholds]
+      # falsePositives = [np.logical_and(vals > t, np.logical_not(outcomes)) for t in aucThresholds]
 
-      positivePopulation = sum(outcomes[:, 0])
-      negativePopulation = len(forAuc) - positivePopulation
+      truePositives = []
+      falsePositives = []
+      notOutcomes = np.logical_not(outcomes)
+      for t in aucThresholds:
+        left = vals > t
+        truePositives.append(np.logical_and(left, outcomes))
+        falsePositives.append(np.logical_and(left, notOutcomes))
+      notOutcomes = []  # save memory
+      vals = []  # save memory
+      outcomes = []  # save memory
+
       truePositiveRate = np.sum(truePositives, axis=1) / positivePopulation
       falsePositiveRate = np.sum(falsePositives, axis=1) / negativePopulation
+      aucs = np.abs(np.trapz(truePositiveRate, falsePositiveRate, axis=0))
+
+      print('completed AUC')
 
       plt.figure()
       plt.plot(falsePositiveRate, truePositiveRate)
       plt.plot([0, 1], [0, 1], 'r--')
       plt.xlabel('false positive rate')
       plt.ylabel('true positive rate')
-      aucs = np.abs(np.trapz(truePositiveRate, falsePositiveRate, axis=0))
       plt.legend([f'{printableModel(m)} AUC={a:.3f}' for m, a in zip(initModels, aucs)],
                  fontsize="x-small")
       plt.title('AUC/ROC')
       plt.savefig('split-auc.png', dpi=300)
       plt.savefig('split-auc.svg')
 
-    # printDetails(cards, models, allModels, allLogliks, outfile='split-compare.txt')
-
-    with open('split-compare.json', 'w') as fid:
-      json.dump(
-          {
-              str(p): oneModelAllHalflives(allModels, len(cards), p=p, modelNum=0)
-              for p in [0.5, 0.8]
-          }, fid)
+    if SAVE_DETAILS:
+      printDetails(cards, models, allModels, allLogliks, outfile='split-compare.txt')
+      with open('split-compare.json', 'w') as fid:
+        json.dump(
+            {
+                str(p): oneModelAllHalflives(allModels, numTotalCards, p=p, modelNum=0)
+                for p in [0.5, 0.8]
+            }, fid)
 
   if GRID_MODE:
     sums = analyzeModelsGrid(allLogliks, abVec, hlVec)

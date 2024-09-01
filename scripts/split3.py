@@ -175,11 +175,11 @@ if __name__ == "__main__":
   plt.ion()
 
   FOCAL_GAMMA = 2
-  GRID_MODE = True
+  GRID_MODE = False
   GRID_MODE_EBISU2 = True
   SAVE_DETAILS = False  # save card-by-card model-by-model results to text file
-  USE_FSRS_DATASET = not True and not GRID_MODE
-  FSRS_PERCENT = 0.5
+  USE_FSRS_DATASET = True and not GRID_MODE
+  FSRS_PERCENT = 0.05
   FSRS_SEED = 123
   FSRS_LIMIT = 1_000_000
 
@@ -226,7 +226,7 @@ if __name__ == "__main__":
       #
       # initModel(1.25, 100, w1=0.6, w2=0.3),
       # initModel(1.25, 100, w1=0.9, w2=0.05),
-      ebisu2.defaultModel(24, 1.25),
+      # ebisu2.defaultModel(24, 1.25),
       ebisu2.defaultModel(7, 1.5),
       # ebisu2.defaultModel(24, 2.5),
       ebisu2.defaultModel(24 * 7, 1.01),

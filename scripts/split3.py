@@ -180,9 +180,11 @@ if __name__ == "__main__":
   SAVE_DETAILS = False  # save card-by-card model-by-model results to text file
   USE_FSRS_DATASET = True
   FSRS_CARD_PERCENT = 1
-  FSRS_USER_PERCENT = 0.01
+  FSRS_USER_PERCENT = 0.25
   FSRS_SEED = 123
-  FSRS_LIMIT = 1_000_000
+  FSRS_LIMIT = 1000
+
+  aucThresholds = np.linspace(0, 1, 51)
 
   if USE_FSRS_DATASET:
     import fsrs_anki_20k_reader as fsrs_reader
@@ -252,15 +254,24 @@ if __name__ == "__main__":
 
   allModels = dict()  # key: (card integer, model number, quiz number)
   allLogliks = dict()
-  forAuc: None | list[list[bool | float]] = list()
+
+  ignoreAuc = False
+  positivePopulation = 0
+  negativePopulation = 0
+  truePositives = np.zeros((len(aucThresholds), len(initModels)), dtype=int)
+  falsePositives = np.zeros((len(aucThresholds), len(initModels)), dtype=int)
+
+  logLossesPerCard: list[np.ndarray] = []
+
   for cardNum, card in tqdm(enumerate(cards), total=numTotalCards):
     models = initModels
-
+    llsPerCard = np.zeros(len(initModels))
     for quizNum, (ankiResult, elapsedTime) in enumerate(zip(card.results, card.dts_hours)):
       resultArgs = convertAnkiResultToBinomial(ankiResult, 'binary')
 
       newModels = []
-      pRecallsForAuc: None | list[float] = list()
+      pRecalls: list[float] = list()
+      llsPerQuiz: list[float] = list()
       for modelNum, m in enumerate(models):
         key = (cardNum, modelNum, quizNum)
 
@@ -268,8 +279,6 @@ if __name__ == "__main__":
             updateRecall(m, elapsed=elapsedTime, **resultArgs)
             if type(m[0]) == tuple else ebisu2.updateRecall(m, tnow=elapsedTime, **resultArgs))
         newModels.append(newModel)
-        if SAVE_DETAILS:
-          allModels[key] = newModel
 
         pRecall = (
             predictRecall(m, elapsedTime) if type(m[0]) == tuple else ebisu2.predictRecall(
@@ -279,65 +288,44 @@ if __name__ == "__main__":
           q1 = max(resultArgs['successes'], 1 - resultArgs['successes'])
           q0 = resultArgs['q0'] if 'q0' in resultArgs else 1 - q1
           loglik = noisyLogProbabilityFocal(z, q1, q0, pRecall, FOCAL_GAMMA)
-          if pRecallsForAuc is not None:
-            pRecallsForAuc.append(pRecall)
+          if not ignoreAuc:
+            pRecalls.append(pRecall)
         else:
-          pRecallsForAuc = None
+          ignoreAuc = True
           loglik = binomialLogProbabilityFocal(resultArgs['successes'], resultArgs['total'],
                                                pRecall, FOCAL_GAMMA)
-        allLogliks[key] = loglik
-      if forAuc is not None:
-        if pRecallsForAuc is not None:
-          forAuc.append([z] + pRecallsForAuc)
-        else:
-          forAuc = None
+
+        llsPerQuiz.append(loglik)
+        if SAVE_DETAILS:
+          allLogliks[key] = loglik
+          allModels[key] = newModel
+
+      llsPerCard += np.array(llsPerQuiz)
+      if not ignoreAuc:
+        ps = np.array(pRecalls)
+        truePositives += np.logical_and(np.atleast_2d(ps).T > aucThresholds, z).T
+        falsePositives += np.logical_and(np.atleast_2d(ps).T > aucThresholds, not z).T
+        positivePopulation += z
+        negativePopulation += not z
 
       models = newModels
+    logLossesPerCard.append(llsPerCard)
 
   # SUMMARY
   print('completed cards analysis')
-  numTotalCards = cardNum + 1
-  summary = np.zeros((numTotalCards, len(initModels)))
-  for (cardNum, modelNum, quizNum), ll in allLogliks.items():
-    summary[cardNum, modelNum] += ll
-  print('generated summary')
+  numTotalCards = len(logLossesPerCard)  # update in case we got more or fewer
+  logLosses = np.array(logLossesPerCard)
 
-  if forAuc:
-    roc = np.array(forAuc)
-    outcomes = roc[:, 0].astype(bool)
-    outcomes = outcomes[:, np.newaxis]
-    vals = roc[:, 1:]
-    roc = []  # save memory
-
-    positivePopulation = sum(outcomes)
-    negativePopulation = len(forAuc) - positivePopulation
-
-    aucThresholds = np.linspace(0, 1, 51)
-    # truePositives = [np.logical_and(vals > t, outcomes) for t in aucThresholds]
-    # falsePositives = [np.logical_and(vals > t, np.logical_not(outcomes)) for t in aucThresholds]
-
-    truePositives = []
-    falsePositives = []
-    notOutcomes = np.logical_not(outcomes)
-    for t in aucThresholds:
-      left = vals > t
-      truePositives.append(np.logical_and(left, outcomes))
-      falsePositives.append(np.logical_and(left, notOutcomes))
-    notOutcomes = []  # save memory
-    vals = []  # save memory
-    outcomes = []  # save memory
-
-    truePositiveRate = np.sum(truePositives, axis=1) / positivePopulation
-    falsePositiveRate = np.sum(falsePositives, axis=1) / negativePopulation
+  if not ignoreAuc:
+    truePositiveRate = truePositives / positivePopulation
+    falsePositiveRate = falsePositives / negativePopulation
     aucs = np.abs(np.trapz(truePositiveRate, falsePositiveRate, axis=0))
 
-    print('completed AUC')
-
   # DETAILS
-  totalFocalLoss = sum(summary, 0)
+  totalFocalLoss = np.sum(logLosses, axis=0)
   if len(initModels) < 10:
     plt.figure()
-    plt.plot(np.array(sorted(summary, key=lambda v: v[0])), alpha=0.5)
+    plt.plot(np.array(sorted(logLosses, key=lambda v: v[0])), alpha=0.5)
     plt.legend(
         [f'{printableModel(m)} (∑l {tot:0.3g})' for m, tot in zip(initModels, totalFocalLoss)],
         fontsize="x-small")
@@ -350,7 +338,7 @@ if __name__ == "__main__":
     plt.savefig('split-compare.svg')
 
     # ROC/AUC
-    if forAuc:
+    if not ignoreAuc:
       plt.figure()
       plt.plot(falsePositiveRate, truePositiveRate)
       plt.plot([0, 1], [0, 1], 'r--')

@@ -21,17 +21,32 @@ CardData = namedtuple('CardData',
                       ['card_id', 'review_th', 'delta_t', 'rating', 'state', 'duration'])
 
 
-def allCards(directory_path: str, train_percent: float = 1.0, seed=None):
-  assert 0 < train_percent <= 1
+def allCards(directory_path: str, card_percent: float = 1.0, user_percent=1.0, seed=None):
+  assert 0 < card_percent <= 1
+  assert 0 < user_percent <= 1
 
   rng = random.Random(seed)
   # Walk through the directory recursively
   for file in custom_walk(directory_path):
+    include_user = card_percent == 1 or rng.random() <= card_percent
+    if not include_user:
+      continue
+
     with open(file, newline='') as csvfile:
       reader = csv.DictReader(csvfile)
       # Use a defaultdict to collect rows by card_id
       card_groups: DefaultDict[int, list[CardData]] = defaultdict(list)
+
+      current_id = None
+      include_card = True
       for row in reader:
+        if current_id != row['card_id']:
+          current_id = row['card_id']
+          include_card = card_percent == 1 or rng.random() <= card_percent
+
+        if not include_card:
+          continue
+
         # Convert the row into a named tuple or dict
         card = CardData(
             card_id=int(row['card_id']),
@@ -44,8 +59,7 @@ def allCards(directory_path: str, train_percent: float = 1.0, seed=None):
 
       # Yield each group of rows by card_id
       for card_id, cards in card_groups.items():
-        if train_percent == 1 or rng.random() <= train_percent:
-          yield cards
+        yield cards
 
 
 if __name__ == "__main__":

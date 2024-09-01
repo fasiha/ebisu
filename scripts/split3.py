@@ -176,10 +176,11 @@ if __name__ == "__main__":
 
   FOCAL_GAMMA = 2
   GRID_MODE = False
-  GRID_MODE_EBISU2 = True
+  GRID_MODE_EBISU2 = not True
   SAVE_DETAILS = False  # save card-by-card model-by-model results to text file
-  USE_FSRS_DATASET = True and not GRID_MODE
-  FSRS_PERCENT = 0.05
+  USE_FSRS_DATASET = True
+  FSRS_CARD_PERCENT = 1
+  FSRS_USER_PERCENT = 0.01
   FSRS_SEED = 123
   FSRS_LIMIT = 1_000_000
 
@@ -192,19 +193,20 @@ if __name__ == "__main__":
       cardNum = 0
       for card in fsrs_reader.allCards(
           os.path.join(os.getenv('FSRS_PATH', '.'), 'dataset'),
-          train_percent=FSRS_PERCENT,
+          card_percent=FSRS_CARD_PERCENT,
+          user_percent=FSRS_USER_PERCENT,
           seed=FSRS_SEED):
-        if cardNum >= FSRS_LIMIT:
-          break
         innerList = [(review.rating, review.delta_t * 24) for review in card if review.delta_t > 0]
-        if len(innerList) < 1:
+        if len(innerList) < 5:
           continue
         results, dts_hours = zip(*innerList)
         yield Mapped(results=results, dts_hours=dts_hours)
         cardNum += 1
+        if cardNum >= FSRS_LIMIT:
+          break
 
     cards = gen()
-    numTotalCards = min(FSRS_LIMIT, round(186292444 * FSRS_PERCENT))
+    numTotalCards = min(FSRS_LIMIT, round(186292444 * FSRS_CARD_PERCENT))
   else:
     ankiPath = Path(os.path.dirname(os.path.realpath(__file__))) / 'collection-no-fields.anki2'
     df = sqliteToDf(str(ankiPath), True)
@@ -217,12 +219,12 @@ if __name__ == "__main__":
     cards = train
 
   initModels: list[Model | Ebisu2Model] = [
-      initModel(1.25, 24, w1=0.35, w2=0.35, scale2=5, hl3=365 * 24 * 10),
+      initModel(1.25, 9, w1=0.35, w2=0.35, scale2=5, hl3=365 * 24 * 10),
       # initModel(1.25, 24, w1=0.35, w2=0.35, scale2=5),
       # initModel(1.25, 24, w1=0.35, w2=0.35),
       #
       # initModel(1.25, 100, w1=0.35, w2=0.35, scale2=5),
-      initModel(1.25, 100, w1=0.35, w2=0.35),
+      # initModel(1.25, 100, w1=0.35, w2=0.35),
       #
       # initModel(1.25, 100, w1=0.6, w2=0.3),
       # initModel(1.25, 100, w1=0.9, w2=0.05),
@@ -234,9 +236,13 @@ if __name__ == "__main__":
 
   if GRID_MODE:
     if not GRID_MODE_EBISU2:
-      abVec = list(np.arange(1.25, 2.5, .25))
-      hlVec = list(range(10, 200, 20))
-      initModels = [initModel(ab, hl, w1=0.35, w2=0.35) for hl in hlVec for ab in abVec]
+      abVec = list(np.arange(1.05, 2, .2))
+      hlVec = list(range(1, 30, 1))
+      initModels = [
+          initModel(ab, hl, w1=0.35, w2=0.35, scale2=5, hl3=365 * 24 * 10)
+          for hl in hlVec
+          for ab in abVec
+      ]
     else:
       abVec = list(np.arange(1.05, 2.5, .25))
       hlVec = list(range(1, 20, 1))

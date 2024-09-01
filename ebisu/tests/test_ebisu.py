@@ -205,4 +205,4 @@ if __name__ == '__main__':
 
   with open("test.json", "w") as out:
     import json
-    out.write(json.dumps(testpoints))
+    out.write(json.dumps(testpoints, indent=1))

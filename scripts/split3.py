@@ -169,6 +169,7 @@ if __name__ == "__main__":
   from tqdm import tqdm  #type:ignore
   from utils import binomialLogProbabilityFocal, convertAnkiResultToBinomial, noisyLogProbabilityFocal, printableList, sqliteToDf, traintest, clipclim
   import json
+  import time
 
   plt.style.use('ggplot')
   plt.rcParams['svg.fonttype'] = 'none'
@@ -179,10 +180,10 @@ if __name__ == "__main__":
   GRID_MODE_EBISU2 = not True
   SAVE_DETAILS = False  # save card-by-card model-by-model results to text file
   USE_FSRS_DATASET = True
-  FSRS_CARD_PERCENT = 1
+  FSRS_CARD_PERCENT = 1.0
   FSRS_USER_PERCENT = 0.1
-  FSRS_SEED = 123
-  FSRS_LIMIT_CARDS = 10_000_000
+  FSRS_SEED = 124
+  FSRS_LIMIT_CARDS = 50_000_000
 
   aucThresholds = np.linspace(0, 1, 51)
 
@@ -208,7 +209,7 @@ if __name__ == "__main__":
           break
 
     cards = gen()
-    numTotalCards = min(FSRS_LIMIT_CARDS, round(186292444 * FSRS_CARD_PERCENT))
+    numTotalCards = min(FSRS_LIMIT_CARDS, round(186292444 * FSRS_CARD_PERCENT * FSRS_USER_PERCENT))
   else:
     ankiPath = Path(os.path.dirname(os.path.realpath(__file__))) / 'collection-no-fields.anki2'
     df = sqliteToDf(str(ankiPath), True)
@@ -261,7 +262,7 @@ if __name__ == "__main__":
   truePositives = np.zeros((len(aucThresholds), len(initModels)), dtype=int)
   falsePositives = np.zeros((len(aucThresholds), len(initModels)), dtype=int)
 
-  logLossesPerCard: list[np.ndarray] = []
+  logLossesPerCard: list[np.ndarray] = []  # this stops growing after a while (save memory)
   totalFocalLoss = np.zeros(len(initModels))
 
   for cardNum, card in tqdm(enumerate(cards), total=numTotalCards):
@@ -313,7 +314,7 @@ if __name__ == "__main__":
     if len(logLossesPerCard) < 10_000:
       logLossesPerCard.append(llsPerCard)
     totalFocalLoss += llsPerCard
-    if cardNum % 50_001 == 50_000:
+    if cardNum % 50_000 == 49_999:
       print(
           f'\n{cardNum=}, auc',
           np.abs(
@@ -336,6 +337,27 @@ if __name__ == "__main__":
   # DETAILS
   totalFocalLoss = np.sum(logLosses, axis=0)
   if len(initModels) < 10:
+    runName = f'{time.time()}'
+    with open(f'split3-{runName}.json', 'w') as fid:
+      json.dump(
+          dict(
+              FOCAL_GAMMA=FOCAL_GAMMA,
+              GRID_MODE=GRID_MODE,
+              GRID_MODE_EBISU2=GRID_MODE_EBISU2,
+              SAVE_DETAILS=SAVE_DETAILS,
+              USE_FSRS_DATASET=USE_FSRS_DATASET,
+              FSRS_CARD_PERCENT=FSRS_CARD_PERCENT,
+              FSRS_USER_PERCENT=FSRS_USER_PERCENT,
+              FSRS_SEED=FSRS_SEED,
+              FSRS_LIMIT_CARDS=FSRS_LIMIT_CARDS,
+              aucThresholds=aucThresholds.tolist(),
+              initModels=initModels,
+              totalFocalLoss=totalFocalLoss.tolist(),
+              numTotalCards=numTotalCards,
+          ),
+          fid,
+          indent=1)
+
     plt.figure()
     plt.plot(np.array(sorted(logLosses, key=lambda v: v[0])), alpha=0.5)
     plt.legend(
@@ -346,8 +368,8 @@ if __name__ == "__main__":
     plt.xlabel('flashcard number')
     plt.ylabel('∑ focal loss')
     plt.title('Split-3-atom performance for training set')
-    plt.savefig('split-compare.png', dpi=300)
-    plt.savefig('split-compare.svg')
+    plt.savefig(f'split-compare-{runName}.png', dpi=300)
+    plt.savefig(f'split-compare-{runName}.svg')
 
     # ROC/AUC
     if not ignoreAuc:
@@ -359,8 +381,8 @@ if __name__ == "__main__":
       plt.legend([f'{printableModel(m)} AUC={a:.3f}' for m, a in zip(initModels, aucs)],
                  fontsize="x-small")
       plt.title('AUC/ROC')
-      plt.savefig('split-auc.png', dpi=300)
-      plt.savefig('split-auc.svg')
+      plt.savefig(f'split-auc-{runName}.png', dpi=300)
+      plt.savefig(f'split-auc-{runName}.svg')
 
     if SAVE_DETAILS:
       printDetails(cards, models, allModels, allLogliks, outfile='split-compare.txt')

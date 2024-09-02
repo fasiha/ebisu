@@ -28,7 +28,7 @@ def allCards(directory_path: str, card_percent: float = 1.0, user_percent=1.0, s
   rng = random.Random(seed)
   # Walk through the directory recursively
   for file in custom_walk(directory_path):
-    include_user = card_percent == 1 or rng.random() <= card_percent
+    include_user = user_percent == 1 or rng.random() <= user_percent
     if not include_user:
       continue
 

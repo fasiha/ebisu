@@ -180,8 +180,8 @@ if __name__ == "__main__":
   GRID_MODE_EBISU2 = not True
   SAVE_DETAILS = False  # save card-by-card model-by-model results to text file
   USE_FSRS_DATASET = True
-  FSRS_CARD_PERCENT = 1.0
-  FSRS_USER_PERCENT = 0.1
+  FSRS_CARD_PERCENT = 0.1
+  FSRS_USER_PERCENT = 1
   FSRS_SEED = 124
   FSRS_LIMIT_CARDS = 50_000_000
 
@@ -341,6 +341,7 @@ if __name__ == "__main__":
     with open(f'split3-{runName}.json', 'w') as fid:
       json.dump(
           dict(
+              numTotalCards=numTotalCards,
               FOCAL_GAMMA=FOCAL_GAMMA,
               GRID_MODE=GRID_MODE,
               GRID_MODE_EBISU2=GRID_MODE_EBISU2,
@@ -353,8 +354,9 @@ if __name__ == "__main__":
               aucThresholds=aucThresholds.tolist(),
               initModels=initModels,
               totalFocalLoss=totalFocalLoss.tolist(),
-              numTotalCards=numTotalCards,
-          ),
+              truePositiveRate=truePositiveRate.tolist(),
+              falsePositiveRate=falsePositiveRate.tolist(),
+              aucs=aucs.tolist()),
           fid,
           indent=1)
 

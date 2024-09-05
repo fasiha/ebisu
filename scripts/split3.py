@@ -5,6 +5,7 @@ import ebisu2
 import betapowerlaw
 
 HOURS_PER_YEAR = 365 * 24
+HOURS_PER_SECOND = 1 / 3600
 SubModel = Tuple[float, float, float, float]
 Model = Tuple[SubModel, SubModel, SubModel]
 Ebisu2Model = Tuple[float, float, float]
@@ -75,11 +76,23 @@ def modelToPercentileDecay(model: Model, percentile=0.5) -> float:
   return res.x
 
 
-def printDetails(cards, initModels, modelsDb, logLikDb, outfile=None):
+def modelToPercentileDecaySafe(m, *args, **kwargs):
+  if type(m[0]) == tuple:
+    return modelToPercentileDecay(m, *args, **kwargs)
+  return ebisu2.modelToPercentileDecay(m, *args, **kwargs)
+
+
+def predictRecallSafe(m, *args, **kwargs):
+  if type(m[0]) == tuple:
+    return predictRecall(m, *args, **kwargs)
+  return ebisu2.predictRecall(m, *args, **kwargs, exact=True)
+
+
+def printDetails(cards, initModels, modelsDb, logLikDb, outfile="out.txt"):
   # key: (card integer, model number, quiz number)
   if outfile:
     print(f'Writing details to {outfile}')
-  with open(outfile, 'w') if outfile else None as outfile:
+  with open(outfile, 'w') as outfile:
     for cardNum, card in tqdm(enumerate(cards), total=len(cards)):
       sumLls = [
           sum([ll
@@ -97,8 +110,8 @@ def printDetails(cards, initModels, modelsDb, logLikDb, outfile=None):
         lls.append([logLikDb[(cardNum, modelNum, quizNum)] for modelNum in range(len(initModels))])
         hls.append([
             printableList([
-                modelToPercentileDecay(modelsDb[(cardNum, modelNum, quizNum)]),
-                modelToPercentileDecay(modelsDb[(cardNum, modelNum, quizNum)], .8),
+                modelToPercentileDecaySafe(modelsDb[(cardNum, modelNum, quizNum)]),
+                modelToPercentileDecaySafe(modelsDb[(cardNum, modelNum, quizNum)], .8),
             ],
                           sep='/') for modelNum in range(len(initModels))
         ])
@@ -106,7 +119,7 @@ def printDetails(cards, initModels, modelsDb, logLikDb, outfile=None):
         oldModels = initModels if quizNum == 0 else [
             modelsDb[(cardNum, modelNum, quizNum - 1)] for modelNum in range(len(initModels))
         ]
-        ps.append([predictRecall(m, t) for m in oldModels])
+        ps.append([predictRecallSafe(m, t) for m in oldModels])
 
       cumsumLls = np.cumsum(lls, axis=0)
       for indiv, cumulative, res, t, hl, p in zip(lls, cumsumLls, card.results, card.dts_hours, hls,
@@ -180,10 +193,23 @@ if __name__ == "__main__":
   GRID_MODE_EBISU2 = not True
   SAVE_DETAILS = False  # save card-by-card model-by-model results to text file
   USE_FSRS_DATASET = True
-  FSRS_CARD_PERCENT = 0.1
-  FSRS_USER_PERCENT = 1
-  FSRS_SEED = 124
-  FSRS_LIMIT_CARDS = 50_000_000
+  FSRS_MIN_CARDS = 2  # this many or more total reviews (including the first learn review)
+  # FSRS_MIN_DELTA_T_SEC = 0  # this many seconds or more
+  FSRS_CARD_PERCENT = 1
+  FSRS_USER_PERCENT = .1
+  FSRS_SEED = 102
+  FSRS_LIMIT_CARDS = 10_000_000
+
+  totalFsrsQuizzes = 186292444
+  # `fsrsQuizCumulativeCounts[i]` is the number of cards with number of quizzes `<=i`
+  fsrsQuizCumulativeCounts = [
+      0, 16826431, 38800236, 60230753, 80187017, 98452344, 114624854, 128063183, 138994472,
+      147540415, 153679407
+  ]
+  maxPossibleFsrsCards = (
+      totalFsrsQuizzes -
+      (fsrsQuizCumulativeCounts[FSRS_MIN_CARDS -
+                                1] if FSRS_MIN_CARDS < len(fsrsQuizCumulativeCounts) else 0))
 
   aucThresholds = np.linspace(0, 1, 51)
 
@@ -191,25 +217,27 @@ if __name__ == "__main__":
     import fsrs_anki_20k_reader as fsrs_reader
 
     def gen():
-      Mapped = namedtuple('Mapped', ['results', 'dts_hours'])
+      Mapped = namedtuple('Mapped', ['results', 'dts_hours', 'key'])
 
       cardNum = 0
       for card in fsrs_reader.allCards(
           os.path.join(os.getenv('FSRS_PATH', '.'), 'dataset'),
-          card_percent=FSRS_CARD_PERCENT,
-          user_percent=FSRS_USER_PERCENT,
+          min_reviews=FSRS_MIN_CARDS,
+          # min_delta_t_sec=FSRS_MIN_DELTA_T_SEC,
+          card_fraction=FSRS_CARD_PERCENT,
+          user_fraction=FSRS_USER_PERCENT,
           seed=FSRS_SEED):
-        innerList = [(review.rating, review.delta_t * 24) for review in card if review.delta_t > 0]
-        if len(innerList) < 5:
-          continue
-        results, dts_hours = zip(*innerList)
-        yield Mapped(results=results, dts_hours=dts_hours)
+        innerList = [(review.rating, max(1, review.delta_t_sec) * HOURS_PER_SECOND,
+                      f'{review.file}:{review.card_id}') for review in card]
+        results, dts_hours, card_id = zip(*innerList)
+        yield Mapped(results=results, dts_hours=dts_hours, key=card_id)
         cardNum += 1
         if cardNum >= FSRS_LIMIT_CARDS:
           break
 
     cards = gen()
-    numTotalCards = min(FSRS_LIMIT_CARDS, round(186292444 * FSRS_CARD_PERCENT * FSRS_USER_PERCENT))
+    numTotalCards = min(FSRS_LIMIT_CARDS,
+                        round(maxPossibleFsrsCards * min(FSRS_CARD_PERCENT, FSRS_USER_PERCENT)))
   else:
     ankiPath = Path(os.path.dirname(os.path.realpath(__file__))) / 'collection-no-fields.anki2'
     df = sqliteToDf(str(ankiPath), True)
@@ -255,6 +283,7 @@ if __name__ == "__main__":
 
   allModels = dict()  # key: (card integer, model number, quiz number)
   allLogliks = dict()
+  allCards = []
 
   ignoreAuc = False
   positivePopulation = 0
@@ -277,9 +306,13 @@ if __name__ == "__main__":
       for modelNum, m in enumerate(models):
         key = (cardNum, modelNum, quizNum)
 
-        newModel = (
-            updateRecall(m, elapsed=elapsedTime, **resultArgs)
-            if type(m[0]) == tuple else ebisu2.updateRecall(m, tnow=elapsedTime, **resultArgs))
+        try:
+          newModel = (
+              updateRecall(m, elapsed=elapsedTime, **resultArgs)
+              if type(m[0]) == tuple else ebisu2.updateRecall(m, tnow=elapsedTime, **resultArgs))
+        except Exception as e:
+          print(f'ERROR {m=}, {elapsedTime=}, {resultArgs=}, {card=}')
+          raise e
         newModels.append(newModel)
 
         pRecall = (
@@ -314,9 +347,13 @@ if __name__ == "__main__":
     if len(logLossesPerCard) < 10_000:
       logLossesPerCard.append(llsPerCard)
     totalFocalLoss += llsPerCard
+
+    if SAVE_DETAILS:
+      allCards.append(card)
+
     if cardNum % 50_000 == 49_999:
       print(
-          f'\n{cardNum=}, auc',
+          f'\n{cardNum+1=}, auc',
           np.abs(
               np.trapz(
                   truePositives / positivePopulation,
@@ -347,16 +384,19 @@ if __name__ == "__main__":
               GRID_MODE_EBISU2=GRID_MODE_EBISU2,
               SAVE_DETAILS=SAVE_DETAILS,
               USE_FSRS_DATASET=USE_FSRS_DATASET,
+              FSRS_MIN_CARDS=FSRS_MIN_CARDS,
+              # FSRS_MIN_DELTA_T_SEC=FSRS_MIN_DELTA_T_SEC,
               FSRS_CARD_PERCENT=FSRS_CARD_PERCENT,
               FSRS_USER_PERCENT=FSRS_USER_PERCENT,
               FSRS_SEED=FSRS_SEED,
               FSRS_LIMIT_CARDS=FSRS_LIMIT_CARDS,
               aucThresholds=aucThresholds.tolist(),
               initModels=initModels,
+              aucs=aucs.tolist(),
               totalFocalLoss=totalFocalLoss.tolist(),
               truePositiveRate=truePositiveRate.tolist(),
               falsePositiveRate=falsePositiveRate.tolist(),
-              aucs=aucs.tolist()),
+          ),
           fid,
           indent=1)
 
@@ -387,7 +427,7 @@ if __name__ == "__main__":
       plt.savefig(f'split-auc-{runName}.svg')
 
     if SAVE_DETAILS:
-      printDetails(cards, models, allModels, allLogliks, outfile='split-compare.txt')
+      printDetails(allCards, models, allModels, allLogliks, outfile='split-compare.txt')
       with open('split-compare.json', 'w') as fid:
         json.dump(
             {

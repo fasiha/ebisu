@@ -192,7 +192,7 @@ if __name__ == "__main__":
   GRID_MODE = False
   GRID_MODE_EBISU2 = not True
   SAVE_DETAILS = False  # save card-by-card model-by-model results to text file
-  USE_FSRS_DATASET = True
+  USE_FSRS_DATASET = False
   FSRS_MIN_CARDS = 2  # this many or more total reviews (including the first learn review)
   # FSRS_MIN_DELTA_T_SEC = 0  # this many seconds or more
   FSRS_CARD_PERCENT = 1
@@ -268,7 +268,7 @@ if __name__ == "__main__":
   if GRID_MODE:
     if not GRID_MODE_EBISU2:
       abVec = list(np.arange(1.05, 2, .2))
-      hlVec = list(range(1, 30, 1))
+      hlVec = list(np.arange(1, 30, 2.5))
       initModels = [
           initModel(ab, hl, w1=0.35, w2=0.35, scale2=5, hl3=365 * 24 * 10)
           for hl in hlVec
@@ -370,6 +370,10 @@ if __name__ == "__main__":
     truePositiveRate = truePositives / positivePopulation
     falsePositiveRate = falsePositives / negativePopulation
     aucs = np.abs(np.trapz(truePositiveRate, falsePositiveRate, axis=0))
+    p20s = [
+        np.interp(0.2, falsePositiveRate[:, i][::-1], truePositiveRate[:, i][::-1])
+        for i in range(falsePositiveRate.shape[1])
+    ]
 
   # DETAILS
   totalFocalLoss = np.sum(logLosses, axis=0)
@@ -436,7 +440,6 @@ if __name__ == "__main__":
             }, fid)
 
   if GRID_MODE:
-    sums = analyzeModelsGrid(allLogliks, abVec, hlVec)
 
     def extents(f):
       delta = f[1] - f[0]
@@ -444,7 +447,7 @@ if __name__ == "__main__":
 
     plt.figure()
     plt.imshow(
-        sums,
+        totalFocalLoss.reshape((len(hlVec), len(abVec))),
         aspect='auto',
         interpolation='none',
         extent=extents(abVec) + extents(hlVec),
@@ -471,3 +474,16 @@ if __name__ == "__main__":
     plt.grid(False)
     plt.savefig(f'auc-split.png', dpi=300)
     plt.savefig(f'auc-split.svg')
+
+    plt.figure()
+    plt.imshow(
+        np.array(p20s).reshape((len(hlVec), len(abVec))),
+        aspect='auto',
+        interpolation='none',
+        extent=extents(abVec) + extents(hlVec),
+        origin='lower')
+    plt.colorbar()
+    plt.xlabel('initial α=β')
+    plt.ylabel('initial halflife')
+    plt.title('TPR @ FPR=0.2')
+    plt.grid(False)

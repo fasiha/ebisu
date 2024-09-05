@@ -191,7 +191,8 @@ if __name__ == "__main__":
   FOCAL_GAMMA = 2
   GRID_MODE = False
   GRID_MODE_EBISU2 = not True
-  SAVE_DETAILS = False  # save card-by-card model-by-model results to text file
+  SAVE_RESULTS = False  # save card-by-card model-by-model results to text file
+  PER_QUIZ_DETAILS = True or SAVE_RESULTS  # this will grow memory
   USE_FSRS_DATASET = False
   FSRS_MIN_CARDS = 2  # this many or more total reviews (including the first learn review)
   # FSRS_MIN_DELTA_T_SEC = 0  # this many seconds or more
@@ -250,6 +251,10 @@ if __name__ == "__main__":
     cards = train
 
   initModels: list[Model | Ebisu2Model] = [
+      initModel(2.25, 10, w1=0.1, w2=0.4, scale2=2, hl3=365 * 24 * 10),
+      initModel(2.25, 20, w1=0.1, w2=0.4, scale2=2, hl3=365 * 24 * 10),
+      initModel(2.25, 40, w1=0.1, w2=0.4, scale2=2, hl3=365 * 24 * 10),
+      #
       initModel(1.25, 9, w1=0.35, w2=0.35, scale2=5, hl3=365 * 24 * 10),
       # initModel(1.25, 24, w1=0.35, w2=0.35, scale2=5),
       # initModel(1.25, 24, w1=0.35, w2=0.35),
@@ -283,6 +288,7 @@ if __name__ == "__main__":
 
   allModels = dict()  # key: (card integer, model number, quiz number)
   allLogliks = dict()
+  allPrecalls = dict()
   allCards = []
 
   ignoreAuc = False
@@ -331,7 +337,8 @@ if __name__ == "__main__":
                                                pRecall, FOCAL_GAMMA)
 
         llsPerQuiz.append(loglik)
-        if SAVE_DETAILS:
+        if PER_QUIZ_DETAILS:
+          allPrecalls[key] = pRecall
           allLogliks[key] = loglik
           allModels[key] = newModel
 
@@ -348,7 +355,7 @@ if __name__ == "__main__":
       logLossesPerCard.append(llsPerCard)
     totalFocalLoss += llsPerCard
 
-    if SAVE_DETAILS:
+    if PER_QUIZ_DETAILS:
       allCards.append(card)
 
     if cardNum % 50_000 == 49_999:
@@ -386,7 +393,8 @@ if __name__ == "__main__":
               FOCAL_GAMMA=FOCAL_GAMMA,
               GRID_MODE=GRID_MODE,
               GRID_MODE_EBISU2=GRID_MODE_EBISU2,
-              SAVE_DETAILS=SAVE_DETAILS,
+              PER_QUIZ_DETAILS=PER_QUIZ_DETAILS,
+              SAVE_RESULTS=SAVE_RESULTS,
               USE_FSRS_DATASET=USE_FSRS_DATASET,
               FSRS_MIN_CARDS=FSRS_MIN_CARDS,
               # FSRS_MIN_DELTA_T_SEC=FSRS_MIN_DELTA_T_SEC,
@@ -430,14 +438,34 @@ if __name__ == "__main__":
       plt.savefig(f'split-auc-{runName}.png', dpi=300)
       plt.savefig(f'split-auc-{runName}.svg')
 
-    if SAVE_DETAILS:
-      printDetails(allCards, models, allModels, allLogliks, outfile='split-compare.txt')
-      with open('split-compare.json', 'w') as fid:
-        json.dump(
-            {
-                str(p): oneModelAllHalflives(allModels, numTotalCards, p=p, modelNum=0)
-                for p in [0.5, 0.8]
-            }, fid)
+    if PER_QUIZ_DETAILS:
+      if SAVE_RESULTS:
+        printDetails(allCards, models, allModels, allLogliks, outfile='split-compare.txt')
+        with open('split-compare.json', 'w') as fid:
+          json.dump(
+              {
+                  str(p): oneModelAllHalflives(allModels, numTotalCards, p=p, modelNum=0)
+                  for p in [0.5, 0.8]
+              }, fid)
+
+      modelToPrecallRes: list[list[tuple[float, bool]]] = [[] for _ in initModels]
+      for (cardNum, modelNum, quizNum), p in allPrecalls.items():
+        modelToPrecallRes[modelNum].append((p, cards[cardNum].results[quizNum] > 1))
+      modelToCenters = []
+      modelToGalef = []
+      for l in modelToPrecallRes:
+        pX = np.array(l)
+        pcounts, pbins = np.histogram(pX[:, 0])
+        pcenters = np.diff(pbins) / 2 + pbins[:-1]
+        pToBin = np.argmin(np.abs(pcenters - pX[:, 0][:, np.newaxis]), axis=1)
+        pres = np.zeros_like(pcenters, dtype=int)
+        for bin, res in zip(pToBin, pX[:, 1]):
+          pres[bin] += res
+
+        modelToCenters.append(pcenters)
+        modelToGalef.append(pres / pcounts)
+      plt.figure()
+      plt.plot(np.array(modelToCenters).T, np.array(modelToGalef).T)
 
   if GRID_MODE:
 

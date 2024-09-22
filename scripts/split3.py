@@ -192,14 +192,14 @@ if __name__ == "__main__":
   GRID_MODE = False
   GRID_MODE_EBISU2 = not True
   SAVE_RESULTS = False  # save card-by-card model-by-model results to text file
-  PER_QUIZ_DETAILS = True or SAVE_RESULTS  # this will grow memory
-  USE_FSRS_DATASET = False
+  PER_QUIZ_DETAILS = SAVE_RESULTS  # this will grow memory
+  USE_FSRS_DATASET = True
   FSRS_MIN_CARDS = 2  # this many or more total reviews (including the first learn review)
-  # FSRS_MIN_DELTA_T_SEC = 0  # this many seconds or more
   FSRS_CARD_PERCENT = 1
   FSRS_USER_PERCENT = .1
   FSRS_SEED = 102
-  FSRS_LIMIT_CARDS = 10_000_000
+  FSRS_LIMIT_CARDS = 1_000_000
+  FSRS_MERGE_TRAILING_SUCCESSES = not True
 
   totalFsrsQuizzes = 186292444
   # `fsrsQuizCumulativeCounts[i]` is the number of cards with number of quizzes `<=i`
@@ -224,10 +224,11 @@ if __name__ == "__main__":
       for card in fsrs_reader.allCards(
           os.path.join(os.getenv('FSRS_PATH', '.'), 'dataset'),
           min_reviews=FSRS_MIN_CARDS,
-          # min_delta_t_sec=FSRS_MIN_DELTA_T_SEC,
           card_fraction=FSRS_CARD_PERCENT,
           user_fraction=FSRS_USER_PERCENT,
-          seed=FSRS_SEED):
+          seed=FSRS_SEED,
+          merge_trailing_successes=FSRS_MERGE_TRAILING_SUCCESSES,
+      ):
         innerList = [(review.rating, max(1, review.delta_t_sec) * HOURS_PER_SECOND,
                       f'{review.file}:{review.card_id}') for review in card]
         results, dts_hours, card_id = zip(*innerList)
@@ -251,10 +252,6 @@ if __name__ == "__main__":
     cards = train
 
   initModels: list[Model | Ebisu2Model] = [
-      initModel(2.25, 10, w1=0.1, w2=0.4, scale2=2, hl3=365 * 24 * 10),
-      initModel(2.25, 20, w1=0.1, w2=0.4, scale2=2, hl3=365 * 24 * 10),
-      initModel(2.25, 40, w1=0.1, w2=0.4, scale2=2, hl3=365 * 24 * 10),
-      #
       initModel(1.25, 9, w1=0.35, w2=0.35, scale2=5, hl3=365 * 24 * 10),
       # initModel(1.25, 24, w1=0.35, w2=0.35, scale2=5),
       # initModel(1.25, 24, w1=0.35, w2=0.35),
@@ -267,6 +264,7 @@ if __name__ == "__main__":
       # ebisu2.defaultModel(24, 1.25),
       ebisu2.defaultModel(7, 1.5),
       # ebisu2.defaultModel(24, 2.5),
+      ebisu2.defaultModel(448 * 7, 0.2),
       ebisu2.defaultModel(24 * 7, 1.01),
   ]
 
@@ -397,11 +395,11 @@ if __name__ == "__main__":
               SAVE_RESULTS=SAVE_RESULTS,
               USE_FSRS_DATASET=USE_FSRS_DATASET,
               FSRS_MIN_CARDS=FSRS_MIN_CARDS,
-              # FSRS_MIN_DELTA_T_SEC=FSRS_MIN_DELTA_T_SEC,
               FSRS_CARD_PERCENT=FSRS_CARD_PERCENT,
               FSRS_USER_PERCENT=FSRS_USER_PERCENT,
               FSRS_SEED=FSRS_SEED,
               FSRS_LIMIT_CARDS=FSRS_LIMIT_CARDS,
+              FSRS_MERGE_TRAILING_SUCCESSES=FSRS_MERGE_TRAILING_SUCCESSES,
               aucThresholds=aucThresholds.tolist(),
               initModels=initModels,
               aucs=aucs.tolist(),
@@ -432,7 +430,10 @@ if __name__ == "__main__":
       plt.plot([0, 1], [0, 1], 'r--')
       plt.xlabel('false positive rate')
       plt.ylabel('true positive rate')
-      plt.legend([f'{printableModel(m)} AUC={a:.3f}' for m, a in zip(initModels, aucs)],
+      plt.legend([
+          f'{printableModel(m)} AUC={a:.3f} (∑l {l:0.3g})'
+          for m, a, l in zip(initModels, aucs, totalFocalLoss)
+      ],
                  fontsize="x-small")
       plt.title('AUC/ROC')
       plt.savefig(f'split-auc-{runName}.png', dpi=300)

@@ -51,7 +51,8 @@ def allCards(
     min_reviews=1,
     card_fraction: float = 1.0,
     user_fraction=1.0,
-    seed=None):
+    seed=None,
+    merge_trailing_successes=True):
   """Generator yielding a list of cards
 
   `directory_path` is the path to your clone of `FSRS-Anki-20k/` (just needs the
@@ -84,7 +85,7 @@ def allCards(
 
     card_groups = loadFile(file)
     for card_id, cards in card_groups.items():
-      combined = combine(cards)[1:]
+      combined = combine(cards, merge_trailing_successes=merge_trailing_successes)[1:]
       include_card = (
           len(combined) >= min_reviews and (card_fraction == 1 or rng.random() <= card_fraction))
       if not include_card:
@@ -125,7 +126,9 @@ def find_last(pred: Callable[[T], bool], l: list[T]) -> int:
   return -1
 
 
-def combine(quizzes: list[CardData], window_in_seconds=4 * 3600) -> list[CardData]:
+def combine(quizzes: list[CardData],
+            window_in_seconds=4 * 3600,
+            merge_trailing_successes=True) -> list[CardData]:
   assert quizzes[0].delta_t_sec == -1
 
   absolute_seconds: list[float] = []
@@ -152,8 +155,9 @@ def combine(quizzes: list[CardData], window_in_seconds=4 * 3600) -> list[CardDat
       failure_qt = group[first_fail_idx]
       # append first fail
       quizTimes.append(failure_qt)
-      # append all passes after last fail (which might or might not be first fail)
-      quizTimes.extend(group[(last_fail_idx + 1):])
+      if merge_trailing_successes:
+        # append all passes after last fail (which might or might not be first fail)
+        quizTimes.extend(group[(last_fail_idx + 1):])
     else:
       quizTimes.extend(group)
 

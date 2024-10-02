@@ -189,6 +189,7 @@ if __name__ == "__main__":
   plt.ion()
 
   FOCAL_GAMMA = 2
+  FOCAL_ALPHA = 0.5  # proportion we expect to be success
   GRID_MODE = False
   GRID_MODE_EBISU2 = not True
   SAVE_RESULTS = False  # save card-by-card model-by-model results to text file
@@ -270,6 +271,7 @@ if __name__ == "__main__":
 
   if GRID_MODE:
     if not GRID_MODE_EBISU2:
+      # Ebisu 3
       abVec = list(np.arange(1.05, 2, .2))
       hlVec = list(np.arange(1, 30, 2.5))
       initModels = [
@@ -278,8 +280,9 @@ if __name__ == "__main__":
           for ab in abVec
       ]
     else:
-      abVec = list(np.arange(1.05, 2.5, .25))
-      hlVec = list(range(1, 20, 1))
+      # Ebisu 2
+      abVec = list(np.arange(0.1, 2.5, .5))
+      hlVec = list(range(1, 500, 100))
       initModels = [ebisu2.defaultModel(hl, ab) for hl in hlVec for ab in abVec]
   else:
     abVec, hlVec, GRID_MODE = [], [], False
@@ -326,13 +329,18 @@ if __name__ == "__main__":
           z = resultArgs['successes'] >= 0.5
           q1 = max(resultArgs['successes'], 1 - resultArgs['successes'])
           q0 = resultArgs['q0'] if 'q0' in resultArgs else 1 - q1
-          loglik = noisyLogProbabilityFocal(z, q1, q0, pRecall, FOCAL_GAMMA)
+          loglik = noisyLogProbabilityFocal(
+              z, q1, q0, pRecall, gamma=FOCAL_GAMMA, alpha=FOCAL_ALPHA)
           if not ignoreAuc:
             pRecalls.append(pRecall)
         else:
           ignoreAuc = True
-          loglik = binomialLogProbabilityFocal(resultArgs['successes'], resultArgs['total'],
-                                               pRecall, FOCAL_GAMMA)
+          loglik = binomialLogProbabilityFocal(
+              resultArgs['successes'],
+              resultArgs['total'],
+              pRecall,
+              gamma=FOCAL_GAMMA,
+              alpha=FOCAL_ALPHA)
 
         llsPerQuiz.append(loglik)
         if PER_QUIZ_DETAILS:
@@ -389,6 +397,7 @@ if __name__ == "__main__":
           dict(
               numTotalCards=numTotalCards,
               FOCAL_GAMMA=FOCAL_GAMMA,
+              FOCAL_ALPHA=FOCAL_ALPHA,
               GRID_MODE=GRID_MODE,
               GRID_MODE_EBISU2=GRID_MODE_EBISU2,
               PER_QUIZ_DETAILS=PER_QUIZ_DETAILS,
@@ -483,8 +492,8 @@ if __name__ == "__main__":
         origin='lower')
     plt.colorbar()
     plt.xlabel('initial α=β')
-    plt.ylabel('initial halflife')
-    plt.title('Focal loss, Split\nall cards in training set (higher is better)')
+    plt.ylabel('initial halflife (hours)')
+    plt.title('Focal loss\nall cards in training set (higher is better)')
     plt.grid(False)
     plt.savefig(f'focal-split.png', dpi=300)
     plt.savefig(f'focal-split.svg')
@@ -498,7 +507,7 @@ if __name__ == "__main__":
         origin='lower')
     plt.colorbar()
     plt.xlabel('initial α=β')
-    plt.ylabel('initial halflife')
+    plt.ylabel('initial halflife (hours)')
     plt.title('AUC')
     plt.grid(False)
     plt.savefig(f'auc-split.png', dpi=300)
@@ -513,6 +522,6 @@ if __name__ == "__main__":
         origin='lower')
     plt.colorbar()
     plt.xlabel('initial α=β')
-    plt.ylabel('initial halflife')
+    plt.ylabel('initial halflife (hours)')
     plt.title('TPR @ FPR=0.2')
     plt.grid(False)

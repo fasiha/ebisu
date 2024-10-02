@@ -270,43 +270,65 @@ def binomln(n: float, k: float):
   return -betaln(1 + n - k, 1 + k) - log(n + 1)
 
 
-def bernoulliLogProbabilityFocal(result: bool, p: float, gamma: float = 2) -> float:
+def bernoulliLogProbabilityFocal(result: bool, p: float, gamma: float = 2, alpha=0.5) -> float:
   assert 0 <= p <= 1
   assert 0 <= gamma
+  assert 0 < alpha < 1
   focalP = p**((1 - p)**gamma)
   focalQ = (1 - p)**(p**gamma)
-  return log(focalP if result else focalQ)
+  return log(alpha * focalP if result else (1 - alpha) * focalQ)
 
 
-def binomialLogProbabilityFocal(k: int, n: int, p: float, gamma: float = 2) -> float:
+def binomialLogProbabilityFocal(k: int, n: int, p: float, gamma: float = 2, alpha=0.5) -> float:
   assert 0 <= k <= n
   assert 0 <= p <= 1
   assert 0 <= gamma
+  assert 0 < alpha < 1
   focalP = p**((1 - p)**gamma)
   focalQ = (1 - p)**(p**gamma)
-  return binomln(n, k) + k * log(focalP) + (n - k) * log(focalQ)
+  return binomln(n, k) + k * log(alpha * focalP) + (n - k) * log((1 - alpha) * focalQ)
 
 
-def noisyLogProbabilityFocal(result: float,
-                             q1: float,
-                             q0: float,
-                             p: float,
-                             gamma: float = 2) -> float:
+def noisyLogProbabilityFocal(
+    result: float,
+    q1: float,
+    q0: float,
+    p: float,
+    gamma: float = 2,
+    alpha=0.5,
+) -> float:
   assert 0 <= result <= 1
   assert 0 <= q1 <= 1
   assert 0 <= q0 <= 1
   assert 0 <= p <= 1
   assert 0 <= gamma
+  assert 0 < alpha < 1
   z = result >= 0.5
   if z:
     focalP = p**((1 - p)**gamma)
-    return log(q1 * focalP + q0 * (1 - focalP))
+    return log(alpha * q1 * focalP + (1 - alpha) * q0 * (1 - focalP))
 
   focalQ = (1 - p)**(p**gamma)
-  return log((1 - q1) * (1 - focalQ) + (1 - q0) * focalQ)
+  return log((1 - q1) * (1 - focalQ) * (alpha) + (1 - alpha) * (1 - q0) * focalQ)
 
 
 def clipclim(z: float, ax=None):
   im = (ax or plt.gca()).get_images()[0]
   c = im.get_clim()
   im.set_clim([max(c) - z, max(c)])
+
+
+if __name__ == "__main__":
+  q1 = 1.0
+  q0 = 0.0
+  p = 0.3
+  alpha = 0.2
+  result = 0.0
+
+  from numpy import isclose
+  for result in [0.0, 1.0]:
+    x = noisyLogProbabilityFocal(result=result, q1=q1, q0=q0, p=p, alpha=alpha)
+    y = bernoulliLogProbabilityFocal(result > 0.5, p, alpha=alpha)
+    z = binomialLogProbabilityFocal(int(result > 0.5), 1, p, alpha=alpha)
+    print(x, y, z)
+    assert all(isclose(a, x) for a in [x, y, z])
